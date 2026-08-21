@@ -511,6 +511,55 @@
             renderVoices(filtered);
         }
 
+        function renderVoices(voices) {
+            const listEl = document.getElementById("voiceList");
+            listEl.innerHTML = "";
+            if (!voices || voices.length === 0) {
+                listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Không tìm thấy giọng đọc</div>';
+                return;
+            }
+            voices.forEach(v => {
+                const item = document.createElement("div");
+                item.className = `voice-item ${v.voice_type === selectedVoice ? 'active' : ''}`;
+                item.onclick = (e) => { if (e.target.closest('.btn-preview')) return; selectVoice(v.voice_type, v.resource_id, item); };
+                const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
+                item.innerHTML = `
+                    <div class="voice-header">
+                        <div class="voice-name">${v.display_name || v.voice_type}</div>
+                        <button class="btn-preview" onclick="previewVoice('${v.voice_type}','${v.lan||'vi'}',this,event)">
+                            <i class="fa-solid fa-volume-high"></i> Nghe thử
+                        </button>
+                    </div>
+                    <div class="voice-tag">${langBadge} ${v.voice_type}</div>`;
+                listEl.appendChild(item);
+            });
+        }
+
+        function selectVoice(voiceType, resourceId, element) {
+            selectedVoice = voiceType; selectedResourceId = resourceId;
+            document.querySelectorAll(".voice-item").forEach(el => el.classList.remove("active"));
+            element.classList.add("active");
+        }
+
+        async function previewVoice(voiceType, lan, btnEl, event) {
+            if (event) event.stopPropagation();
+            previewAudioEl.pause();
+            if (activePreviewBtn) { activePreviewBtn.classList.remove("playing"); activePreviewBtn.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
+            if (activePreviewBtn === btnEl && !previewAudioEl.paused) { activePreviewBtn = null; return; }
+            btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Nạp...'; btnEl.disabled = true;
+            try {
+                const resp = await fetch("/api/preview_voice", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({voice:voiceType,lan:lan}) });
+                const data = await resp.json();
+                if (data.status === "success") {
+                    previewAudioEl.src = data.download_url; previewAudioEl.play();
+                    activePreviewBtn = btnEl; btnEl.classList.add("playing");
+                    btnEl.innerHTML = '<i class="fa-solid fa-pause"></i> Đang phát';
+                    previewAudioEl.onended = () => { btnEl.classList.remove("playing"); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; activePreviewBtn = null; };
+                } else { alert("Lỗi: " + (data.message || "Thử giọng khác!")); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
+            } catch (e) { alert("Lỗi kết nối: " + e.message); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
+            finally { btnEl.disabled = false; }
+        }
+
         function formatDuration(ms) {
             const s = Math.round(ms/1000), m = Math.floor(s/60);
             return m > 0 ? `${m} phút ${s%60} giây` : `${s} giây`;
