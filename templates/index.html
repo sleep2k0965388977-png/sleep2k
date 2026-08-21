@@ -20,6 +20,7 @@
             --accent-blue: #3b82f6;
             --accent-pink: #ec4899;
             --accent-emerald: #10b981;
+            --accent-red: #ef4444;
             --text-main: #f3f4f6;
             --text-muted: #9ca3af;
         }
@@ -532,7 +533,18 @@
             opacity: 0.9;
         }
 
-        /* History List */
+        /* History List & Controls */
+        .history-stats-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
         .history-list {
             display: flex;
             flex-direction: column;
@@ -545,7 +557,7 @@
             background: rgba(255, 255, 255, 0.02);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 12px;
-            padding: 14px;
+            padding: 12px 14px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -560,6 +572,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            overflow: hidden;
         }
 
         .file-icon {
@@ -571,16 +584,44 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
         .file-details h4 {
             font-size: 13px;
             font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
         }
 
         .file-details p {
             font-size: 11px;
             color: var(--text-muted);
+        }
+
+        .history-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: var(--accent-red);
+            color: #fff;
         }
     </style>
 </head>
@@ -731,9 +772,20 @@
                     <div class="card-title">
                         <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử File MP3 Đã Tạo
                     </div>
-                    <button onclick="loadHistory()" style="background: none; border: none; color: var(--accent-blue); cursor: pointer; font-size: 13px;">
-                        <i class="fa-solid fa-arrows-rotate"></i> Làm mới
-                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="clearAllHistory()" style="background: none; border: none; color: #fca5a5; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-broom"></i> Xóa tất cả
+                        </button>
+                        <button onclick="loadHistory()" style="background: none; border: none; color: var(--accent-blue); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                            <i class="fa-solid fa-arrows-rotate"></i> Làm mới
+                        </button>
+                    </div>
+                </div>
+
+                <!-- History Storage Stats Bar -->
+                <div class="history-stats-bar">
+                    <span><i class="fa-solid fa-hard-drive" style="color: var(--accent-blue);"></i> Bộ nhớ đã dùng: <strong id="historySize" style="color: #fff;">0 MB</strong></span>
+                    <span><strong id="historyCount" style="color: #a78bfa;">0</strong> tệp MP3</span>
                 </div>
 
                 <div class="history-list" id="historyList">
@@ -949,6 +1001,16 @@ Hắn từng bước quật khởi, đánh bại các thiên tài đồng môn, 
                 const pollInterval = setInterval(async () => {
                     try {
                         const sresp = await fetch(`/api/job_status/${jobId}`);
+                        
+                        // Handle server restart or 404 gracefully
+                        if (sresp.status === 404) {
+                            clearInterval(pollInterval);
+                            progressCard.classList.remove("show");
+                            btn.disabled = false;
+                            btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
+                            return;
+                        }
+
                         const sdata = await sresp.json();
 
                         if (sdata.status === "processing" || sdata.status === "queued") {
@@ -1011,6 +1073,9 @@ Hắn từng bước quật khởi, đánh bại các thiên tài đồng môn, 
                 const listEl = document.getElementById("historyList");
                 listEl.innerHTML = "";
 
+                document.getElementById("historySize").innerText = (data.total_size_mb || 0) + " MB";
+                document.getElementById("historyCount").innerText = data.total_files || 0;
+
                 if (data.status === "success" && data.files.length > 0) {
                     data.files.forEach(f => {
                         const item = document.createElement("div");
@@ -1019,13 +1084,18 @@ Hắn từng bước quật khởi, đánh bại các thiên tài đồng môn, 
                             <div class="file-info">
                                 <div class="file-icon"><i class="fa-solid fa-file-audio"></i></div>
                                 <div class="file-details">
-                                    <h4>${f.filename}</h4>
+                                    <h4 title="${f.filename}">${f.filename}</h4>
                                     <p>${f.created_at} • ${f.size_kb} KB</p>
                                 </div>
                             </div>
-                            <a href="${f.download_url}" download class="download-btn" style="padding: 6px 12px; font-size: 11px;">
-                                <i class="fa-solid fa-download"></i> Tải
-                            </a>
+                            <div class="history-actions">
+                                <a href="${f.download_url}" download class="download-btn" style="padding: 6px 10px; font-size: 11px; margin-top: 0;">
+                                    <i class="fa-solid fa-download"></i> Tải
+                                </a>
+                                <button class="btn-delete" title="Xóa file này" onclick="deleteHistoryFile('${f.filename}')">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
                         `;
                         listEl.appendChild(item);
                     });
@@ -1034,6 +1104,36 @@ Hắn từng bước quật khởi, đánh bại các thiên tài đồng môn, 
                 }
             } catch (e) {
                 console.error("Load history error:", e);
+            }
+        }
+
+        async function deleteHistoryFile(filename) {
+            if (!confirm(`Bạn có chắc muốn xóa file ${filename}?`)) return;
+            try {
+                const resp = await fetch(`/api/delete_file/${filename}`, { method: "DELETE" });
+                const data = await resp.json();
+                if (data.status === "success") {
+                    loadHistory();
+                } else {
+                    alert("Lỗi: " + data.message);
+                }
+            } catch (e) {
+                alert("Lỗi kết nối khi xóa file: " + e.message);
+            }
+        }
+
+        async function clearAllHistory() {
+            if (!confirm("Bạn có chắc muốn xóa TOÀN BỘ file MP3 trong lịch sử không?")) return;
+            try {
+                const resp = await fetch("/api/clear_history", { method: "POST" });
+                const data = await resp.json();
+                if (data.status === "success") {
+                    loadHistory();
+                } else {
+                    alert("Lỗi: " + data.message);
+                }
+            } catch (e) {
+                alert("Lỗi kết nối khi dọn dẹp lịch sử: " + e.message);
             }
         }
 

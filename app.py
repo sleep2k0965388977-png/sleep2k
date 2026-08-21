@@ -39,10 +39,6 @@ def find_voice_info(voice_type):
     return None
 
 def split_text_into_chunks(text, max_chars=180):
-    """
-    Split text of ANY length (unlimited characters) into sentence-aware chunks.
-    Guarantees 100% full coverage without losing a single character.
-    """
     sentences = re.split(r'(?<=[.!?;\n])\s+', text.strip())
     chunks = []
     current_chunk = ''
@@ -75,9 +71,6 @@ def split_text_into_chunks(text, max_chars=180):
     return chunks if chunks else [text]
 
 def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
-    """
-    Helper function to process a single chunk with retries.
-    """
     for retry in range(3):
         try:
             create_res = client.create_tts_task(texts=text_chunk, voice=voice, resource_id=resource_id, rate=rate)
@@ -114,9 +107,6 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
     return idx, None, 0
 
 def run_tts_job(job_id, text, voice, resource_id, rate):
-    """
-    Multi-threaded parallel worker to process unlimited text chunks concurrently (4x faster).
-    """
     try:
         chunks = split_text_into_chunks(text, max_chars=180)
         total_chunks = len(chunks)
@@ -127,14 +117,14 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
             "message": f"Đã chia văn bản ({len(text)} ký tự) thành {total_chunks} đoạn...",
             "total_chunks": total_chunks,
             "completed_chunks": 0,
-            "result": None
+            "result": None,
+            "updated_at": time.time()
         }
 
         chunk_results = [None] * total_chunks
         durations = [0] * total_chunks
         completed_count = 0
 
-        # Run 4 parallel threads for 4x faster processing of long texts/novels
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [
                 executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate)
@@ -152,12 +142,12 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
                     JOBS[job_id]["progress"] = progress_pct
                     JOBS[job_id]["completed_chunks"] = completed_count
                     JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
+                    JOBS[job_id]["updated_at"] = time.time()
                 else:
                     JOBS[job_id]["status"] = "error"
                     JOBS[job_id]["message"] = f"Không thể xử lý đoạn {idx+1}/{total_chunks}. Vui lòng thử lại!"
                     return
 
-        # Merge all chunks preserving original sequence order
         JOBS[job_id]["progress"] = 95
         JOBS[job_id]["message"] = "Đang ghép nối toàn bộ tệp âm thanh MP3..."
 
@@ -187,10 +177,12 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
             "total_chunks": total_chunks,
             "voice": voice
         }
+        JOBS[job_id]["updated_at"] = time.time()
 
     except Exception as e:
         JOBS[job_id]["status"] = "error"
         JOBS[job_id]["message"] = f"Lỗi hệ thống: {str(e)}"
+        JOBS[job_id]["updated_at"] = time.time()
 
 @app.route("/")
 def index():
@@ -222,10 +214,10 @@ def generate_job():
             "status": "queued",
             "progress": 0,
             "message": "Đang phân tích văn bản không giới hạn ký tự...",
-            "result": None
+            "result": None,
+            "updated_at": time.time()
         }
 
-        # Start background multi-threaded worker
         t = threading.Thread(target=run_tts_job, args=(job_id, text, voice, resource_id, rate), daemon=True)
         t.start()
 
@@ -238,7 +230,11 @@ def generate_job():
 def get_job_status(job_id):
     job = JOBS.get(job_id)
     if not job:
-        return jsonify({"status": "error", "message": "Job không tồn tại"}), 404
+        return jsonify({
+            "status": "error",
+            "error_type": "job_not_found",
+            "message": "Tiến trình cũ không tồn tại (Server vừa được khởi động lại). Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
+        }), 404
     return jsonify(job)
 
 @app.route("/api/preview_voice", methods=["POST"])
@@ -315,14 +311,48 @@ def serve_preview_audio(filename):
 @app.route("/api/history", methods=["GET"])
 def get_history():
     files = []
+    total_bytes = 0
     for p in sorted(OUTPUT_DIR.glob("*.mp3"), key=os.path.getmtime, reverse=True):
+        size_bytes = p.stat().st_size
+        total_bytes += size_bytes
         files.append({
             "filename": p.name,
             "download_url": f"/output/{p.name}",
             "created_at": time.strftime('%H:%M:%S %d/%m/%Y', time.localtime(p.stat().st_mtime)),
-            "size_kb": round(p.stat().st_size / 1024, 1)
+            "size_kb": round(size_bytes / 1024, 1)
         })
-    return jsonify({"status": "success", "files": files})
+    
+    size_mb = round(total_bytes / (1024 * 1024), 2)
+    return jsonify({
+        "status": "success",
+        "files": files,
+        "total_files": len(files),
+        "total_size_mb": size_mb
+    })
+
+@app.route("/api/delete_file/<filename>", methods=["DELETE"])
+def delete_file(filename):
+    try:
+        clean_name = os.path.basename(filename)
+        target = OUTPUT_DIR / clean_name
+        if target.exists() and target.is_file():
+            target.unlink()
+            return jsonify({"status": "success", "message": f"Đã xóa file {clean_name}"})
+        return jsonify({"status": "error", "message": "File không tồn tại"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/clear_history", methods=["POST"])
+def clear_history():
+    try:
+        deleted_count = 0
+        for p in OUTPUT_DIR.glob("*.mp3"):
+            if p.is_file():
+                p.unlink()
+                deleted_count += 1
+        return jsonify({"status": "success", "message": f"Đã xóa {deleted_count} file lịch sử!"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     import sys
