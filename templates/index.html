@@ -49,11 +49,10 @@
 
         .logo-area { display: flex; align-items: center; gap: 14px; }
 
-        .logo-icon {
+        .logo-icon-img {
             width: 48px; height: 48px;
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            border-radius: 14px; display: flex; align-items: center; justify-content: center;
-            font-size: 22px; color: #fff;
+            border-radius: 14px; object-fit: cover;
+            border: 1px solid rgba(255, 255, 255, 0.15);
             box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
         }
 
@@ -208,7 +207,7 @@
     <div class="container">
         <header>
             <div class="logo-area">
-                <div class="logo-icon"><i class="fa-solid fa-infinity"></i></div>
+                <img src="/static/logo_2.jpg" alt="SLEEP2K Logo" class="logo-icon-img">
                 <div class="logo-text">
                     <h1>SLEEP2K</h1>
                     <p>Chuyển đổi Văn bản thành Giọng nói — Không giới hạn ký tự — Xử lý song song 4x</p>
