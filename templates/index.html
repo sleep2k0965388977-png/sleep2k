@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CapCut Voice Studio - Chuyển Văn Bản Thành Giọng Nói</title>
+    <title>CapCut Voice Studio - Chuyển Văn Bản Thành Giọng Nói (Không Giới Hạn Ký Tự)</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -106,17 +106,18 @@
             color: var(--text-muted);
         }
 
-        .badge-safe {
-            background: rgba(16, 185, 129, 0.15);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #34d399;
-            padding: 6px 14px;
+        .badge-unlimited {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2));
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            color: #c4b5fd;
+            padding: 6px 16px;
             border-radius: 20px;
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
             display: flex;
             align-items: center;
             gap: 8px;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
         }
 
         /* Flow Architecture Banner */
@@ -203,17 +204,22 @@
             color: var(--accent-blue);
         }
 
-        /* Text Area */
+        /* Text Area Container & Counter Bar */
+        .textarea-container {
+            position: relative;
+            margin-bottom: 8px;
+        }
+
         textarea {
             width: 100%;
-            height: 160px;
-            background: rgba(11, 15, 25, 0.8);
+            height: 200px;
+            background: rgba(11, 15, 25, 0.85);
             border: 1px solid var(--card-border);
             border-radius: 14px;
             padding: 16px;
             color: #fff;
             font-size: 15px;
-            line-height: 1.6;
+            line-height: 1.65;
             resize: vertical;
             outline: none;
             transition: all 0.2s ease;
@@ -222,6 +228,27 @@
         textarea:focus {
             border-color: var(--accent-purple);
             box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        .text-stats-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 4px 6px;
+        }
+
+        .stats-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stats-badge span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         /* Search Box */
@@ -397,13 +424,13 @@
 
         /* Progress Card & Bar */
         .progress-card {
-            background: rgba(15, 23, 42, 0.9);
-            border: 1px solid rgba(139, 92, 246, 0.3);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(139, 92, 246, 0.35);
             border-radius: 16px;
             padding: 20px;
             margin-top: 20px;
             display: none;
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.15);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.2);
         }
 
         .progress-card.show {
@@ -563,15 +590,15 @@
         <header>
             <div class="logo-area">
                 <div class="logo-icon">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <i class="fa-solid fa-infinity"></i>
                 </div>
                 <div class="logo-text">
-                    <h1>CapCut Voice Studio</h1>
-                    <p>Hệ thống chuyển đổi Văn bản thành Giọng nói (Tự động chia nhỏ & Ghép MP3)</p>
+                    <h1>CapCut Voice Studio (Unlimited)</h1>
+                    <p>Hệ thống chuyển đổi Văn bản KHÔNG GIỚI HẠN KÝ TỰ (Xử lý song song 4x)</p>
                 </div>
             </div>
-            <div class="badge-safe">
-                <i class="fa-solid fa-shield-halved"></i> Verified Safe & Secure
+            <div class="badge-unlimited">
+                <i class="fa-solid fa-bolt"></i> Không Giới Hạn Ký Tự
             </div>
         </header>
 
@@ -579,7 +606,7 @@
         <div class="flow-banner">
             <div class="flow-step">
                 <i class="fa-solid fa-align-left"></i>
-                <span>Text Input</span>
+                <span>Văn Bản Không Giới Hạn</span>
             </div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
             <div class="flow-step">
@@ -588,8 +615,8 @@
             </div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
             <div class="flow-step">
-                <i class="fa-solid fa-scissors"></i>
-                <span>Chia Nhỏ Đoạn Chuẩn</span>
+                <i class="fa-solid fa-layer-group"></i>
+                <span>Xử Lý Đoạn Song Song (4x)</span>
             </div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
             <div class="flow-step">
@@ -599,7 +626,7 @@
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
             <div class="flow-step" style="border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);">
                 <i class="fa-solid fa-file-audio" style="color: var(--accent-emerald);"></i>
-                <span style="color: #34d399;">Ghép File MP3 Cục Bộ</span>
+                <span style="color: #34d399;">File .MP3 Toàn Bộ</span>
             </div>
         </div>
 
@@ -611,10 +638,23 @@
                     <div class="card-title">
                         <i class="fa-solid fa-pen-to-square"></i> Nhập Văn Bản & Chọn Giọng Đọc
                     </div>
+                    <button onclick="clearText()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                        <i class="fa-solid fa-trash-can"></i> Xóa văn bản
+                    </button>
                 </div>
 
-                <!-- Text Area -->
-                <textarea id="textInput" placeholder="Nhập văn bản tiếng Việt hoặc tiếng Anh... Hệ thống tự động chia nhỏ thành các đoạn chuẩn để đọc chính xác 100% không bị ngắt quãng hay lỗi timeout!"></textarea>
+                <!-- Text Area & Stats Bar -->
+                <div class="textarea-container">
+                    <textarea id="textInput" oninput="updateTextStats()" placeholder="Dán bài văn, chương truyện hoặc bất kỳ văn bản dài bao nhiêu trang tùy thích vào đây... (Không giới hạn ký tự, hệ thống tự động chia nhỏ và ghép MP3 siêu tốc)!"></textarea>
+                </div>
+                <div class="text-stats-bar">
+                    <div class="stats-badge">
+                        <span><i class="fa-solid fa-font" style="color: var(--accent-purple);"></i> <strong id="charCount">0</strong> ký tự</span>
+                        <span><i class="fa-solid fa-file-lines" style="color: var(--accent-blue);"></i> <strong id="wordCount">0</strong> từ</span>
+                        <span><i class="fa-solid fa-scissors" style="color: var(--accent-pink);"></i> Dự kiến <strong id="chunkCount">0</strong> đoạn</span>
+                    </div>
+                    <span style="color: #34d399; font-weight: 600;"><i class="fa-solid fa-check"></i> Sẵn sàng xử lý không giới hạn</span>
+                </div>
 
                 <!-- Voice Picker Section -->
                 <div style="margin-top: 18px;">
@@ -654,7 +694,7 @@
                 <div class="progress-card" id="progressCard">
                     <div class="progress-header">
                         <div class="progress-title">
-                            <i class="fa-solid fa-gear fa-spin" style="color: var(--accent-purple);"></i> Tiến Độ Tạo Giọng Đọc
+                            <i class="fa-solid fa-gear fa-spin" style="color: var(--accent-purple);"></i> Tiến Độ Tạo Giọng Đọc Song Song
                         </div>
                         <div class="progress-percentage" id="progressPercentage">0%</div>
                     </div>
@@ -662,7 +702,7 @@
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
                     <div class="progress-status" id="progressStatus">
-                        <i class="fa-solid fa-circle-notch fa-spin"></i> Đang chuẩn bị văn bản...
+                        <i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản...
                     </div>
                 </div>
 
@@ -713,8 +753,30 @@
         let activePreviewBtn = null;
         const previewAudioEl = document.getElementById("previewAudio");
 
-        // Set default long story sample text
-        document.getElementById("textInput").value = `còn nhảy nhót đây này! Nhị đương gia cười khẩy: Chưa chết mà còn dám giết nhiều người của ta thế này, thực sự coi Hắc Phong Trại ta là trái hồng mềm? Lão tử, trở về tập hợp anh em, ba ngày sau đêm xuống chúng ta giết vào Thiên Thủy thành, diệt sạch Lâm gia. Quanh người hắn có linh khí dao động, hiển nhiên đạt đến Thai Tức đỉnh phong. Vầng, Nhị ca! Tên Hán tử mừng rỡ, vội đi xuống. Nhị đương gia cười lạnh một tiếng: Tính thời gian, Đại ca cũng sắp đột phá Luyện Khí rồi. Chỉ bằng bắt Lâm gia làm lễ mừng cho Đại ca ra mắt!`;
+        // Sample text
+        document.getElementById("textInput").value = `Chương 1: Đại Thế Giới. Thần Châu đại lục rộng lớn bao la, xưng hùng xưng bá khắp nơi. Ở phương bắc xa xôi là tuyết sơn ngàn năm không tan, nơi ở của Bắc Hàn môn phái. Phương nam là biển lớn cuộn sóng, ma thú tung hoành khắp chốn.
+
+Thiếu niên Lâm Phong vốn là đệ tử ngoại môn của Thiên Thủy Môn, tư chất bình thường nhưng ý chí kiên định như sắt đá. Ba năm nhập môn, hắn luôn chịu sự chèn ép của đồng môn, bị coi là phế vật không thể tu hành. Tuy nhiên, trong một lần đi hái dược ở Thâm Lâm Cốc, Lâm Phong vô tình rơi xuống một viễn cổ động phủ.
+
+Tại đây, hắn phát hiện ra một pho tượng đá cổ xưa chứa đựng tàn hồn của một vị Thượng Cổ Chí Tôn. Nhờ cơ duyên xảo hợp, Lâm Phong được truyền thừa Hỗn Độn Thần Ma Quyết - môn công pháp xưng bá thái cổ đã thất truyền hàng triệu năm. Từ thời điểm này, số phận của hắn hoàn toàn thay đổi.
+
+Hắn từng bước quật khởi, đánh bại các thiên tài đồng môn, càn quét khắp chốn, dấn thân vào con đường nghịch thiên cải mệnh, đạp bằng vạn giới để trở thành vị chúa tể tối cao!`;
+
+        function updateTextStats() {
+            const text = document.getElementById("textInput").value;
+            const charCount = text.length;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const chunks = Math.ceil(charCount / 160);
+
+            document.getElementById("charCount").innerText = charCount.toLocaleString();
+            document.getElementById("wordCount").innerText = words.toLocaleString();
+            document.getElementById("chunkCount").innerText = chunks;
+        }
+
+        function clearText() {
+            document.getElementById("textInput").value = "";
+            updateTextStats();
+        }
 
         async function fetchVoices() {
             try {
@@ -827,7 +889,16 @@
             renderVoices(filtered);
         });
 
-        // Start generation with job queue & progress bar
+        function formatDuration(ms) {
+            const totalSec = Math.round(ms / 1000);
+            const mins = Math.floor(totalSec / 60);
+            const secs = totalSec % 60;
+            if (mins > 0) {
+                return `${mins} phút ${secs} giây`;
+            }
+            return `${secs} giây`;
+        }
+
         async function startGeneration() {
             const text = document.getElementById("textInput").value.trim();
             if (!text) {
@@ -847,14 +918,12 @@
             btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...`;
             playerCard.classList.remove("show");
             
-            // Show progress bar
             progressCard.classList.add("show");
             fillEl.style.width = "5%";
             pctEl.innerText = "5%";
-            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản...`;
+            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản không giới hạn...`;
 
             try {
-                // Submit job
                 const resp = await fetch("/api/generate_job", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -877,7 +946,6 @@
 
                 const jobId = data.job_id;
 
-                // Poll job status every 600ms
                 const pollInterval = setInterval(async () => {
                     try {
                         const sresp = await fetch(`/api/job_status/${jobId}`);
@@ -887,7 +955,7 @@
                             const pct = sdata.progress || 10;
                             fillEl.style.width = pct + "%";
                             pctEl.innerText = pct + "%";
-                            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${sdata.message || 'Đang xử lý...'}`;
+                            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${sdata.message || 'Đang xử lý song song...'}`;
                         } else if (sdata.status === "completed") {
                             clearInterval(pollInterval);
                             
@@ -906,7 +974,7 @@
                                 downloadBtn.href = res.download_url;
                                 downloadBtn.download = res.filename;
 
-                                document.getElementById("resultTime").innerText = `Thời lượng: ${(res.duration_ms / 1000).toFixed(1)}s`;
+                                document.getElementById("resultTime").innerText = `Thời lượng: ${formatDuration(res.duration_ms)} (${res.text_length.toLocaleString()} ký tự)`;
                                 playerCard.classList.add("show");
                                 audioPlayer.play();
 
@@ -972,6 +1040,7 @@
         // Init
         fetchVoices();
         loadHistory();
+        updateTextStats();
     </script>
 </body>
 </html>
