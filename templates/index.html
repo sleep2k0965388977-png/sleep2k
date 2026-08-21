@@ -196,11 +196,58 @@
         }
         .download-btn:hover { opacity: 0.9; }
 
-        .no-save-note {
-            display: flex; align-items: center; gap: 8px; margin-top: 14px;
-            padding: 10px 14px; border-radius: 10px; font-size: 12px; color: #fbbf24;
-            background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.2);
+        /* Donation Modal CSS */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 9999; padding: 20px;
         }
+        .modal-overlay.show {
+            display: flex; animation: modalFadeIn 0.3s ease;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.92); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-card {
+            background: rgba(18, 24, 38, 0.95); border: 1px solid rgba(139, 92, 246, 0.4);
+            border-radius: 24px; padding: 28px; max-width: 440px; width: 100%;
+            text-align: center; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+        .modal-close-btn {
+            position: absolute; top: 16px; right: 16px;
+            background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-muted);
+            width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+            font-size: 14px; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .modal-close-btn:hover { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+        .modal-header {
+            display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 14px;
+        }
+        .modal-icon {
+            width: 52px; height: 52px; background: linear-gradient(135deg, #f59e0b, #ec4899);
+            border-radius: 16px; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: #fff; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+        }
+        .modal-header h3 { font-size: 18px; font-weight: 800; color: #fff; }
+        .qr-image {
+            width: 100%; max-width: 250px; border-radius: 16px; border: 2px solid rgba(255,255,255,0.1);
+            margin: 6px 0 14px 0; box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+        .donate-message {
+            font-size: 13px; line-height: 1.6; color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.04); padding: 12px 14px; border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06); text-align: left; margin-bottom: 18px;
+        }
+        .modal-action-btn {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: #fff; border: none; border-radius: 12px; padding: 12px 28px;
+            font-size: 14px; font-weight: 700; cursor: pointer; width: 100%;
+            transition: all 0.2s; box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+        }
+        .modal-action-btn:hover { transform: translateY(-2px); opacity: 0.95; }
     </style>
 </head>
 <body>
@@ -302,11 +349,27 @@
                         <i class="fa-solid fa-download"></i> Tải File MP3
                     </a>
                 </div>
-                <div class="no-save-note">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    File MP3 chỉ tồn tại tạm thời. Hãy bấm <strong>Tải File MP3</strong> để lưu về máy trước khi tạo file mới!
-                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Donation Coffee Modal -->
+    <div class="modal-overlay" id="donateModal" onclick="if(event.target===this) closeDonateModal()">
+        <div class="modal-card">
+            <button class="modal-close-btn" onclick="closeDonateModal()"><i class="fa-solid fa-xmark"></i></button>
+            <div class="modal-header">
+                <div class="modal-icon"><i class="fa-solid fa-mug-hot"></i></div>
+                <h3>Mời Admin Cốc Coffee ☕</h3>
+            </div>
+            <div class="modal-body">
+                <img src="/static/donate_qr.png" alt="Mã Chuyển Khoản QR" class="qr-image">
+                <p class="donate-message">
+                    Nếu bạn thấy app này hữu ích và giúp ích cho công việc của bạn, bạn có thể mời add cốc coffee để góp phần duy trì và phát triển app. Cảm ơn bạn rất nhiều!
+                </p>
+            </div>
+            <button class="modal-action-btn" onclick="closeDonateModal()">
+                <i class="fa-solid fa-heart"></i> Cảm ơn bạn!
+            </button>
         </div>
     </div>
 
@@ -446,6 +509,20 @@
                 btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
             }
         }
+
+        function showDonateModal() {
+            document.getElementById("donateModal").classList.add("show");
+        }
+
+        function closeDonateModal() {
+            document.getElementById("donateModal").classList.remove("show");
+        }
+
+        document.getElementById("downloadBtn").addEventListener("click", () => {
+            setTimeout(() => {
+                showDonateModal();
+            }, 400);
+        });
 
         fetchVoices(); updateTextStats();
     </script>
