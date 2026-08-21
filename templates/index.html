@@ -303,7 +303,7 @@
             word-break: break-word;
         }
 
-        /* Nghe Thử Preview Button */
+        /* Preview Button */
         .btn-preview {
             background: rgba(139, 92, 246, 0.2);
             border: 1px solid rgba(139, 92, 246, 0.4);
@@ -393,6 +393,71 @@
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
+        }
+
+        /* Progress Card & Bar */
+        .progress-card {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.15);
+        }
+
+        .progress-card.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .progress-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .progress-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-percentage {
+            font-size: 16px;
+            font-weight: 800;
+            color: #a78bfa;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue), var(--accent-pink));
+            border-radius: 10px;
+            transition: width 0.4s ease;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+        }
+
+        .progress-status {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         /* Player Result Card */
@@ -502,7 +567,7 @@
                 </div>
                 <div class="logo-text">
                     <h1>CapCut Voice Studio</h1>
-                    <p>Hệ thống chuyển đổi Văn bản thành Giọng nói với chức năng Nghe thử</p>
+                    <p>Hệ thống chuyển đổi Văn bản thành Giọng nói (Tự động chia nhỏ & Ghép MP3)</p>
                 </div>
             </div>
             <div class="badge-safe">
@@ -519,22 +584,22 @@
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
             <div class="flow-step">
                 <i class="fa-solid fa-sliders"></i>
-                <span>Voice Station (Chọn & Nghe Thử)</span>
+                <span>Voice Station (Nghe Thử)</span>
+            </div>
+            <i class="fa-solid fa-chevron-right flow-arrow"></i>
+            <div class="flow-step">
+                <i class="fa-solid fa-scissors"></i>
+                <span>Chia Nhỏ Đoạn Chuẩn</span>
             </div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
             <div class="flow-step">
                 <i class="fa-solid fa-microchip"></i>
-                <span>cc_cut Engine (device.json + token)</span>
-            </div>
-            <i class="fa-solid fa-chevron-right flow-arrow"></i>
-            <div class="flow-step">
-                <i class="fa-solid fa-cloud-arrow-down"></i>
-                <span>CapCut API & URL Audio</span>
+                <span>CapCut API Engine</span>
             </div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
             <div class="flow-step" style="border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);">
                 <i class="fa-solid fa-file-audio" style="color: var(--accent-emerald);"></i>
-                <span style="color: #34d399;">File .MP3 Cục Bộ</span>
+                <span style="color: #34d399;">Ghép File MP3 Cục Bộ</span>
             </div>
         </div>
 
@@ -549,7 +614,7 @@
                 </div>
 
                 <!-- Text Area -->
-                <textarea id="textInput" placeholder="Nhập văn bản tiếng Việt hoặc tiếng Anh bạn muốn chuyển thành giọng nói tại đây... (Ví dụ: Xin chào bạn! Chúc bạn một ngày mới đầy năng lượng.)">Xin chào! Chào mừng bạn đến với ứng dụng CapCut Voice Studio. Hãy chọn giọng đọc yêu thích và bấm Tạo Giọng Đọc MP3 nhé!</textarea>
+                <textarea id="textInput" placeholder="Nhập văn bản tiếng Việt hoặc tiếng Anh... Hệ thống tự động chia nhỏ thành các đoạn chuẩn để đọc chính xác 100% không bị ngắt quãng hay lỗi timeout!"></textarea>
 
                 <!-- Voice Picker Section -->
                 <div style="margin-top: 18px;">
@@ -580,9 +645,25 @@
                         </select>
                     </div>
 
-                    <button class="btn-generate" id="btnGenerate" onclick="generateAudio()">
+                    <button class="btn-generate" id="btnGenerate" onclick="startGeneration()">
                         <i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3
                     </button>
+                </div>
+
+                <!-- Progress Bar Card -->
+                <div class="progress-card" id="progressCard">
+                    <div class="progress-header">
+                        <div class="progress-title">
+                            <i class="fa-solid fa-gear fa-spin" style="color: var(--accent-purple);"></i> Tiến Độ Tạo Giọng Đọc
+                        </div>
+                        <div class="progress-percentage" id="progressPercentage">0%</div>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-status" id="progressStatus">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i> Đang chuẩn bị văn bản...
+                    </div>
                 </div>
 
                 <!-- Result Player Card -->
@@ -627,9 +708,13 @@
 
     <script>
         let selectedVoice = "BV421_vivn_streaming";
+        let selectedResourceId = null;
         let allVoices = [];
         let activePreviewBtn = null;
         const previewAudioEl = document.getElementById("previewAudio");
+
+        // Set default long story sample text
+        document.getElementById("textInput").value = `còn nhảy nhót đây này! Nhị đương gia cười khẩy: Chưa chết mà còn dám giết nhiều người của ta thế này, thực sự coi Hắc Phong Trại ta là trái hồng mềm? Lão tử, trở về tập hợp anh em, ba ngày sau đêm xuống chúng ta giết vào Thiên Thủy thành, diệt sạch Lâm gia. Quanh người hắn có linh khí dao động, hiển nhiên đạt đến Thai Tức đỉnh phong. Vầng, Nhị ca! Tên Hán tử mừng rỡ, vội đi xuống. Nhị đương gia cười lạnh một tiếng: Tính thời gian, Đại ca cũng sắp đột phá Luyện Khí rồi. Chỉ bằng bắt Lâm gia làm lễ mừng cho Đại ca ra mắt!`;
 
         async function fetchVoices() {
             try {
@@ -657,8 +742,8 @@
                 const item = document.createElement("div");
                 item.className = `voice-item ${v.voice_type === selectedVoice ? 'active' : ''}`;
                 item.onclick = (e) => {
-                    if (e.target.closest('.btn-preview')) return; // Ignore click if preview button was clicked
-                    selectVoice(v.voice_type, item);
+                    if (e.target.closest('.btn-preview')) return;
+                    selectVoice(v.voice_type, v.resource_id, item);
                 };
                 
                 const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
@@ -675,8 +760,9 @@
             });
         }
 
-        function selectVoice(voiceType, element) {
+        function selectVoice(voiceType, resourceId, element) {
             selectedVoice = voiceType;
+            selectedResourceId = resourceId;
             document.querySelectorAll(".voice-item").forEach(el => el.classList.remove("active"));
             element.classList.add("active");
         }
@@ -684,7 +770,6 @@
         async function previewVoice(voiceType, lan, btnEl, event) {
             if (event) event.stopPropagation();
 
-            // Stop current playing preview if any
             previewAudioEl.pause();
             if (activePreviewBtn) {
                 activePreviewBtn.classList.remove("playing");
@@ -696,7 +781,7 @@
                 return;
             }
 
-            btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang nạp...`;
+            btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Nạp...`;
             btnEl.disabled = true;
 
             try {
@@ -721,7 +806,7 @@
                         activePreviewBtn = null;
                     };
                 } else {
-                    alert("Lỗi nghe thử: " + (data.message || "Không tải được mẫu giọng"));
+                    alert("Lỗi nghe thử: " + (data.message || "Giọng đọc này chưa tạo được mẫu thử. Vui lòng thử giọng khác!"));
                     btnEl.innerHTML = `<i class="fa-solid fa-volume-high"></i> Nghe thử`;
                 }
             } catch (e) {
@@ -742,7 +827,8 @@
             renderVoices(filtered);
         });
 
-        async function generateAudio() {
+        // Start generation with job queue & progress bar
+        async function startGeneration() {
             const text = document.getElementById("textInput").value.trim();
             if (!text) {
                 alert("Vui lòng nhập văn bản cần đọc!");
@@ -751,43 +837,100 @@
 
             const btn = document.getElementById("btnGenerate");
             const rate = document.getElementById("rateSelect").value;
+            const progressCard = document.getElementById("progressCard");
             const playerCard = document.getElementById("playerCard");
+            const fillEl = document.getElementById("progressFill");
+            const pctEl = document.getElementById("progressPercentage");
+            const statusEl = document.getElementById("progressStatus");
 
             btn.disabled = true;
             btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...`;
             playerCard.classList.remove("show");
+            
+            // Show progress bar
+            progressCard.classList.add("show");
+            fillEl.style.width = "5%";
+            pctEl.innerText = "5%";
+            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản...`;
 
             try {
-                const resp = await fetch("/api/generate", {
+                // Submit job
+                const resp = await fetch("/api/generate_job", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         text: text,
                         voice: selectedVoice,
+                        resource_id: selectedResourceId,
                         rate: rate
                     })
                 });
 
                 const data = await resp.json();
-                if (data.status === "success") {
-                    const audioPlayer = document.getElementById("audioPlayer");
-                    const downloadBtn = document.getElementById("downloadBtn");
-                    
-                    audioPlayer.src = data.download_url;
-                    downloadBtn.href = data.download_url;
-                    downloadBtn.download = data.filename;
-
-                    document.getElementById("resultTime").innerText = `Thời lượng: ${(data.duration_ms / 1000).toFixed(1)}s`;
-                    playerCard.classList.add("show");
-                    audioPlayer.play();
-
-                    loadHistory();
-                } else {
-                    alert("Lỗi: " + (data.message || "Không thể tạo file âm thanh"));
+                if (data.status !== "success") {
+                    alert("Lỗi tạo job: " + (data.message || "Không khởi tạo được"));
+                    progressCard.classList.remove("show");
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
+                    return;
                 }
+
+                const jobId = data.job_id;
+
+                // Poll job status every 600ms
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const sresp = await fetch(`/api/job_status/${jobId}`);
+                        const sdata = await sresp.json();
+
+                        if (sdata.status === "processing" || sdata.status === "queued") {
+                            const pct = sdata.progress || 10;
+                            fillEl.style.width = pct + "%";
+                            pctEl.innerText = pct + "%";
+                            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${sdata.message || 'Đang xử lý...'}`;
+                        } else if (sdata.status === "completed") {
+                            clearInterval(pollInterval);
+                            
+                            fillEl.style.width = "100%";
+                            pctEl.innerText = "100%";
+                            statusEl.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--accent-emerald);"></i> ${sdata.message}`;
+
+                            setTimeout(() => {
+                                progressCard.classList.remove("show");
+                                const res = sdata.result;
+                                
+                                const audioPlayer = document.getElementById("audioPlayer");
+                                const downloadBtn = document.getElementById("downloadBtn");
+                                
+                                audioPlayer.src = res.download_url;
+                                downloadBtn.href = res.download_url;
+                                downloadBtn.download = res.filename;
+
+                                document.getElementById("resultTime").innerText = `Thời lượng: ${(res.duration_ms / 1000).toFixed(1)}s`;
+                                playerCard.classList.add("show");
+                                audioPlayer.play();
+
+                                loadHistory();
+
+                                btn.disabled = false;
+                                btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
+                            }, 500);
+
+                        } else if (sdata.status === "error") {
+                            clearInterval(pollInterval);
+                            alert("Lỗi xử lý: " + sdata.message);
+                            progressCard.classList.remove("show");
+                            btn.disabled = false;
+                            btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
+                        }
+                    } catch (err) {
+                        console.error("Poll error:", err);
+                    }
+                }, 600);
+
             } catch (e) {
                 alert("Lỗi kết nối máy chủ: " + e.message);
-            } finally {
+                progressCard.classList.remove("show");
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
             }
