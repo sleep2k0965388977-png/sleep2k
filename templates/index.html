@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CapCut Voice Studio - Chuyển Văn Bản Thành Giọng Nói (Không Giới Hạn Ký Tự)</title>
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -20,17 +18,11 @@
             --accent-blue: #3b82f6;
             --accent-pink: #ec4899;
             --accent-emerald: #10b981;
-            --accent-red: #ef4444;
             --text-main: #f3f4f6;
             --text-muted: #9ca3af;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Plus Jakarta Sans', sans-serif;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
 
         body {
             background-color: var(--bg-dark);
@@ -43,760 +35,283 @@
             padding: 24px;
         }
 
-        /* Custom Dark Scrollbars */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(139, 92, 246, 0.4);
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(139, 92, 246, 0.7);
-        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.4); border-radius: 4px; }
 
-        .container {
-            max-width: 1280px;
-            margin: 0 auto;
-        }
+        .container { max-width: 900px; margin: 0 auto; }
 
-        /* Header */
         header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-            padding-bottom: 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 24px; padding-bottom: 20px;
             border-bottom: 1px solid var(--card-border);
         }
 
-        .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
+        .logo-area { display: flex; align-items: center; gap: 14px; }
 
         .logo-icon {
-            width: 48px;
-            height: 48px;
+            width: 48px; height: 48px;
             background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            color: #fff;
+            border-radius: 14px; display: flex; align-items: center; justify-content: center;
+            font-size: 22px; color: #fff;
             box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
         }
 
         .logo-text h1 {
-            font-size: 22px;
-            font-weight: 800;
+            font-size: 22px; font-weight: 800;
             background: linear-gradient(90deg, #fff, #93c5fd);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-
-        .logo-text p {
-            font-size: 13px;
-            color: var(--text-muted);
-        }
+        .logo-text p { font-size: 13px; color: var(--text-muted); }
 
         .badge-unlimited {
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2));
-            border: 1px solid rgba(139, 92, 246, 0.4);
-            color: #c4b5fd;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+            background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.2));
+            border: 1px solid rgba(139,92,246,0.4); color: #c4b5fd;
+            padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
+            display: flex; align-items: center; gap: 8px;
         }
 
-        /* Flow Architecture Banner */
         .flow-banner {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 14px 20px;
-            margin-bottom: 24px;
-            backdrop-filter: blur(12px);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            overflow-x: auto;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; padding: 14px 20px; margin-bottom: 24px;
+            backdrop-filter: blur(12px); display: flex; align-items: center;
+            justify-content: space-between; gap: 10px; overflow-x: auto;
         }
-
         .flow-step {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: rgba(255, 255, 255, 0.03);
-            padding: 8px 14px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            white-space: nowrap;
+            display: flex; align-items: center; gap: 10px;
+            background: rgba(255,255,255,0.03); padding: 8px 14px;
+            border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); white-space: nowrap;
         }
+        .flow-step i { color: var(--accent-purple); font-size: 15px; }
+        .flow-step span { font-size: 13px; font-weight: 600; }
+        .flow-arrow { color: var(--text-muted); font-size: 13px; }
 
-        .flow-step i {
-            color: var(--accent-purple);
-            font-size: 15px;
-        }
-
-        .flow-step span {
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .flow-arrow {
-            color: var(--text-muted);
-            font-size: 13px;
-        }
-
-        /* Layout Grid */
-        .grid-layout {
-            display: grid;
-            grid-template-columns: 1.25fr 0.75fr;
-            gap: 24px;
-        }
-
-        @media (max-width: 992px) {
-            .grid-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Card Panels */
         .card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 20px;
-            padding: 24px;
-            backdrop-filter: blur(16px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 20px; padding: 24px; backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }
-
-        .card-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 18px;
-        }
-
-        .card-title {
-            font-size: 16px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #fff;
-        }
-
-        .card-title i {
-            color: var(--accent-blue);
-        }
-
-        /* Text Area Container & Counter Bar */
-        .textarea-container {
-            position: relative;
-            margin-bottom: 8px;
-        }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+        .card-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; color: #fff; }
+        .card-title i { color: var(--accent-blue); }
 
         textarea {
-            width: 100%;
-            height: 200px;
-            background: rgba(11, 15, 25, 0.85);
-            border: 1px solid var(--card-border);
-            border-radius: 14px;
-            padding: 16px;
-            color: #fff;
-            font-size: 15px;
-            line-height: 1.65;
-            resize: vertical;
-            outline: none;
-            transition: all 0.2s ease;
+            width: 100%; height: 200px; background: rgba(11,15,25,0.85);
+            border: 1px solid var(--card-border); border-radius: 14px;
+            padding: 16px; color: #fff; font-size: 15px; line-height: 1.65;
+            resize: vertical; outline: none; transition: all 0.2s ease;
         }
-
-        textarea:focus {
-            border-color: var(--accent-purple);
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
-        }
+        textarea:focus { border-color: var(--accent-purple); box-shadow: 0 0 0 3px rgba(139,92,246,0.2); }
 
         .text-stats-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 12px;
-            color: var(--text-muted);
-            padding: 4px 6px;
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 12px; color: var(--text-muted); padding: 4px 6px; margin-bottom: 8px;
         }
+        .stats-badge { display: flex; align-items: center; gap: 12px; }
+        .stats-badge span { display: flex; align-items: center; gap: 5px; }
 
-        .stats-badge {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .stats-badge span {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        /* Search Box */
-        .search-box {
-            position: relative;
-            margin-bottom: 14px;
-        }
-
+        .search-box { position: relative; margin-bottom: 14px; }
         .search-box input {
-            width: 100%;
-            background: rgba(11, 15, 25, 0.8);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 10px 14px 10px 38px;
-            color: #fff;
-            font-size: 13px;
-            outline: none;
+            width: 100%; background: rgba(11,15,25,0.8); border: 1px solid var(--card-border);
+            border-radius: 12px; padding: 10px 14px 10px 38px; color: #fff; font-size: 13px; outline: none;
         }
+        .search-box i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
 
-        .search-box i {
-            position: absolute;
-            left: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-            font-size: 14px;
-        }
-
-        /* Voice List Container */
         .voice-list {
-            max-height: 310px;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: grid;
+            max-height: 310px; overflow-y: auto; display: grid;
             grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-            gap: 12px;
-            padding-right: 6px;
+            gap: 12px; padding-right: 6px;
         }
-
-        /* Voice Card Item */
         .voice-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 14px;
-            padding: 12px 14px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            gap: 8px;
-            position: relative;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 14px; padding: 12px 14px; cursor: pointer;
+            transition: all 0.2s ease; display: flex; flex-direction: column;
+            justify-content: space-between; gap: 8px;
         }
-
-        .voice-item:hover {
-            background: rgba(139, 92, 246, 0.12);
-            border-color: rgba(139, 92, 246, 0.35);
-            transform: translateY(-2px);
-        }
-
+        .voice-item:hover { background: rgba(139,92,246,0.12); border-color: rgba(139,92,246,0.35); transform: translateY(-2px); }
         .voice-item.active {
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(59, 130, 246, 0.25));
-            border-color: var(--accent-purple);
-            box-shadow: 0 4px 14px rgba(139, 92, 246, 0.3);
+            background: linear-gradient(135deg, rgba(139,92,246,0.25), rgba(59,130,246,0.25));
+            border-color: var(--accent-purple); box-shadow: 0 4px 14px rgba(139,92,246,0.3);
         }
+        .voice-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+        .voice-name { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.3; word-break: break-word; }
 
-        .voice-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 8px;
-        }
-
-        .voice-name {
-            font-size: 14px;
-            font-weight: 700;
-            color: #fff;
-            line-height: 1.3;
-            word-break: break-word;
-        }
-
-        /* Preview Button */
         .btn-preview {
-            background: rgba(139, 92, 246, 0.2);
-            border: 1px solid rgba(139, 92, 246, 0.4);
-            color: #c4b5fd;
-            border-radius: 20px;
-            padding: 4px 10px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.2s ease;
-            white-space: nowrap;
-            flex-shrink: 0;
+            background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4);
+            color: #c4b5fd; border-radius: 20px; padding: 4px 10px; font-size: 11px;
+            font-weight: 600; cursor: pointer; display: inline-flex; align-items: center;
+            gap: 5px; transition: all 0.2s ease; white-space: nowrap; flex-shrink: 0;
         }
+        .btn-preview:hover { background: var(--accent-purple); color: #fff; }
+        .btn-preview.playing { background: var(--accent-pink); border-color: var(--accent-pink); color: #fff; }
+        .voice-tag { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        .btn-preview:hover {
-            background: var(--accent-purple);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
-        }
-
-        .btn-preview.playing {
-            background: var(--accent-pink);
-            border-color: var(--accent-pink);
-            color: #fff;
-        }
-
-        .voice-tag {
-            font-size: 11px;
-            color: var(--text-muted);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        /* Controls */
-        .controls-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-top: 18px;
-            gap: 14px;
-        }
-
-        .rate-select {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: var(--text-muted);
-        }
-
+        .controls-row { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; gap: 14px; }
+        .rate-select { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
         .rate-select select {
-            background: rgba(11, 15, 25, 0.8);
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            color: #fff;
-            padding: 8px 12px;
-            outline: none;
-            cursor: pointer;
+            background: rgba(11,15,25,0.8); border: 1px solid var(--card-border);
+            border-radius: 8px; color: #fff; padding: 8px 12px; outline: none; cursor: pointer;
         }
 
         .btn-generate {
             background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            color: #fff;
-            border: none;
-            border-radius: 12px;
-            padding: 12px 28px;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.2s ease;
-            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+            color: #fff; border: none; border-radius: 12px; padding: 12px 28px;
+            font-size: 15px; font-weight: 700; cursor: pointer; display: flex;
+            align-items: center; gap: 10px; transition: all 0.2s ease;
+            box-shadow: 0 6px 20px rgba(139,92,246,0.4);
         }
+        .btn-generate:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(139,92,246,0.5); }
+        .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-        .btn-generate:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5);
-        }
-
-        .btn-generate:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* Progress Card & Bar */
         .progress-card {
-            background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(139, 92, 246, 0.35);
-            border-radius: 16px;
-            padding: 20px;
-            margin-top: 20px;
-            display: none;
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.2);
+            background: rgba(15,23,42,0.95); border: 1px solid rgba(139,92,246,0.35);
+            border-radius: 16px; padding: 20px; margin-top: 20px; display: none;
+            box-shadow: 0 8px 25px rgba(139,92,246,0.2);
         }
-
-        .progress-card.show {
-            display: block;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .progress-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
-
-        .progress-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .progress-percentage {
-            font-size: 16px;
-            font-weight: 800;
-            color: #a78bfa;
-        }
-
-        .progress-track {
-            width: 100%;
-            height: 10px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            overflow: hidden;
-            margin-bottom: 12px;
-            position: relative;
-        }
-
+        .progress-card.show { display: block; animation: fadeIn 0.3s ease; }
+        .progress-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .progress-title { font-size: 14px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .progress-percentage { font-size: 16px; font-weight: 800; color: #a78bfa; }
+        .progress-track { width: 100%; height: 10px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
         .progress-fill {
-            height: 100%;
-            width: 0%;
+            height: 100%; width: 0%;
             background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue), var(--accent-pink));
-            border-radius: 10px;
-            transition: width 0.4s ease;
-            box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+            border-radius: 10px; transition: width 0.4s ease; box-shadow: 0 0 12px rgba(139,92,246,0.6);
         }
+        .progress-status { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
 
-        .progress-status {
-            font-size: 12px;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* Player Result Card */
         .player-card {
-            background: rgba(139, 92, 246, 0.08);
-            border: 1px solid rgba(139, 92, 246, 0.25);
-            border-radius: 16px;
-            padding: 20px;
-            margin-top: 20px;
-            display: none;
+            background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.25);
+            border-radius: 16px; padding: 20px; margin-top: 20px; display: none;
         }
+        .player-card.show { display: block; animation: fadeIn 0.3s ease; }
 
-        .player-card.show {
-            display: block;
-            animation: fadeIn 0.3s ease;
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .audio-player-custom {
-            width: 100%;
-            margin-top: 12px;
-            border-radius: 8px;
-        }
+        .audio-player-custom { width: 100%; margin-top: 12px; border-radius: 8px; }
 
         .download-btn {
-            background: var(--accent-emerald);
-            color: #fff;
-            text-decoration: none;
-            padding: 10px 18px;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 700;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 12px;
-            transition: opacity 0.2s;
+            background: var(--accent-emerald); color: #fff; text-decoration: none;
+            padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 700;
+            display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; transition: opacity 0.2s;
         }
+        .download-btn:hover { opacity: 0.9; }
 
-        .download-btn:hover {
-            opacity: 0.9;
-        }
-
-        /* History List & Controls */
-        .history-stats-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .history-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: 480px;
-            overflow-y: auto;
-        }
-
-        .history-item {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 12px 14px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            transition: background 0.2s;
-        }
-
-        .history-item:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .file-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            overflow: hidden;
-        }
-
-        .file-icon {
-            width: 36px;
-            height: 36px;
-            background: rgba(59, 130, 246, 0.15);
-            color: var(--accent-blue);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .file-details h4 {
-            font-size: 13px;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 200px;
-        }
-
-        .file-details p {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .history-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-shrink: 0;
-        }
-
-        .btn-delete {
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-            padding: 6px 10px;
-            border-radius: 8px;
-            font-size: 11px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-delete:hover {
-            background: var(--accent-red);
-            color: #fff;
+        .no-save-note {
+            display: flex; align-items: center; gap: 8px; margin-top: 14px;
+            padding: 10px 14px; border-radius: 10px; font-size: 12px; color: #fbbf24;
+            background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.2);
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <header>
             <div class="logo-area">
-                <div class="logo-icon">
-                    <i class="fa-solid fa-infinity"></i>
-                </div>
+                <div class="logo-icon"><i class="fa-solid fa-infinity"></i></div>
                 <div class="logo-text">
                     <h1>CapCut Voice Studio (Unlimited)</h1>
-                    <p>Hệ thống chuyển đổi Văn bản KHÔNG GIỚI HẠN KÝ TỰ (Xử lý song song 4x)</p>
+                    <p>Chuyển đổi Văn bản thành Giọng nói — Không giới hạn ký tự — Xử lý song song 4x</p>
                 </div>
             </div>
-            <div class="badge-unlimited">
-                <i class="fa-solid fa-bolt"></i> Không Giới Hạn Ký Tự
-            </div>
+            <div class="badge-unlimited"><i class="fa-solid fa-bolt"></i> Không Giới Hạn</div>
         </header>
 
-        <!-- System Flow Architecture Banner -->
         <div class="flow-banner">
-            <div class="flow-step">
-                <i class="fa-solid fa-align-left"></i>
-                <span>Văn Bản Không Giới Hạn</span>
-            </div>
+            <div class="flow-step"><i class="fa-solid fa-align-left"></i><span>Văn Bản</span></div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
-            <div class="flow-step">
-                <i class="fa-solid fa-sliders"></i>
-                <span>Voice Station (Nghe Thử)</span>
-            </div>
+            <div class="flow-step"><i class="fa-solid fa-sliders"></i><span>Chọn Giọng</span></div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
-            <div class="flow-step">
-                <i class="fa-solid fa-layer-group"></i>
-                <span>Xử Lý Đoạn Song Song (4x)</span>
-            </div>
+            <div class="flow-step"><i class="fa-solid fa-layer-group"></i><span>Chia Đoạn Song Song (4x)</span></div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
-            <div class="flow-step">
-                <i class="fa-solid fa-microchip"></i>
-                <span>CapCut API Engine</span>
-            </div>
+            <div class="flow-step"><i class="fa-solid fa-microchip"></i><span>CapCut API</span></div>
             <i class="fa-solid fa-chevron-right flow-arrow"></i>
-            <div class="flow-step" style="border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1);">
+            <div class="flow-step" style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1);">
                 <i class="fa-solid fa-file-audio" style="color: var(--accent-emerald);"></i>
-                <span style="color: #34d399;">File .MP3 Toàn Bộ</span>
+                <span style="color: #34d399;">Nghe & Tải MP3</span>
             </div>
         </div>
 
-        <!-- Main Grid -->
-        <div class="grid-layout">
-            <!-- Left Column: Creation Panel -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fa-solid fa-pen-to-square"></i> Nhập Văn Bản & Chọn Giọng Đọc
-                    </div>
-                    <button onclick="clearText()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
-                        <i class="fa-solid fa-trash-can"></i> Xóa văn bản
-                    </button>
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title"><i class="fa-solid fa-pen-to-square"></i> Nhập Văn Bản & Chọn Giọng Đọc</div>
+                <button onclick="clearText()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px;">
+                    <i class="fa-solid fa-trash-can"></i> Xóa văn bản
+                </button>
+            </div>
+
+            <div class="textarea-container">
+                <textarea id="textInput" oninput="updateTextStats()" placeholder="Dán văn bản, chương truyện hoặc bất kỳ nội dung dài bao nhiêu trang tùy thích vào đây..."></textarea>
+            </div>
+            <div class="text-stats-bar">
+                <div class="stats-badge">
+                    <span><i class="fa-solid fa-font" style="color:var(--accent-purple);"></i> <strong id="charCount">0</strong> ký tự</span>
+                    <span><i class="fa-solid fa-file-lines" style="color:var(--accent-blue);"></i> <strong id="wordCount">0</strong> từ</span>
+                    <span><i class="fa-solid fa-scissors" style="color:var(--accent-pink);"></i> ~<strong id="chunkCount">0</strong> đoạn</span>
                 </div>
+                <span style="color:#34d399;font-weight:600;"><i class="fa-solid fa-check"></i> Không giới hạn</span>
+            </div>
 
-                <!-- Text Area & Stats Bar -->
-                <div class="textarea-container">
-                    <textarea id="textInput" oninput="updateTextStats()" placeholder="Dán bài văn, chương truyện hoặc bất kỳ văn bản dài bao nhiêu trang tùy thích vào đây... (Không giới hạn ký tự, hệ thống tự động chia nhỏ và ghép MP3 siêu tốc)!"></textarea>
+            <div style="margin-top: 18px;">
+                <div class="card-title" style="font-size:14px;margin-bottom:10px;">
+                    <i class="fa-solid fa-microphone-lines"></i> Danh Sách Giọng Đọc (Voice Station)
                 </div>
-                <div class="text-stats-bar">
-                    <div class="stats-badge">
-                        <span><i class="fa-solid fa-font" style="color: var(--accent-purple);"></i> <strong id="charCount">0</strong> ký tự</span>
-                        <span><i class="fa-solid fa-file-lines" style="color: var(--accent-blue);"></i> <strong id="wordCount">0</strong> từ</span>
-                        <span><i class="fa-solid fa-scissors" style="color: var(--accent-pink);"></i> Dự kiến <strong id="chunkCount">0</strong> đoạn</span>
-                    </div>
-                    <span style="color: #34d399; font-weight: 600;"><i class="fa-solid fa-check"></i> Sẵn sàng xử lý không giới hạn</span>
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="voiceSearch" placeholder="Tìm kiếm giọng đọc (VD: Thảo Trinh, Bé, Việt Méo, ...)">
                 </div>
-
-                <!-- Voice Picker Section -->
-                <div style="margin-top: 18px;">
-                    <div class="card-title" style="font-size: 14px; margin-bottom: 10px;">
-                        <i class="fa-solid fa-microphone-lines"></i> Danh Sách Giọng Đọc (Voice Station)
-                    </div>
-
-                    <div class="search-box">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="voiceSearch" placeholder="Tìm kiếm giọng đọc (VD: Thảo Trinh, Bé, Việt Méo, ...)">
-                    </div>
-
-                    <div class="voice-list" id="voiceList">
-                        <div style="color: var(--text-muted); font-size: 13px; grid-column: 1/-1;">Đang tải danh sách giọng đọc...</div>
-                    </div>
-                </div>
-
-                <!-- Controls & Generate Button -->
-                <div class="controls-row">
-                    <div class="rate-select">
-                        <label for="rateSelect">Tốc độ đọc:</label>
-                        <select id="rateSelect">
-                            <option value="0.75">0.75x</option>
-                            <option value="1.0" selected>1.0x (Chuẩn)</option>
-                            <option value="1.25">1.25x</option>
-                            <option value="1.5">1.5x</option>
-                            <option value="2.0">2.0x</option>
-                        </select>
-                    </div>
-
-                    <button class="btn-generate" id="btnGenerate" onclick="startGeneration()">
-                        <i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3
-                    </button>
-                </div>
-
-                <!-- Progress Bar Card -->
-                <div class="progress-card" id="progressCard">
-                    <div class="progress-header">
-                        <div class="progress-title">
-                            <i class="fa-solid fa-gear fa-spin" style="color: var(--accent-purple);"></i> Tiến Độ Tạo Giọng Đọc Song Song
-                        </div>
-                        <div class="progress-percentage" id="progressPercentage">0%</div>
-                    </div>
-                    <div class="progress-track">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <div class="progress-status" id="progressStatus">
-                        <i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản...
-                    </div>
-                </div>
-
-                <!-- Result Player Card -->
-                <div class="player-card" id="playerCard">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span style="font-weight: 700; color: #fff; font-size: 14px;" id="resultTitle">
-                            <i class="fa-solid fa-circle-check" style="color: var(--accent-emerald);"></i> Tạo âm thanh thành công!
-                        </span>
-                        <span style="font-size: 12px; color: var(--text-muted);" id="resultTime">--:--</span>
-                    </div>
-                    
-                    <audio id="audioPlayer" class="audio-player-custom" controls></audio>
-                    
-                    <div style="display: flex; gap: 10px; margin-top: 10px;">
-                        <a id="downloadBtn" href="#" download class="download-btn">
-                            <i class="fa-solid fa-download"></i> Tải File MP3 Cục Bộ
-                        </a>
-                    </div>
+                <div class="voice-list" id="voiceList">
+                    <div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Đang tải danh sách giọng đọc...</div>
                 </div>
             </div>
 
-            <!-- Right Column: History Panel -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử File MP3 Đã Tạo
-                    </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button onclick="clearAllHistory()" style="background: none; border: none; color: #fca5a5; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
-                            <i class="fa-solid fa-broom"></i> Xóa tất cả
-                        </button>
-                        <button onclick="loadHistory()" style="background: none; border: none; color: var(--accent-blue); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;">
-                            <i class="fa-solid fa-arrows-rotate"></i> Làm mới
-                        </button>
-                    </div>
+            <div class="controls-row">
+                <div class="rate-select">
+                    <label for="rateSelect">Tốc độ đọc:</label>
+                    <select id="rateSelect">
+                        <option value="0.75">0.75x</option>
+                        <option value="1.0" selected>1.0x (Chuẩn)</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2.0">2.0x</option>
+                    </select>
                 </div>
+                <button class="btn-generate" id="btnGenerate" onclick="startGeneration()">
+                    <i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3
+                </button>
+            </div>
 
-                <!-- History Storage Stats Bar -->
-                <div class="history-stats-bar">
-                    <span><i class="fa-solid fa-hard-drive" style="color: var(--accent-blue);"></i> Bộ nhớ đã dùng: <strong id="historySize" style="color: #fff;">0 MB</strong></span>
-                    <span><strong id="historyCount" style="color: #a78bfa;">0</strong> tệp MP3</span>
+            <div class="progress-card" id="progressCard">
+                <div class="progress-header">
+                    <div class="progress-title"><i class="fa-solid fa-gear fa-spin" style="color:var(--accent-purple);"></i> Tiến Độ Tạo Giọng Đọc</div>
+                    <div class="progress-percentage" id="progressPercentage">0%</div>
                 </div>
+                <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-status" id="progressStatus"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản...</div>
+            </div>
 
-                <div class="history-list" id="historyList">
-                    <div style="color: var(--text-muted); font-size: 13px;">Đang tải lịch sử...</div>
+            <div class="player-card" id="playerCard">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-weight:700;color:#fff;font-size:14px;">
+                        <i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> Tạo âm thanh thành công!
+                    </span>
+                    <span style="font-size:12px;color:var(--text-muted);" id="resultTime">--:--</span>
+                </div>
+                <audio id="audioPlayer" class="audio-player-custom" controls></audio>
+                <div style="display:flex;gap:10px;margin-top:10px;">
+                    <a id="downloadBtn" href="#" download class="download-btn">
+                        <i class="fa-solid fa-download"></i> Tải File MP3
+                    </a>
+                </div>
+                <div class="no-save-note">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    File MP3 chỉ tồn tại tạm thời. Hãy bấm <strong>Tải File MP3</strong> để lưu về máy trước khi tạo file mới!
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Hidden global preview audio element -->
-    <audio id="previewAudio" style="display: none;"></audio>
+    <audio id="previewAudio" style="display:none;"></audio>
 
     <script>
         let selectedVoice = "BV421_vivn_streaming";
@@ -805,342 +320,135 @@
         let activePreviewBtn = null;
         const previewAudioEl = document.getElementById("previewAudio");
 
-        // Sample text
-        document.getElementById("textInput").value = `Chương 1: Đại Thế Giới. Thần Châu đại lục rộng lớn bao la, xưng hùng xưng bá khắp nơi. Ở phương bắc xa xôi là tuyết sơn ngàn năm không tan, nơi ở của Bắc Hàn môn phái. Phương nam là biển lớn cuộn sóng, ma thú tung hoành khắp chốn.
-
-Thiếu niên Lâm Phong vốn là đệ tử ngoại môn của Thiên Thủy Môn, tư chất bình thường nhưng ý chí kiên định như sắt đá. Ba năm nhập môn, hắn luôn chịu sự chèn ép của đồng môn, bị coi là phế vật không thể tu hành. Tuy nhiên, trong một lần đi hái dược ở Thâm Lâm Cốc, Lâm Phong vô tình rơi xuống một viễn cổ động phủ.
-
-Tại đây, hắn phát hiện ra một pho tượng đá cổ xưa chứa đựng tàn hồn của một vị Thượng Cổ Chí Tôn. Nhờ cơ duyên xảo hợp, Lâm Phong được truyền thừa Hỗn Độn Thần Ma Quyết - môn công pháp xưng bá thái cổ đã thất truyền hàng triệu năm. Từ thời điểm này, số phận của hắn hoàn toàn thay đổi.
-
-Hắn từng bước quật khởi, đánh bại các thiên tài đồng môn, càn quét khắp chốn, dấn thân vào con đường nghịch thiên cải mệnh, đạp bằng vạn giới để trở thành vị chúa tể tối cao!`;
-
         function updateTextStats() {
             const text = document.getElementById("textInput").value;
-            const charCount = text.length;
-            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-            const chunks = Math.ceil(charCount / 160);
-
-            document.getElementById("charCount").innerText = charCount.toLocaleString();
-            document.getElementById("wordCount").innerText = words.toLocaleString();
-            document.getElementById("chunkCount").innerText = chunks;
+            document.getElementById("charCount").innerText = text.length.toLocaleString();
+            document.getElementById("wordCount").innerText = (text.trim() ? text.trim().split(/\s+/).length : 0).toLocaleString();
+            document.getElementById("chunkCount").innerText = Math.ceil(text.length / 160);
         }
 
-        function clearText() {
-            document.getElementById("textInput").value = "";
-            updateTextStats();
-        }
+        function clearText() { document.getElementById("textInput").value = ""; updateTextStats(); }
 
         async function fetchVoices() {
             try {
                 const resp = await fetch("/api/voices");
                 const data = await resp.json();
-                if (data.status === "success") {
-                    allVoices = data.voices;
-                    renderVoices(allVoices);
-                }
-            } catch (e) {
-                console.error("Fetch voices error:", e);
-            }
+                if (data.status === "success") { allVoices = data.voices; renderVoices(allVoices); }
+            } catch (e) { console.error("Fetch voices error:", e); }
         }
 
         function renderVoices(voices) {
             const listEl = document.getElementById("voiceList");
             listEl.innerHTML = "";
-
             if (!voices || voices.length === 0) {
-                listEl.innerHTML = `<div style="color: var(--text-muted); font-size: 13px; grid-column: 1/-1;">Không tìm thấy giọng đọc phù hợp</div>`;
+                listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Không tìm thấy giọng đọc</div>';
                 return;
             }
-
             voices.forEach(v => {
                 const item = document.createElement("div");
                 item.className = `voice-item ${v.voice_type === selectedVoice ? 'active' : ''}`;
-                item.onclick = (e) => {
-                    if (e.target.closest('.btn-preview')) return;
-                    selectVoice(v.voice_type, v.resource_id, item);
-                };
-                
+                item.onclick = (e) => { if (e.target.closest('.btn-preview')) return; selectVoice(v.voice_type, v.resource_id, item); };
                 const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
                 item.innerHTML = `
                     <div class="voice-header">
                         <div class="voice-name">${v.display_name || v.voice_type}</div>
-                        <button class="btn-preview" title="Nghe thử giọng này" onclick="previewVoice('${v.voice_type}', '${v.lan || 'vi'}', this, event)">
+                        <button class="btn-preview" onclick="previewVoice('${v.voice_type}','${v.lan||'vi'}',this,event)">
                             <i class="fa-solid fa-volume-high"></i> Nghe thử
                         </button>
                     </div>
-                    <div class="voice-tag">${langBadge} ${v.voice_type}</div>
-                `;
+                    <div class="voice-tag">${langBadge} ${v.voice_type}</div>`;
                 listEl.appendChild(item);
             });
         }
 
         function selectVoice(voiceType, resourceId, element) {
-            selectedVoice = voiceType;
-            selectedResourceId = resourceId;
+            selectedVoice = voiceType; selectedResourceId = resourceId;
             document.querySelectorAll(".voice-item").forEach(el => el.classList.remove("active"));
             element.classList.add("active");
         }
 
         async function previewVoice(voiceType, lan, btnEl, event) {
             if (event) event.stopPropagation();
-
             previewAudioEl.pause();
-            if (activePreviewBtn) {
-                activePreviewBtn.classList.remove("playing");
-                activePreviewBtn.innerHTML = `<i class="fa-solid fa-volume-high"></i> Nghe thử`;
-            }
-
-            if (activePreviewBtn === btnEl && !previewAudioEl.paused) {
-                activePreviewBtn = null;
-                return;
-            }
-
-            btnEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Nạp...`;
-            btnEl.disabled = true;
-
+            if (activePreviewBtn) { activePreviewBtn.classList.remove("playing"); activePreviewBtn.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
+            if (activePreviewBtn === btnEl && !previewAudioEl.paused) { activePreviewBtn = null; return; }
+            btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Nạp...'; btnEl.disabled = true;
             try {
-                const resp = await fetch("/api/preview_voice", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ voice: voiceType, lan: lan })
-                });
+                const resp = await fetch("/api/preview_voice", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({voice:voiceType,lan:lan}) });
                 const data = await resp.json();
-
                 if (data.status === "success") {
-                    previewAudioEl.src = data.download_url;
-                    previewAudioEl.play();
-                    
-                    activePreviewBtn = btnEl;
-                    btnEl.classList.add("playing");
-                    btnEl.innerHTML = `<i class="fa-solid fa-pause"></i> Đang phát`;
-
-                    previewAudioEl.onended = () => {
-                        btnEl.classList.remove("playing");
-                        btnEl.innerHTML = `<i class="fa-solid fa-volume-high"></i> Nghe thử`;
-                        activePreviewBtn = null;
-                    };
-                } else {
-                    alert("Lỗi nghe thử: " + (data.message || "Giọng đọc này chưa tạo được mẫu thử. Vui lòng thử giọng khác!"));
-                    btnEl.innerHTML = `<i class="fa-solid fa-volume-high"></i> Nghe thử`;
-                }
-            } catch (e) {
-                alert("Lỗi kết nối nghe thử: " + e.message);
-                btnEl.innerHTML = `<i class="fa-solid fa-volume-high"></i> Nghe thử`;
-            } finally {
-                btnEl.disabled = false;
-            }
+                    previewAudioEl.src = data.download_url; previewAudioEl.play();
+                    activePreviewBtn = btnEl; btnEl.classList.add("playing");
+                    btnEl.innerHTML = '<i class="fa-solid fa-pause"></i> Đang phát';
+                    previewAudioEl.onended = () => { btnEl.classList.remove("playing"); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; activePreviewBtn = null; };
+                } else { alert("Lỗi: " + (data.message || "Thử giọng khác!")); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
+            } catch (e) { alert("Lỗi kết nối: " + e.message); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
+            finally { btnEl.disabled = false; }
         }
 
         document.getElementById("voiceSearch").addEventListener("input", (e) => {
             const term = e.target.value.toLowerCase().trim();
-            const filtered = allVoices.filter(v => 
-                (v.display_name && v.display_name.toLowerCase().includes(term)) ||
-                (v.voice_type && v.voice_type.toLowerCase().includes(term)) ||
-                (v.lan && v.lan.toLowerCase().includes(term))
-            );
-            renderVoices(filtered);
+            renderVoices(allVoices.filter(v => (v.display_name||'').toLowerCase().includes(term) || (v.voice_type||'').toLowerCase().includes(term) || (v.lan||'').toLowerCase().includes(term)));
         });
 
         function formatDuration(ms) {
-            const totalSec = Math.round(ms / 1000);
-            const mins = Math.floor(totalSec / 60);
-            const secs = totalSec % 60;
-            if (mins > 0) {
-                return `${mins} phút ${secs} giây`;
-            }
-            return `${secs} giây`;
+            const s = Math.round(ms/1000), m = Math.floor(s/60);
+            return m > 0 ? `${m} phút ${s%60} giây` : `${s} giây`;
         }
 
         async function startGeneration() {
             const text = document.getElementById("textInput").value.trim();
-            if (!text) {
-                alert("Vui lòng nhập văn bản cần đọc!");
-                return;
-            }
+            if (!text) { alert("Vui lòng nhập văn bản!"); return; }
+            const btn = document.getElementById("btnGenerate"), rate = document.getElementById("rateSelect").value;
+            const progressCard = document.getElementById("progressCard"), playerCard = document.getElementById("playerCard");
+            const fillEl = document.getElementById("progressFill"), pctEl = document.getElementById("progressPercentage"), statusEl = document.getElementById("progressStatus");
 
-            const btn = document.getElementById("btnGenerate");
-            const rate = document.getElementById("rateSelect").value;
-            const progressCard = document.getElementById("progressCard");
-            const playerCard = document.getElementById("playerCard");
-            const fillEl = document.getElementById("progressFill");
-            const pctEl = document.getElementById("progressPercentage");
-            const statusEl = document.getElementById("progressStatus");
-
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...`;
-            playerCard.classList.remove("show");
-            
-            progressCard.classList.add("show");
-            fillEl.style.width = "5%";
-            pctEl.innerText = "5%";
-            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản không giới hạn...`;
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+            playerCard.classList.remove("show"); progressCard.classList.add("show");
+            fillEl.style.width = "5%"; pctEl.innerText = "5%";
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản...';
 
             try {
-                const resp = await fetch("/api/generate_job", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        text: text,
-                        voice: selectedVoice,
-                        resource_id: selectedResourceId,
-                        rate: rate
-                    })
-                });
-
+                const resp = await fetch("/api/generate_job", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({text, voice:selectedVoice, resource_id:selectedResourceId, rate}) });
                 const data = await resp.json();
-                if (data.status !== "success") {
-                    alert("Lỗi tạo job: " + (data.message || "Không khởi tạo được"));
-                    progressCard.classList.remove("show");
-                    btn.disabled = false;
-                    btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
-                    return;
-                }
+                if (data.status !== "success") { alert("Lỗi: " + (data.message||"")); progressCard.classList.remove("show"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3'; return; }
 
                 const jobId = data.job_id;
-
                 const pollInterval = setInterval(async () => {
                     try {
-                        const sresp = await fetch(`/api/job_status/${jobId}`);
-                        
-                        // Handle server restart or 404 gracefully
-                        if (sresp.status === 404) {
-                            clearInterval(pollInterval);
-                            progressCard.classList.remove("show");
-                            btn.disabled = false;
-                            btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
-                            return;
-                        }
-
-                        const sdata = await sresp.json();
-
-                        if (sdata.status === "processing" || sdata.status === "queued") {
-                            const pct = sdata.progress || 10;
-                            fillEl.style.width = pct + "%";
-                            pctEl.innerText = pct + "%";
-                            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${sdata.message || 'Đang xử lý song song...'}`;
-                        } else if (sdata.status === "completed") {
-                            clearInterval(pollInterval);
-                            
-                            fillEl.style.width = "100%";
-                            pctEl.innerText = "100%";
-                            statusEl.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--accent-emerald);"></i> ${sdata.message}`;
-
+                        const sr = await fetch(`/api/job_status/${jobId}`);
+                        if (sr.status === 404) { clearInterval(pollInterval); progressCard.classList.remove("show"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3'; return; }
+                        const sd = await sr.json();
+                        if (sd.status === "processing" || sd.status === "queued") {
+                            const p = sd.progress||10; fillEl.style.width=p+"%"; pctEl.innerText=p+"%";
+                            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message||'Đang xử lý...');
+                        } else if (sd.status === "completed") {
+                            clearInterval(pollInterval); fillEl.style.width="100%"; pctEl.innerText="100%";
+                            statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> ' + sd.message;
                             setTimeout(() => {
                                 progressCard.classList.remove("show");
-                                const res = sdata.result;
-                                
-                                const audioPlayer = document.getElementById("audioPlayer");
-                                const downloadBtn = document.getElementById("downloadBtn");
-                                
-                                audioPlayer.src = res.download_url;
-                                downloadBtn.href = res.download_url;
-                                downloadBtn.download = res.filename;
-
-                                document.getElementById("resultTime").innerText = `Thời lượng: ${formatDuration(res.duration_ms)} (${res.text_length.toLocaleString()} ký tự)`;
+                                const res = sd.result;
+                                document.getElementById("audioPlayer").src = res.download_url;
+                                document.getElementById("downloadBtn").href = res.download_url;
+                                document.getElementById("downloadBtn").download = res.filename;
+                                document.getElementById("resultTime").innerText = 'Thời lượng: ' + formatDuration(res.duration_ms) + ' (' + res.text_length.toLocaleString() + ' ký tự)';
                                 playerCard.classList.add("show");
-                                audioPlayer.play();
-
-                                loadHistory();
-
-                                btn.disabled = false;
-                                btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
+                                document.getElementById("audioPlayer").play();
+                                btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
                             }, 500);
-
-                        } else if (sdata.status === "error") {
-                            clearInterval(pollInterval);
-                            alert("Lỗi xử lý: " + sdata.message);
-                            progressCard.classList.remove("show");
-                            btn.disabled = false;
-                            btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
+                        } else if (sd.status === "error") {
+                            clearInterval(pollInterval); alert("Lỗi: " + sd.message);
+                            progressCard.classList.remove("show"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
                         }
-                    } catch (err) {
-                        console.error("Poll error:", err);
-                    }
+                    } catch (err) { console.error("Poll error:", err); }
                 }, 600);
-
             } catch (e) {
-                alert("Lỗi kết nối máy chủ: " + e.message);
-                progressCard.classList.remove("show");
-                btn.disabled = false;
-                btn.innerHTML = `<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3`;
+                alert("Lỗi kết nối: " + e.message); progressCard.classList.remove("show");
+                btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
             }
         }
 
-        async function loadHistory() {
-            try {
-                const resp = await fetch("/api/history");
-                const data = await resp.json();
-                const listEl = document.getElementById("historyList");
-                listEl.innerHTML = "";
-
-                document.getElementById("historySize").innerText = (data.total_size_mb || 0) + " MB";
-                document.getElementById("historyCount").innerText = data.total_files || 0;
-
-                if (data.status === "success" && data.files.length > 0) {
-                    data.files.forEach(f => {
-                        const item = document.createElement("div");
-                        item.className = "history-item";
-                        item.innerHTML = `
-                            <div class="file-info">
-                                <div class="file-icon"><i class="fa-solid fa-file-audio"></i></div>
-                                <div class="file-details">
-                                    <h4 title="${f.filename}">${f.filename}</h4>
-                                    <p>${f.created_at} • ${f.size_kb} KB</p>
-                                </div>
-                            </div>
-                            <div class="history-actions">
-                                <a href="${f.download_url}" download class="download-btn" style="padding: 6px 10px; font-size: 11px; margin-top: 0;">
-                                    <i class="fa-solid fa-download"></i> Tải
-                                </a>
-                                <button class="btn-delete" title="Xóa file này" onclick="deleteHistoryFile('${f.filename}')">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </div>
-                        `;
-                        listEl.appendChild(item);
-                    });
-                } else {
-                    listEl.innerHTML = `<div style="color: var(--text-muted); font-size: 13px;">Chưa có file nào trong lịch sử</div>`;
-                }
-            } catch (e) {
-                console.error("Load history error:", e);
-            }
-        }
-
-        async function deleteHistoryFile(filename) {
-            if (!confirm(`Bạn có chắc muốn xóa file ${filename}?`)) return;
-            try {
-                const resp = await fetch(`/api/delete_file/${filename}`, { method: "DELETE" });
-                const data = await resp.json();
-                if (data.status === "success") {
-                    loadHistory();
-                } else {
-                    alert("Lỗi: " + data.message);
-                }
-            } catch (e) {
-                alert("Lỗi kết nối khi xóa file: " + e.message);
-            }
-        }
-
-        async function clearAllHistory() {
-            if (!confirm("Bạn có chắc muốn xóa TOÀN BỘ file MP3 trong lịch sử không?")) return;
-            try {
-                const resp = await fetch("/api/clear_history", { method: "POST" });
-                const data = await resp.json();
-                if (data.status === "success") {
-                    loadHistory();
-                } else {
-                    alert("Lỗi: " + data.message);
-                }
-            } catch (e) {
-                alert("Lỗi kết nối khi dọn dẹp lịch sử: " + e.message);
-            }
-        }
-
-        // Init
-        fetchVoices();
-        loadHistory();
-        updateTextStats();
+        fetchVoices(); updateTextStats();
     </script>
 </body>
 </html>

@@ -12,7 +12,7 @@ from capcut_tts_api import CapCutClient, CapCutError
 
 app = Flask(__name__)
 
-# Output directories
+# Temporary output directory (files auto-cleaned on each new generation)
 OUTPUT_DIR = Path(__file__).parent / "output_audio"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -70,6 +70,14 @@ def split_text_into_chunks(text, max_chars=180):
         chunks.append(current_chunk)
     return chunks if chunks else [text]
 
+def cleanup_old_mp3():
+    """Auto-delete all old generated MP3 files to save disk space."""
+    for p in OUTPUT_DIR.glob("tts_*.mp3"):
+        try:
+            p.unlink()
+        except Exception:
+            pass
+
 def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
     for retry in range(3):
         try:
@@ -108,6 +116,9 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
 
 def run_tts_job(job_id, text, voice, resource_id, rate):
     try:
+        # Clean up old files before generating new one
+        cleanup_old_mp3()
+
         chunks = split_text_into_chunks(text, max_chars=180)
         total_chunks = len(chunks)
 
@@ -118,7 +129,6 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
             "total_chunks": total_chunks,
             "completed_chunks": 0,
             "result": None,
-            "updated_at": time.time()
         }
 
         chunk_results = [None] * total_chunks
@@ -142,7 +152,6 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
                     JOBS[job_id]["progress"] = progress_pct
                     JOBS[job_id]["completed_chunks"] = completed_count
                     JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
-                    JOBS[job_id]["updated_at"] = time.time()
                 else:
                     JOBS[job_id]["status"] = "error"
                     JOBS[job_id]["message"] = f"Không thể xử lý đoạn {idx+1}/{total_chunks}. Vui lòng thử lại!"
@@ -160,6 +169,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
         combined_data = b"".join(valid_bytes)
         total_duration_ms = sum(durations)
 
+        # Save temporary file (will be auto-deleted on next generation)
         filename = f"tts_{job_id}_{int(time.time())}.mp3"
         local_path = OUTPUT_DIR / filename
 
@@ -177,12 +187,10 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
             "total_chunks": total_chunks,
             "voice": voice
         }
-        JOBS[job_id]["updated_at"] = time.time()
 
     except Exception as e:
         JOBS[job_id]["status"] = "error"
         JOBS[job_id]["message"] = f"Lỗi hệ thống: {str(e)}"
-        JOBS[job_id]["updated_at"] = time.time()
 
 @app.route("/")
 def index():
@@ -215,7 +223,6 @@ def generate_job():
             "progress": 0,
             "message": "Đang phân tích văn bản không giới hạn ký tự...",
             "result": None,
-            "updated_at": time.time()
         }
 
         t = threading.Thread(target=run_tts_job, args=(job_id, text, voice, resource_id, rate), daemon=True)
@@ -233,7 +240,7 @@ def get_job_status(job_id):
         return jsonify({
             "status": "error",
             "error_type": "job_not_found",
-            "message": "Tiến trình cũ không tồn tại (Server vừa được khởi động lại). Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
+            "message": "Tiến trình không tồn tại. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
         }), 404
     return jsonify(job)
 
@@ -308,55 +315,11 @@ def serve_audio(filename):
 def serve_preview_audio(filename):
     return send_from_directory(PREVIEW_DIR, filename)
 
-@app.route("/api/history", methods=["GET"])
-def get_history():
-    files = []
-    total_bytes = 0
-    for p in sorted(OUTPUT_DIR.glob("*.mp3"), key=os.path.getmtime, reverse=True):
-        size_bytes = p.stat().st_size
-        total_bytes += size_bytes
-        files.append({
-            "filename": p.name,
-            "download_url": f"/output/{p.name}",
-            "created_at": time.strftime('%H:%M:%S %d/%m/%Y', time.localtime(p.stat().st_mtime)),
-            "size_kb": round(size_bytes / 1024, 1)
-        })
-    
-    size_mb = round(total_bytes / (1024 * 1024), 2)
-    return jsonify({
-        "status": "success",
-        "files": files,
-        "total_files": len(files),
-        "total_size_mb": size_mb
-    })
-
-@app.route("/api/delete_file/<filename>", methods=["DELETE"])
-def delete_file(filename):
-    try:
-        clean_name = os.path.basename(filename)
-        target = OUTPUT_DIR / clean_name
-        if target.exists() and target.is_file():
-            target.unlink()
-            return jsonify({"status": "success", "message": f"Đã xóa file {clean_name}"})
-        return jsonify({"status": "error", "message": "File không tồn tại"}), 404
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/api/clear_history", methods=["POST"])
-def clear_history():
-    try:
-        deleted_count = 0
-        for p in OUTPUT_DIR.glob("*.mp3"):
-            if p.is_file():
-                p.unlink()
-                deleted_count += 1
-        return jsonify({"status": "success", "message": f"Đã xóa {deleted_count} file lịch sử!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
 if __name__ == "__main__":
     import sys
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+    # Clean up any leftover MP3 files on startup
+    cleanup_old_mp3()
     print("CapCut TTS Web Interface running at http://127.0.0.1:5000")
     app.run(host="0.0.0.0", port=5000, debug=False)
