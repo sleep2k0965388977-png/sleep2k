@@ -248,6 +248,29 @@
             transition: all 0.2s; box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
         }
         .modal-action-btn:hover { transform: translateY(-2px); opacity: 0.95; }
+
+        /* Language Filter Tabs CSS */
+        .lang-filter-bar {
+            display: flex; align-items: center; gap: 8px;
+            margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px;
+        }
+        .lang-tab {
+            background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-muted); padding: 6px 14px; border-radius: 20px;
+            font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+            transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .lang-tab:hover {
+            background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.3); color: #fff;
+        }
+        .lang-tab.active {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            border-color: var(--accent-purple); color: #fff;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.35);
+        }
+        .lang-count {
+            background: rgba(0, 0, 0, 0.25); padding: 2px 6px; border-radius: 10px; font-size: 10px;
+        }
     </style>
 </head>
 <body>
@@ -302,9 +325,32 @@
                 <div class="card-title" style="font-size:14px;margin-bottom:10px;">
                     <i class="fa-solid fa-microphone-lines"></i> Danh Sách Giọng Đọc (Voice Station)
                 </div>
+
+                <!-- Language Filter Tabs -->
+                <div class="lang-filter-bar" id="langFilterBar">
+                    <button class="lang-tab active" onclick="filterByLang('all', this)">
+                        🌐 Tất Cả <span class="lang-count" id="cntAll">129</span>
+                    </button>
+                    <button class="lang-tab" onclick="filterByLang('vi', this)">
+                        🇻🇳 Việt Nam <span class="lang-count" id="cntVi">24</span>
+                    </button>
+                    <button class="lang-tab" onclick="filterByLang('en', this)">
+                        🇺🇸 Tiếng Anh <span class="lang-count" id="cntEn">40</span>
+                    </button>
+                    <button class="lang-tab" onclick="filterByLang('zh', this)">
+                        🇨🇳 Tiếng Trung <span class="lang-count" id="cntZh">16</span>
+                    </button>
+                    <button class="lang-tab" onclick="filterByLang('ja', this)">
+                        🇯🇵 Tiếng Nhật <span class="lang-count" id="cntJa">19</span>
+                    </button>
+                    <button class="lang-tab" onclick="filterByLang('other', this)">
+                        🌍 Quốc Gia Khác <span class="lang-count" id="cntOther">10</span>
+                    </button>
+                </div>
+
                 <div class="search-box">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="voiceSearch" placeholder="Tìm kiếm giọng đọc (VD: Thảo Trinh, Bé, Việt Méo, ...)">
+                    <input type="text" id="voiceSearch" placeholder="Tìm kiếm giọng đọc (VD: Thảo Trinh, Bé, Việt Méo, ...)" oninput="applyFilters()">
                 </div>
                 <div class="voice-list" id="voiceList">
                     <div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Đang tải danh sách giọng đọc...</div>
@@ -392,67 +438,78 @@
 
         function clearText() { document.getElementById("textInput").value = ""; updateTextStats(); }
 
+        let currentLangFilter = "all";
+
         async function fetchVoices() {
             try {
                 const resp = await fetch("/api/voices");
                 const data = await resp.json();
-                if (data.status === "success") { allVoices = data.voices; renderVoices(allVoices); }
+                if (data.status === "success") { 
+                    allVoices = data.voices; 
+                    updateLangCounts();
+                    applyFilters(); 
+                }
             } catch (e) { console.error("Fetch voices error:", e); }
         }
 
-        function renderVoices(voices) {
-            const listEl = document.getElementById("voiceList");
-            listEl.innerHTML = "";
-            if (!voices || voices.length === 0) {
-                listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Không tìm thấy giọng đọc</div>';
-                return;
-            }
-            voices.forEach(v => {
-                const item = document.createElement("div");
-                item.className = `voice-item ${v.voice_type === selectedVoice ? 'active' : ''}`;
-                item.onclick = (e) => { if (e.target.closest('.btn-preview')) return; selectVoice(v.voice_type, v.resource_id, item); };
-                const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
-                item.innerHTML = `
-                    <div class="voice-header">
-                        <div class="voice-name">${v.display_name || v.voice_type}</div>
-                        <button class="btn-preview" onclick="previewVoice('${v.voice_type}','${v.lan||'vi'}',this,event)">
-                            <i class="fa-solid fa-volume-high"></i> Nghe thử
-                        </button>
-                    </div>
-                    <div class="voice-tag">${langBadge} ${v.voice_type}</div>`;
-                listEl.appendChild(item);
+        function updateLangCounts() {
+            let vi = 0, en = 0, zh = 0, ja = 0, other = 0;
+            allVoices.forEach(v => {
+                const lan = (v.lan || "").toLowerCase();
+                const vtype = (v.voice_type || "").toLowerCase();
+                const dname = (v.display_name || "").toLowerCase();
+
+                if (lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt")) vi++;
+                else if (lan.includes("en")) en++;
+                else if (lan.includes("zh") || lan.includes("cn")) zh++;
+                else if (lan.includes("ja") || lan.includes("jp")) ja++;
+                else other++;
             });
+
+            document.getElementById("cntAll").innerText = allVoices.length;
+            document.getElementById("cntVi").innerText = vi;
+            document.getElementById("cntEn").innerText = en;
+            document.getElementById("cntZh").innerText = zh;
+            document.getElementById("cntJa").innerText = ja;
+            document.getElementById("cntOther").innerText = other;
         }
 
-        function selectVoice(voiceType, resourceId, element) {
-            selectedVoice = voiceType; selectedResourceId = resourceId;
-            document.querySelectorAll(".voice-item").forEach(el => el.classList.remove("active"));
-            element.classList.add("active");
+        function filterByLang(lang, btnEl) {
+            currentLangFilter = lang;
+            document.querySelectorAll(".lang-tab").forEach(el => el.classList.remove("active"));
+            if (btnEl) btnEl.classList.add("active");
+            applyFilters();
         }
 
-        async function previewVoice(voiceType, lan, btnEl, event) {
-            if (event) event.stopPropagation();
-            previewAudioEl.pause();
-            if (activePreviewBtn) { activePreviewBtn.classList.remove("playing"); activePreviewBtn.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
-            if (activePreviewBtn === btnEl && !previewAudioEl.paused) { activePreviewBtn = null; return; }
-            btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Nạp...'; btnEl.disabled = true;
-            try {
-                const resp = await fetch("/api/preview_voice", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({voice:voiceType,lan:lan}) });
-                const data = await resp.json();
-                if (data.status === "success") {
-                    previewAudioEl.src = data.download_url; previewAudioEl.play();
-                    activePreviewBtn = btnEl; btnEl.classList.add("playing");
-                    btnEl.innerHTML = '<i class="fa-solid fa-pause"></i> Đang phát';
-                    previewAudioEl.onended = () => { btnEl.classList.remove("playing"); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; activePreviewBtn = null; };
-                } else { alert("Lỗi: " + (data.message || "Thử giọng khác!")); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
-            } catch (e) { alert("Lỗi kết nối: " + e.message); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
-            finally { btnEl.disabled = false; }
-        }
+        function applyFilters() {
+            const term = (document.getElementById("voiceSearch").value || "").toLowerCase().trim();
+            const filtered = allVoices.filter(v => {
+                const lan = (v.lan || "").toLowerCase();
+                const vtype = (v.voice_type || "").toLowerCase();
+                const dname = (v.display_name || "").toLowerCase();
 
-        document.getElementById("voiceSearch").addEventListener("input", (e) => {
-            const term = e.target.value.toLowerCase().trim();
-            renderVoices(allVoices.filter(v => (v.display_name||'').toLowerCase().includes(term) || (v.voice_type||'').toLowerCase().includes(term) || (v.lan||'').toLowerCase().includes(term)));
-        });
+                let matchesLang = false;
+                if (currentLangFilter === "all") matchesLang = true;
+                else if (currentLangFilter === "vi") matchesLang = lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt");
+                else if (currentLangFilter === "en") matchesLang = lan.includes("en");
+                else if (currentLangFilter === "zh") matchesLang = lan.includes("zh") || lan.includes("cn");
+                else if (currentLangFilter === "ja") matchesLang = lan.includes("ja") || lan.includes("jp");
+                else if (currentLangFilter === "other") {
+                    matchesLang = !lan.includes("vi") && !vtype.includes("vivn") && !dname.includes("việt") &&
+                                  !lan.includes("en") && !lan.includes("zh") && !lan.includes("cn") &&
+                                  !lan.includes("ja") && !lan.includes("jp");
+                }
+
+                let matchesSearch = true;
+                if (term) {
+                    matchesSearch = dname.includes(term) || vtype.includes(term) || lan.includes(term);
+                }
+
+                return matchesLang && matchesSearch;
+            });
+
+            renderVoices(filtered);
+        }
 
         function formatDuration(ms) {
             const s = Math.round(ms/1000), m = Math.floor(s/60);
