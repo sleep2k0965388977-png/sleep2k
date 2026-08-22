@@ -3,12 +3,106 @@ import re
 import json
 import time
 import uuid
+import asyncio
+import io
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import requests
+import subprocess
+import soundfile as sf
+import edge_tts
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from capcut_tts_api import CapCutClient, CapCutError
+
+# ── VieNeu-TTS Official Neural Model (20 distinct preset voices) ──
+_vieneu_tts_instance = None
+_vieneu_lock = threading.Lock()
+
+VIENEU_PRESET_MAP = {
+    "vieneu_truc_ly": "Trúc Ly",
+    "vieneu_ngoc_linh": "Ngọc Linh",
+    "vieneu_doan_trang": "Đoan Trang",
+    "vieneu_mai_anh": "Mai Anh",
+    "vieneu_quynh_anh": "Quỳnh Anh",
+    "vieneu_ngoc_huyen": "Ngọc Huyền",
+    "vieneu_thuy_dung": "Thùy Dung",
+    "vieneu_thuc_doan": "Thục Đoan",
+    "vieneu_my_duyen": "Mỹ Duyên",
+    "vieneu_kim_thanh": "Kim Thanh",
+    "vieneu_ngoc_tran": "Ngọc Trân",
+    "vieneu_minh_duc": "Minh Đức",
+    "vieneu_pham_tuyen": "Phạm Tuyên",
+    "vieneu_thanh_binh": "Thanh Bình",
+    "vieneu_thai_son": "Thái Sơn",
+    "vieneu_xuan_vinh": "Xuân Vĩnh",
+    "vieneu_minh_triet": "Minh Triết",
+    "vieneu_duc_tri": "Đức Trí",
+    "vieneu_adam": "Adam",
+    "vieneu_quang_son": "Quang Sơn",
+}
+
+VIENEU_SAMPLE_TEXTS = {
+    "vieneu_truc_ly": "Xin chào, tôi là Trúc Ly, giọng đọc tự nhiên miền Bắc.",
+    "vieneu_ngoc_linh": "Ngày xửa ngày xưa, ở một ngôi làng nhỏ bên triền đồi xanh mát...",
+    "vieneu_doan_trang": "Chào bạn, tôi là Đoan Trang, rất vui được đồng hành cùng bạn.",
+    "vieneu_mai_anh": "Kính chào quý vị, đây là bản tin thời sự hôm nay.",
+    "vieneu_quynh_anh": "Đêm đã về khuya, không gian yên tĩnh và lắng đọng từng trang sách.",
+    "vieneu_ngoc_huyen": "Xin chào, tôi là Ngọc Huyền, giọng đọc nhẹ nhàng và trong trẻo.",
+    "vieneu_thuy_dung": "Xin kính chào quý khán giả đang theo dõi bản tin phát thanh trực tiếp.",
+    "vieneu_thuc_doan": "Hôm nay em xin gửi tới quý thính giả một câu chuyện thật ấm áp.",
+    "vieneu_my_duyen": "Gió thoảng qua rặng dừa xanh, sông nước miền Tây êm đềm trôi.",
+    "vieneu_kim_thanh": "Kính mời quý thính giả cùng lắng nghe trọn vẹn chương truyện sau đây.",
+    "vieneu_ngoc_tran": "Dạ em chào anh chị, giọng em là giọng Huế miền Trung thương nhớ.",
+    "vieneu_minh_duc": "Kính chào quý vị và các bạn đang theo dõi bản tin thời sự truyền hình.",
+    "vieneu_pham_tuyen": "Xin chào tất cả các bạn, chúc các bạn một ngày làm việc thật hiệu quả.",
+    "vieneu_thanh_binh": "Trong ký ức của tôi, những ngày tháng tuổi thơ ấy thật khó phai mờ.",
+    "vieneu_thai_son": "Chào bà con cô bác, bữa nay tôi xin kể cho bà con nghe một câu chuyện vui.",
+    "vieneu_xuan_vinh": "Chào bạn nha, đây là giọng đọc miền Nam gần gũi và mộc mạc.",
+    "vieneu_minh_triet": "Chào quý khán giả, chương trình tiêu điểm kinh tế hôm nay xin được bắt đầu.",
+    "vieneu_duc_tri": "Bóng đêm dần buông xuống cánh đồng bao la, chỉ còn tiếng dế kêu rả rích.",
+    "vieneu_adam": "Xin chào các bạn, chúc các bạn có những giây phút trải nghiệm tuyệt vời.",
+    "vieneu_quang_son": "Chào bà con miền Trung khúc ruột thân thương, chúc mọi người luôn bình an.",
+}
+
+def get_vieneu_tts():
+    global _vieneu_tts_instance
+    if _vieneu_tts_instance is None:
+        with _vieneu_lock:
+            if _vieneu_tts_instance is None:
+                from vieneu.v3turbo import V3TurboVieNeuTTS
+                _vieneu_tts_instance = V3TurboVieNeuTTS()
+    return _vieneu_tts_instance
+
+def is_vieneu_voice(voice_type):
+    """Check if a voice_type is a VieNeu AI preset."""
+    return voice_type and (voice_type.startswith("vieneu_") or voice_type in VIENEU_PRESET_MAP.values())
+
+def vieneu_synthesize_audio(text, voice_type):
+    """Generate true distinct neural MP3 audio using official VieNeu-TTS v3 Turbo model at 48kHz."""
+    preset_name = VIENEU_PRESET_MAP.get(voice_type, voice_type)
+    tts = get_vieneu_tts()
+    with _vieneu_lock:
+        audio = tts.infer(text=text, voice=preset_name, denoise=True)
+    
+    buf = io.BytesIO()
+    sf.write(buf, audio, tts.sample_rate, format="WAV")
+    wav_bytes = buf.getvalue()
+    
+    try:
+        proc = subprocess.Popen(
+            ["ffmpeg", "-y", "-i", "pipe:0", "-f", "mp3", "-b:a", "192k", "pipe:1"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
+        )
+        mp3_bytes, _ = proc.communicate(input=wav_bytes)
+        if mp3_bytes and len(mp3_bytes) > 0:
+            return mp3_bytes
+    except Exception as ex:
+        print(f"FFmpeg MP3 convert warning: {ex}")
+    
+    return wav_bytes
 
 app = Flask(__name__)
 
@@ -79,6 +173,18 @@ def cleanup_old_mp3():
             pass
 
 def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
+    # ── VieNeu AI voices: use official VieNeu-TTS v3 Turbo model ──
+    if is_vieneu_voice(voice):
+        try:
+            audio_bytes = vieneu_synthesize_audio(text_chunk, voice)
+            if audio_bytes and len(audio_bytes) > 0:
+                est_duration = int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, est_duration
+        except Exception as ex:
+            print(f"VieNeu TTS error chunk {idx+1}: {ex}")
+        return idx, None, 0
+
+    # ── Original CapCut voices: unchanged logic ──
     for retry in range(3):
         try:
             create_res = client.create_tts_task(texts=text_chunk, voice=voice, resource_id=resource_id, rate=rate)
@@ -271,6 +377,23 @@ def preview_voice():
         else:
             sample_text = "Xin chào, đây là giọng đọc thử nghiệm."
 
+        # ── VieNeu AI voices: preview via official VieNeu model ──
+        if is_vieneu_voice(voice):
+            vieneu_sample = VIENEU_SAMPLE_TEXTS.get(voice, sample_text)
+            try:
+                audio_bytes = vieneu_synthesize_audio(vieneu_sample, voice)
+                if audio_bytes and len(audio_bytes) > 0:
+                    with open(preview_file_path, "wb") as f:
+                        f.write(audio_bytes)
+                    return jsonify({
+                        "status": "success",
+                        "download_url": f"/output/previews/{preview_filename}"
+                    })
+            except Exception as ex:
+                return jsonify({"status": "error", "message": f"Lỗi VieNeu AI: {ex}"}), 500
+            return jsonify({"status": "error", "message": "Không tạo được giọng VieNeu AI."}), 500
+
+        # ── Original CapCut voices: unchanged logic ──
         create_res = client.create_tts_task(texts=sample_text, voice=voice, resource_id=resource_id, rate="1.0")
         tasks = (create_res.get("data") or {}).get("tasks") or []
         if not tasks:

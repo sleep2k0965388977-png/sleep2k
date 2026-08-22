@@ -141,6 +141,7 @@ class VoiceInfo:
     lang: str
     lan: str
     captured_at: Optional[str] = None
+    engine: Optional[str] = None
 
     @classmethod
     def load_catalog(cls, file_path: Union[str, Path]) -> List["VoiceInfo"]:
@@ -150,4 +151,4 @@ class VoiceInfo:
             return []
         with open(path, "r", encoding="utf-8") as fp:
             data = json.load(fp)
-        return [cls(**item) for item in data]
+        return [cls(**{k: v for k, v in item.items() if k in cls.__dataclass_fields__}) for item in data]
