@@ -445,6 +445,13 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         JOBS[job_id]["status"] = "error"
         JOBS[job_id]["message"] = f"Lỗi hệ thống: {str(e)}"
 
+@app.after_request
+def add_cache_control_headers(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 @app.route("/")
 def index():
     return render_template("index.html")
