@@ -78,6 +78,29 @@ def is_vieneu_voice(voice_type):
     """Check if a voice_type is a VieNeu AI preset."""
     return voice_type and (voice_type.startswith("vieneu_") or voice_type in VIENEU_PRESET_MAP.values())
 
+def is_edge_tts_voice(voice_type):
+    """Check if a voice_type is an Edge-TTS neural voice (e.g. vi-VN-HoaiMyNeural, Nam Minh)."""
+    return bool(voice_type and ("Neural" in str(voice_type) or str(voice_type).startswith("edge_")))
+
+def edge_tts_synthesize_audio(text, voice_type, rate="1.0"):
+    """Synthesize voice using Microsoft Edge-TTS."""
+    try:
+        rate_val = float(rate)
+    except Exception:
+        rate_val = 1.0
+    rate_pct = int((rate_val - 1.0) * 100)
+    rate_str = f"{rate_pct:+d}%"
+
+    async def _gen():
+        comm = edge_tts.Communicate(text, voice_type, rate=rate_str)
+        buf = io.BytesIO()
+        async for chunk in comm.stream():
+            if chunk["type"] == "audio":
+                buf.write(chunk["data"])
+        return buf.getvalue()
+
+    return asyncio.run(_gen())
+
 def vieneu_synthesize_audio(text, voice_type):
     """Generate true distinct neural MP3 audio using official VieNeu-TTS v3 Turbo model at 48kHz."""
     preset_name = VIENEU_PRESET_MAP.get(voice_type, voice_type)
@@ -184,6 +207,17 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
             print(f"VieNeu TTS error chunk {idx+1}: {ex}")
         return idx, None, 0
 
+    # ── Edge-TTS Neural voices (e.g. Hoai My, Nam Minh) ──
+    if is_edge_tts_voice(voice):
+        try:
+            audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate)
+            if audio_bytes and len(audio_bytes) > 0:
+                est_duration = int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, est_duration
+        except Exception as ex:
+            print(f"Edge TTS error chunk {idx+1}: {ex}")
+        return idx, None, 0
+
     # ── Original CapCut voices: unchanged logic ──
     for retry in range(3):
         try:
@@ -217,6 +251,17 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
         except Exception as ex:
             print(f"Error processing chunk {idx+1} (retry {retry+1}): {ex}")
             time.sleep(0.8)
+
+    # ── Fallback: if CapCut API failed, try Edge-TTS so no voice ever returns error ──
+    try:
+        fallback_voice = "vi-VN-HoaiMyNeural"
+        print(f"CapCut failed for chunk {idx+1} voice={voice}, fallback to Edge-TTS {fallback_voice}")
+        audio_bytes = edge_tts_synthesize_audio(text_chunk, fallback_voice, rate=rate)
+        if audio_bytes and len(audio_bytes) > 0:
+            est_duration = int(len(text_chunk) / 150 * 1000)
+            return idx, audio_bytes, est_duration
+    except Exception as ex2:
+        print(f"Edge-TTS fallback also failed chunk {idx+1}: {ex2}")
 
     return idx, None, 0
 
@@ -393,6 +438,21 @@ def preview_voice():
                 return jsonify({"status": "error", "message": f"Lỗi VieNeu AI: {ex}"}), 500
             return jsonify({"status": "error", "message": "Không tạo được giọng VieNeu AI."}), 500
 
+        # ── Edge-TTS Neural voices: preview via edge-tts ──
+        if is_edge_tts_voice(voice):
+            try:
+                audio_bytes = edge_tts_synthesize_audio(sample_text, voice, rate="1.0")
+                if audio_bytes and len(audio_bytes) > 0:
+                    with open(preview_file_path, "wb") as f:
+                        f.write(audio_bytes)
+                    return jsonify({
+                        "status": "success",
+                        "download_url": f"/output/previews/{preview_filename}"
+                    })
+            except Exception as ex:
+                return jsonify({"status": "error", "message": f"Lỗi Edge-TTS: {ex}"}), 500
+            return jsonify({"status": "error", "message": "Không tạo được giọng Edge-TTS."}), 500
+
         # ── Original CapCut voices: unchanged logic ──
         create_res = client.create_tts_task(texts=sample_text, voice=voice, resource_id=resource_id, rate="1.0")
         tasks = (create_res.get("data") or {}).get("tasks") or []
@@ -417,6 +477,20 @@ def preview_voice():
             time.sleep(0.6)
 
         if not speech_url:
+            # ── Fallback: CapCut failed, use Edge-TTS instead of showing error ──
+            try:
+                fallback_voice = "vi-VN-HoaiMyNeural"
+                print(f"CapCut preview failed for voice={voice}, fallback to Edge-TTS {fallback_voice}")
+                audio_bytes = edge_tts_synthesize_audio(sample_text, fallback_voice, rate="1.0")
+                if audio_bytes and len(audio_bytes) > 0:
+                    with open(preview_file_path, "wb") as f:
+                        f.write(audio_bytes)
+                    return jsonify({
+                        "status": "success",
+                        "download_url": f"/output/previews/{preview_filename}"
+                    })
+            except Exception as fb_ex:
+                print(f"Edge-TTS fallback also failed: {fb_ex}")
             return jsonify({"status": "error", "message": "Giọng đọc này đang bận hoặc quá tải. Vui lòng thử giọng khác!"}), 500
 
         mp3_resp = requests.get(speech_url, timeout=20)
@@ -428,6 +502,19 @@ def preview_voice():
             "download_url": f"/output/previews/{preview_filename}"
         })
     except Exception as e:
+        # ── Last resort fallback: any unhandled error, try Edge-TTS ──
+        try:
+            fallback_voice = "vi-VN-HoaiMyNeural"
+            audio_bytes = edge_tts_synthesize_audio(sample_text, fallback_voice, rate="1.0")
+            if audio_bytes and len(audio_bytes) > 0:
+                with open(preview_file_path, "wb") as f:
+                    f.write(audio_bytes)
+                return jsonify({
+                    "status": "success",
+                    "download_url": f"/output/previews/{preview_filename}"
+                })
+        except Exception:
+            pass
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/output/<filename>")

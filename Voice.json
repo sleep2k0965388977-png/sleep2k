@@ -526,7 +526,7 @@
   {
     "lan": "en",
     "lang": "en-US",
-    "voice_type": "en-US-JennyMultilingualNeural",
+    "voice_type": "en-US-JennyNeural",
     "display_name": "Jenny",
     "resource_id": "7569439521352338689",
     "captured_at": "2026-04-16T18:05:52.828530"
