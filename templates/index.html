@@ -329,10 +329,13 @@
                 <!-- Language Filter Tabs -->
                 <div class="lang-filter-bar" id="langFilterBar">
                     <button class="lang-tab active" onclick="filterByLang('all', this)">
-                        🌐 Tất Cả <span class="lang-count" id="cntAll">129</span>
+                        🌐 Tất Cả <span class="lang-count" id="cntAll">149</span>
+                    </button>
+                    <button class="lang-tab" onclick="filterByLang('vieneu', this)" style="border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.15);">
+                        ✨ VieNeu AI (48kHz) <span class="lang-count" id="cntVieneu">20</span>
                     </button>
                     <button class="lang-tab" onclick="filterByLang('vi', this)">
-                        🇻🇳 Việt Nam <span class="lang-count" id="cntVi">24</span>
+                        🇻🇳 Tiếng Việt <span class="lang-count" id="cntVi">26</span>
                     </button>
                     <button class="lang-tab" onclick="filterByLang('en', this)">
                         🇺🇸 Tiếng Anh <span class="lang-count" id="cntEn">40</span>
@@ -344,7 +347,7 @@
                         🇯🇵 Tiếng Nhật <span class="lang-count" id="cntJa">19</span>
                     </button>
                     <button class="lang-tab" onclick="filterByLang('other', this)">
-                        🌍 Quốc Gia Khác <span class="lang-count" id="cntOther">10</span>
+                        🌍 Quốc Tế Khác <span class="lang-count" id="cntOther">28</span>
                     </button>
                 </div>
 
@@ -453,20 +456,30 @@
         }
 
         function updateLangCounts() {
-            let vi = 0, en = 0, zh = 0, ja = 0, other = 0;
+            let vieneu = 0, vi = 0, en = 0, zh = 0, ja = 0, other = 0;
             allVoices.forEach(v => {
                 const lan = (v.lan || "").toLowerCase();
                 const vtype = (v.voice_type || "").toLowerCase();
                 const dname = (v.display_name || "").toLowerCase();
 
-                if (lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt")) vi++;
-                else if (lan.includes("en")) en++;
-                else if (lan.includes("zh") || lan.includes("cn")) zh++;
-                else if (lan.includes("ja") || lan.includes("jp")) ja++;
-                else other++;
+                if (vtype.startsWith("vieneu_")) {
+                    vieneu++;
+                    vi++;
+                } else if (lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt")) {
+                    vi++;
+                } else if (lan.includes("en")) {
+                    en++;
+                } else if (lan.includes("zh") || lan.includes("cn")) {
+                    zh++;
+                } else if (lan.includes("ja") || lan.includes("jp")) {
+                    ja++;
+                } else {
+                    other++;
+                }
             });
 
             document.getElementById("cntAll").innerText = allVoices.length;
+            if (document.getElementById("cntVieneu")) document.getElementById("cntVieneu").innerText = vieneu;
             document.getElementById("cntVi").innerText = vi;
             document.getElementById("cntEn").innerText = en;
             document.getElementById("cntZh").innerText = zh;
@@ -490,12 +503,13 @@
 
                 let matchesLang = false;
                 if (currentLangFilter === "all") matchesLang = true;
+                else if (currentLangFilter === "vieneu") matchesLang = vtype.startsWith("vieneu_");
                 else if (currentLangFilter === "vi") matchesLang = lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt");
                 else if (currentLangFilter === "en") matchesLang = lan.includes("en");
                 else if (currentLangFilter === "zh") matchesLang = lan.includes("zh") || lan.includes("cn");
                 else if (currentLangFilter === "ja") matchesLang = lan.includes("ja") || lan.includes("jp");
                 else if (currentLangFilter === "other") {
-                    matchesLang = !lan.includes("vi") && !vtype.includes("vivn") && !dname.includes("việt") &&
+                    matchesLang = !vtype.startsWith("vieneu_") && !lan.includes("vi") && !vtype.includes("vivn") && !dname.includes("việt") &&
                                   !lan.includes("en") && !lan.includes("zh") && !lan.includes("cn") &&
                                   !lan.includes("ja") && !lan.includes("jp");
                 }
@@ -520,9 +534,22 @@
             }
             voices.forEach(v => {
                 const item = document.createElement("div");
+                const isVieneu = (v.voice_type || "").startsWith("vieneu_");
+                const isEdge = (v.voice_type || "").includes("Neural");
+                
                 item.className = `voice-item ${v.voice_type === selectedVoice ? 'active' : ''}`;
                 item.onclick = (e) => { if (e.target.closest('.btn-preview')) return; selectVoice(v.voice_type, v.resource_id, item); };
-                const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
+                
+                let badgeHtml = '';
+                if (isVieneu) {
+                    badgeHtml = '<span style="color:#a78bfa;font-weight:700;">✨ VieNeu 48kHz</span>';
+                } else if (isEdge) {
+                    badgeHtml = '<span style="color:#60a5fa;font-weight:600;">⚡ Edge Neural</span>';
+                } else {
+                    const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
+                    badgeHtml = `${langBadge} ${v.voice_type}`;
+                }
+
                 item.innerHTML = `
                     <div class="voice-header">
                         <div class="voice-name">${v.display_name || v.voice_type}</div>
@@ -530,7 +557,7 @@
                             <i class="fa-solid fa-volume-high"></i> Nghe thử
                         </button>
                     </div>
-                    <div class="voice-tag">${langBadge} ${v.voice_type}</div>`;
+                    <div class="voice-tag">${badgeHtml}</div>`;
                 listEl.appendChild(item);
             });
         }
