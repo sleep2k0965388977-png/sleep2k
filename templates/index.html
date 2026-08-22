@@ -63,12 +63,148 @@
         }
         .logo-text p { font-size: 13px; color: var(--text-muted); }
 
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .social-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .social-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 13px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            color: #fff;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+        }
+
+        .social-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+        }
+
+        .social-btn.btn-youtube {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.35));
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+        }
+        .social-btn.btn-youtube:hover {
+            background: #ef4444;
+            color: #fff;
+            border-color: #ef4444;
+            box-shadow: 0 6px 18px rgba(239, 68, 68, 0.45);
+        }
+
+        .social-btn.btn-facebook {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.35));
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+        }
+        .social-btn.btn-facebook:hover {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+        }
+
+        .social-btn.btn-mail {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.35));
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #6ee7b7;
+        }
+        .social-btn.btn-mail:hover {
+            background: #059669;
+            color: #fff;
+            border-color: #059669;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+        }
+
         .badge-unlimited {
             background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.2));
             border: 1px solid rgba(139,92,246,0.4); color: #c4b5fd;
             padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
             display: flex; align-items: center; gap: 8px;
         }
+
+        /* Footer Support Section */
+        .app-footer {
+            margin-top: 36px;
+            padding-top: 24px;
+            border-top: 1px solid var(--card-border);
+        }
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .footer-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .footer-title i {
+            color: var(--accent-purple);
+        }
+        .footer-social-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+        }
+        .footer-social-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #fff;
+            transition: all 0.25s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .footer-social-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--accent-purple);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        .social-card-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .yt-card .social-card-icon { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+        .fb-card .social-card-icon { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+        .mail-card .social-card-icon { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+
+        .social-card-info { flex: 1; min-width: 0; }
+        .social-card-name { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .social-card-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .arrow-icon { font-size: 12px; color: var(--text-muted); transition: transform 0.2s; }
+        .footer-social-card:hover .arrow-icon { transform: translate(2px, -2px); color: #fff; }
+        .footer-copyright { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 10px; }
 
         .flow-banner {
             background: var(--card-bg); border: 1px solid var(--card-border);
@@ -279,11 +415,24 @@
             <div class="logo-area">
                 <img src="/static/logo_2.jpg" alt="SLEEP2K Logo" class="logo-icon-img">
                 <div class="logo-text">
-                    <h1>SLEEP2K</h1>
-                    <p>Chuyển đổi Văn bản thành Giọng nói — Không giới hạn ký tự — Xử lý song song 4x</p>
+                    <h1>SLEEP2K TTS</h1>
+                    <p>Chuyển đổi Văn bản thành Giọng nói — Không giới hạn ký tự</p>
                 </div>
             </div>
-            <div class="badge-unlimited"><i class="fa-solid fa-bolt"></i> Không Giới Hạn</div>
+            <div class="header-right">
+                <div class="social-links">
+                    <a href="https://www.youtube.com/channel/UCJZbbNNQi_3b7woAWsxfcOA" target="_blank" rel="noopener noreferrer" class="social-btn btn-youtube" title="Kênh YouTube SLEEP2K">
+                        <i class="fa-brands fa-youtube"></i> <span>YouTube</span>
+                    </a>
+                    <a href="https://www.facebook.com/profile.php?id=61573341676326" target="_blank" rel="noopener noreferrer" class="social-btn btn-facebook" title="Facebook hỗ trợ">
+                        <i class="fa-brands fa-facebook"></i> <span>Facebook</span>
+                    </a>
+                    <a href="mailto:sleepchill2002@gmail.com" class="social-btn btn-mail" title="Gửi Email trực tiếp">
+                        <i class="fa-solid fa-envelope"></i> <span>Email</span>
+                    </a>
+                </div>
+                <div class="badge-unlimited"><i class="fa-solid fa-bolt"></i> Không Giới Hạn</div>
+            </div>
         </header>
 
         <div class="flow-banner">
@@ -329,10 +478,13 @@
                 <!-- Language Filter Tabs -->
                 <div class="lang-filter-bar" id="langFilterBar">
                     <button class="lang-tab active" onclick="filterByLang('all', this)">
-                        🌐 Tất Cả <span class="lang-count" id="cntAll">129</span>
+                        🌐 Tất Cả <span class="lang-count" id="cntAll">149</span>
+                    </button>
+                    <button class="lang-tab" onclick="filterByLang('vieneu', this)" style="border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.15);">
+                        ✨ VieNeu AI (48kHz) <span class="lang-count" id="cntVieneu">20</span>
                     </button>
                     <button class="lang-tab" onclick="filterByLang('vi', this)">
-                        🇻🇳 Việt Nam <span class="lang-count" id="cntVi">24</span>
+                        🇻🇳 Tiếng Việt <span class="lang-count" id="cntVi">26</span>
                     </button>
                     <button class="lang-tab" onclick="filterByLang('en', this)">
                         🇺🇸 Tiếng Anh <span class="lang-count" id="cntEn">40</span>
@@ -344,7 +496,7 @@
                         🇯🇵 Tiếng Nhật <span class="lang-count" id="cntJa">19</span>
                     </button>
                     <button class="lang-tab" onclick="filterByLang('other', this)">
-                        🌍 Quốc Gia Khác <span class="lang-count" id="cntOther">10</span>
+                        🌍 Quốc Tế Khác <span class="lang-count" id="cntOther">28</span>
                     </button>
                 </div>
 
@@ -398,6 +550,44 @@
 
             </div>
         </div>
+
+        <!-- Support & Contact Footer -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <div class="footer-title">
+                    <i class="fa-solid fa-headset"></i> Trung Tâm Hỗ Trợ & Liên Hệ Trực Tiếp
+                </div>
+                <div class="footer-social-row">
+                    <a href="https://www.youtube.com/channel/UCJZbbNNQi_3b7woAWsxfcOA" target="_blank" rel="noopener noreferrer" class="footer-social-card yt-card">
+                        <div class="social-card-icon"><i class="fa-brands fa-youtube"></i></div>
+                        <div class="social-card-info">
+                            <div class="social-card-name">Kênh YouTube</div>
+                            <div class="social-card-sub">Xem video hướng dẫn & cập nhật mới nhất</div>
+                        </div>
+                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
+                    </a>
+                    <a href="https://www.facebook.com/profile.php?id=61573341676326" target="_blank" rel="noopener noreferrer" class="footer-social-card fb-card">
+                        <div class="social-card-icon"><i class="fa-brands fa-facebook"></i></div>
+                        <div class="social-card-info">
+                            <div class="social-card-name">Facebook Cá Nhân</div>
+                            <div class="social-card-sub">Nhắn tin Messenger hỗ trợ trực tiếp 24/7</div>
+                        </div>
+                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
+                    </a>
+                    <a href="mailto:sleepchill2002@gmail.com" class="footer-social-card mail-card">
+                        <div class="social-card-icon"><i class="fa-solid fa-envelope"></i></div>
+                        <div class="social-card-info">
+                            <div class="social-card-name">sleepchill2002@gmail.com</div>
+                            <div class="social-card-sub">Gửi phản hồi, góp ý & yêu cầu tính năng</div>
+                        </div>
+                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
+                    </a>
+                </div>
+                <div class="footer-copyright">
+                    © 2026 SLEEP2K TTS AI — Phát triển vì cộng đồng sáng tạo nội dung.
+                </div>
+            </div>
+        </footer>
     </div>
 
     <!-- Donation Coffee Modal -->
@@ -413,9 +603,20 @@
                 <p class="donate-message">
                     Nếu bạn thấy app này hữu ích và giúp ích cho công việc của bạn, bạn có thể mời add cốc coffee để góp phần duy trì và phát triển app. Cảm ơn bạn rất nhiều!
                 </p>
+                <div style="display:flex;justify-content:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+                    <a href="https://www.youtube.com/channel/UCJZbbNNQi_3b7woAWsxfcOA" target="_blank" rel="noopener noreferrer" class="social-btn btn-youtube" style="padding:8px 14px;">
+                        <i class="fa-brands fa-youtube"></i> YouTube
+                    </a>
+                    <a href="https://www.facebook.com/profile.php?id=61573341676326" target="_blank" rel="noopener noreferrer" class="social-btn btn-facebook" style="padding:8px 14px;">
+                        <i class="fa-brands fa-facebook"></i> Facebook
+                    </a>
+                    <a href="mailto:sleepchill2002@gmail.com" class="social-btn btn-mail" style="padding:8px 14px;">
+                        <i class="fa-solid fa-envelope"></i> Email
+                    </a>
+                </div>
             </div>
             <button class="modal-action-btn" onclick="closeDonateModal()">
-                <i class="fa-solid fa-heart"></i> Cảm ơn bạn!
+                <i class="fa-solid fa-heart"></i> Đóng lại
             </button>
         </div>
     </div>
@@ -453,20 +654,30 @@
         }
 
         function updateLangCounts() {
-            let vi = 0, en = 0, zh = 0, ja = 0, other = 0;
+            let vieneu = 0, vi = 0, en = 0, zh = 0, ja = 0, other = 0;
             allVoices.forEach(v => {
                 const lan = (v.lan || "").toLowerCase();
                 const vtype = (v.voice_type || "").toLowerCase();
                 const dname = (v.display_name || "").toLowerCase();
 
-                if (lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt")) vi++;
-                else if (lan.includes("en")) en++;
-                else if (lan.includes("zh") || lan.includes("cn")) zh++;
-                else if (lan.includes("ja") || lan.includes("jp")) ja++;
-                else other++;
+                if (vtype.startsWith("vieneu_")) {
+                    vieneu++;
+                    vi++;
+                } else if (lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt")) {
+                    vi++;
+                } else if (lan.includes("en")) {
+                    en++;
+                } else if (lan.includes("zh") || lan.includes("cn")) {
+                    zh++;
+                } else if (lan.includes("ja") || lan.includes("jp")) {
+                    ja++;
+                } else {
+                    other++;
+                }
             });
 
             document.getElementById("cntAll").innerText = allVoices.length;
+            if (document.getElementById("cntVieneu")) document.getElementById("cntVieneu").innerText = vieneu;
             document.getElementById("cntVi").innerText = vi;
             document.getElementById("cntEn").innerText = en;
             document.getElementById("cntZh").innerText = zh;
@@ -490,12 +701,13 @@
 
                 let matchesLang = false;
                 if (currentLangFilter === "all") matchesLang = true;
+                else if (currentLangFilter === "vieneu") matchesLang = vtype.startsWith("vieneu_");
                 else if (currentLangFilter === "vi") matchesLang = lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt");
                 else if (currentLangFilter === "en") matchesLang = lan.includes("en");
                 else if (currentLangFilter === "zh") matchesLang = lan.includes("zh") || lan.includes("cn");
                 else if (currentLangFilter === "ja") matchesLang = lan.includes("ja") || lan.includes("jp");
                 else if (currentLangFilter === "other") {
-                    matchesLang = !lan.includes("vi") && !vtype.includes("vivn") && !dname.includes("việt") &&
+                    matchesLang = !vtype.startsWith("vieneu_") && !lan.includes("vi") && !vtype.includes("vivn") && !dname.includes("việt") &&
                                   !lan.includes("en") && !lan.includes("zh") && !lan.includes("cn") &&
                                   !lan.includes("ja") && !lan.includes("jp");
                 }
@@ -520,9 +732,22 @@
             }
             voices.forEach(v => {
                 const item = document.createElement("div");
+                const isVieneu = (v.voice_type || "").startsWith("vieneu_");
+                const isEdge = (v.voice_type || "").includes("Neural");
+                
                 item.className = `voice-item ${v.voice_type === selectedVoice ? 'active' : ''}`;
                 item.onclick = (e) => { if (e.target.closest('.btn-preview')) return; selectVoice(v.voice_type, v.resource_id, item); };
-                const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
+                
+                let badgeHtml = '';
+                if (isVieneu) {
+                    badgeHtml = '<span style="color:#a78bfa;font-weight:700;">✨ VieNeu 48kHz</span>';
+                } else if (isEdge) {
+                    badgeHtml = '<span style="color:#60a5fa;font-weight:600;">⚡ Edge Neural</span>';
+                } else {
+                    const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
+                    badgeHtml = `${langBadge} ${v.voice_type}`;
+                }
+
                 item.innerHTML = `
                     <div class="voice-header">
                         <div class="voice-name">${v.display_name || v.voice_type}</div>
@@ -530,7 +755,7 @@
                             <i class="fa-solid fa-volume-high"></i> Nghe thử
                         </button>
                     </div>
-                    <div class="voice-tag">${langBadge} ${v.voice_type}</div>`;
+                    <div class="voice-tag">${badgeHtml}</div>`;
                 listEl.appendChild(item);
             });
         }

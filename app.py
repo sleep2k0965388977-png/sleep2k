@@ -3,12 +3,144 @@ import re
 import json
 import time
 import uuid
+import asyncio
+import io
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import requests
+import subprocess
+import soundfile as sf
+import edge_tts
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from capcut_tts_api import CapCutClient, CapCutError
+
+# ── VieNeu-TTS Official Neural Model (20 distinct preset voices) ──
+_vieneu_tts_instance = None
+_vieneu_lock = threading.Lock()
+
+VIENEU_PRESET_MAP = {
+    "vieneu_truc_ly": "Trúc Ly",
+    "vieneu_ngoc_linh": "Ngọc Linh",
+    "vieneu_doan_trang": "Đoan Trang",
+    "vieneu_mai_anh": "Mai Anh",
+    "vieneu_quynh_anh": "Quỳnh Anh",
+    "vieneu_ngoc_huyen": "Ngọc Huyền",
+    "vieneu_thuy_dung": "Thùy Dung",
+    "vieneu_thuc_doan": "Thục Đoan",
+    "vieneu_my_duyen": "Mỹ Duyên",
+    "vieneu_kim_thanh": "Kim Thanh",
+    "vieneu_ngoc_tran": "Ngọc Trân",
+    "vieneu_minh_duc": "Minh Đức",
+    "vieneu_pham_tuyen": "Phạm Tuyên",
+    "vieneu_thanh_binh": "Thanh Bình",
+    "vieneu_thai_son": "Thái Sơn",
+    "vieneu_xuan_vinh": "Xuân Vĩnh",
+    "vieneu_minh_triet": "Minh Triết",
+    "vieneu_duc_tri": "Đức Trí",
+    "vieneu_adam": "Adam",
+    "vieneu_quang_son": "Quang Sơn",
+}
+
+VIENEU_SAMPLE_TEXTS = {
+    "vieneu_truc_ly": "Xin chào, tôi là Trúc Ly, giọng đọc tự nhiên miền Bắc.",
+    "vieneu_ngoc_linh": "Ngày xửa ngày xưa, ở một ngôi làng nhỏ bên triền đồi xanh mát...",
+    "vieneu_doan_trang": "Chào bạn, tôi là Đoan Trang, rất vui được đồng hành cùng bạn.",
+    "vieneu_mai_anh": "Kính chào quý vị, đây là bản tin thời sự hôm nay.",
+    "vieneu_quynh_anh": "Đêm đã về khuya, không gian yên tĩnh và lắng đọng từng trang sách.",
+    "vieneu_ngoc_huyen": "Xin chào, tôi là Ngọc Huyền, giọng đọc nhẹ nhàng và trong trẻo.",
+    "vieneu_thuy_dung": "Xin kính chào quý khán giả đang theo dõi bản tin phát thanh trực tiếp.",
+    "vieneu_thuc_doan": "Hôm nay em xin gửi tới quý thính giả một câu chuyện thật ấm áp.",
+    "vieneu_my_duyen": "Gió thoảng qua rặng dừa xanh, sông nước miền Tây êm đềm trôi.",
+    "vieneu_kim_thanh": "Kính mời quý thính giả cùng lắng nghe trọn vẹn chương truyện sau đây.",
+    "vieneu_ngoc_tran": "Dạ em chào anh chị, giọng em là giọng Huế miền Trung thương nhớ.",
+    "vieneu_minh_duc": "Kính chào quý vị và các bạn đang theo dõi bản tin thời sự truyền hình.",
+    "vieneu_pham_tuyen": "Xin chào tất cả các bạn, chúc các bạn một ngày làm việc thật hiệu quả.",
+    "vieneu_thanh_binh": "Trong ký ức của tôi, những ngày tháng tuổi thơ ấy thật khó phai mờ.",
+    "vieneu_thai_son": "Chào bà con cô bác, bữa nay tôi xin kể cho bà con nghe một câu chuyện vui.",
+    "vieneu_xuan_vinh": "Chào bạn nha, đây là giọng đọc miền Nam gần gũi và mộc mạc.",
+    "vieneu_minh_triet": "Chào quý khán giả, chương trình tiêu điểm kinh tế hôm nay xin được bắt đầu.",
+    "vieneu_duc_tri": "Bóng đêm dần buông xuống cánh đồng bao la, chỉ còn tiếng dế kêu rả rích.",
+    "vieneu_adam": "Xin chào các bạn, chúc các bạn có những giây phút trải nghiệm tuyệt vời.",
+    "vieneu_quang_son": "Chào bà con miền Trung khúc ruột thân thương, chúc mọi người luôn bình an.",
+}
+
+LANGUAGE_FALLBACK_VOICE = {
+    "vi": "vi-VN-HoaiMyNeural",
+    "en": "en-US-JennyNeural",
+    "zh": "zh-CN-XiaoxiaoNeural",
+    "ja": "ja-JP-NanamiNeural",
+    "jp": "ja-JP-NanamiNeural",
+    "th": "th-TH-PremwadeeNeural",
+    "id": "id-ID-GadisNeural",
+    "pt": "pt-BR-FranciscaNeural",
+    "br": "pt-BR-FranciscaNeural",
+    "fr": "fr-FR-DeniseNeural",
+    "de": "de-DE-KatjaNeural",
+    "es": "es-ES-ElviraNeural",
+}
+
+def get_vieneu_tts():
+    global _vieneu_tts_instance
+    if _vieneu_tts_instance is None:
+        with _vieneu_lock:
+            if _vieneu_tts_instance is None:
+                from vieneu.v3turbo import V3TurboVieNeuTTS
+                _vieneu_tts_instance = V3TurboVieNeuTTS()
+    return _vieneu_tts_instance
+
+def is_vieneu_voice(voice_type):
+    """Check if a voice_type is a VieNeu AI preset."""
+    return voice_type and (voice_type.startswith("vieneu_") or voice_type in VIENEU_PRESET_MAP.values())
+
+def is_edge_tts_voice(voice_type):
+    """Check if a voice_type is an Edge-TTS neural voice (e.g. vi-VN-HoaiMyNeural, Nam Minh)."""
+    return bool(voice_type and ("Neural" in str(voice_type) or str(voice_type).startswith("edge_")))
+
+def edge_tts_synthesize_audio(text, voice_type, rate="1.0"):
+    """Synthesize voice using Microsoft Edge-TTS."""
+    try:
+        rate_val = float(rate)
+    except Exception:
+        rate_val = 1.0
+    rate_pct = int((rate_val - 1.0) * 100)
+    rate_str = f"{rate_pct:+d}%"
+
+    async def _gen():
+        comm = edge_tts.Communicate(text, voice_type, rate=rate_str)
+        buf = io.BytesIO()
+        async for chunk in comm.stream():
+            if chunk["type"] == "audio":
+                buf.write(chunk["data"])
+        return buf.getvalue()
+
+    return asyncio.run(_gen())
+
+def vieneu_synthesize_audio(text, voice_type):
+    """Generate true distinct neural MP3 audio using official VieNeu-TTS v3 Turbo model at 48kHz."""
+    preset_name = VIENEU_PRESET_MAP.get(voice_type, voice_type)
+    tts = get_vieneu_tts()
+    with _vieneu_lock:
+        audio = tts.infer(text=text, voice=preset_name, denoise=True)
+    
+    buf = io.BytesIO()
+    sf.write(buf, audio, tts.sample_rate, format="WAV")
+    wav_bytes = buf.getvalue()
+    
+    try:
+        proc = subprocess.Popen(
+            ["ffmpeg", "-y", "-i", "pipe:0", "-f", "mp3", "-b:a", "192k", "pipe:1"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
+        )
+        mp3_bytes, _ = proc.communicate(input=wav_bytes)
+        if mp3_bytes and len(mp3_bytes) > 0:
+            return mp3_bytes
+    except Exception as ex:
+        print(f"FFmpeg MP3 convert warning: {ex}")
+    
+    return wav_bytes
 
 app = Flask(__name__)
 
@@ -38,8 +170,23 @@ def find_voice_info(voice_type):
             return v
     return None
 
+def normalize_text_input(text):
+    """Clean and normalize input text for robust, error-free TTS generation."""
+    if not text:
+        return ""
+    text = text.replace("…", "...").replace("“", '"').replace("”", '"').replace("’", "'").replace("‘", "'")
+    text = text.replace("–", "-").replace("—", "-")
+    text = "".join(ch for ch in text if ch in ('\n', '\t') or ord(ch) >= 32)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
 def split_text_into_chunks(text, max_chars=180):
-    sentences = re.split(r'(?<=[.!?;\n])\s+', text.strip())
+    """Split text intelligently at punctuation and word boundaries."""
+    text = normalize_text_input(text)
+    if not text:
+        return []
+
+    sentences = re.split(r'(?<=[.!?;\n])\s+', text)
     chunks = []
     current_chunk = ''
 
@@ -70,26 +217,116 @@ def split_text_into_chunks(text, max_chars=180):
         chunks.append(current_chunk)
     return chunks if chunks else [text]
 
-def cleanup_old_mp3():
-    """Auto-delete all old generated MP3 files to save disk space."""
+def cleanup_old_mp3(max_age_seconds=1800):
+    """Auto-delete generated MP3 files older than 30 minutes to save disk space while keeping recent downloads safe."""
+    now = time.time()
     for p in OUTPUT_DIR.glob("tts_*.mp3"):
         try:
-            p.unlink()
+            if now - p.stat().st_mtime > max_age_seconds:
+                p.unlink()
         except Exception:
             pass
 
-def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
+def stitch_audio_chunks(chunk_bytes_list, output_file_path):
+    """
+    Concatenate audio chunks seamlessly using FFmpeg.
+    Standardizes sample rate to 48kHz, 192kbps MP3 without clicks/pops.
+    Falls back to binary join if FFmpeg fails.
+    """
+    if not chunk_bytes_list:
+        return False
+        
+    if len(chunk_bytes_list) == 1:
+        with open(output_file_path, "wb") as f:
+            f.write(chunk_bytes_list[0])
+        return True
+
+    temp_dir = OUTPUT_DIR / f"temp_{uuid.uuid4().hex[:8]}"
+    temp_dir.mkdir(exist_ok=True)
+    try:
+        concat_list_file = temp_dir / "concat_list.txt"
+        with open(concat_list_file, "w", encoding="utf-8") as f_list:
+            for i, chunk_bytes in enumerate(chunk_bytes_list):
+                chunk_file = temp_dir / f"chunk_{i:04d}.mp3"
+                with open(chunk_file, "wb") as fc:
+                    fc.write(chunk_bytes)
+                f_list.write(f"file '{chunk_file.resolve().as_posix()}'\n")
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_list_file),
+            "-c:a", "libmp3lame",
+            "-b:a", "192k",
+            "-ar", "48000",
+            str(output_file_path)
+        ]
+        proc = subprocess.run(cmd, capture_output=True, timeout=60)
+        if proc.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
+            return True
+    except Exception as ex:
+        print(f"FFmpeg stitch warning: {ex}")
+    finally:
+        try:
+            for p in temp_dir.glob("*"):
+                p.unlink(missing_ok=True)
+            temp_dir.rmdir()
+        except Exception:
+            pass
+
+    # Direct fallback
+    try:
+        combined = b"".join(chunk_bytes_list)
+        with open(output_file_path, "wb") as f:
+            f.write(combined)
+        return True
+    except Exception as ex:
+        print(f"Binary concat error: {ex}")
+        return False
+
+def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
+    # ── 1. VieNeu AI voices: use official VieNeu-TTS v3 Turbo model (48kHz) ──
+    if is_vieneu_voice(voice):
+        try:
+            audio_bytes = vieneu_synthesize_audio(text_chunk, voice)
+            if audio_bytes and len(audio_bytes) > 0:
+                est_duration = int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, est_duration
+        except Exception as ex:
+            print(f"VieNeu TTS error chunk {idx+1}: {ex}")
+        try:
+            fb = LANGUAGE_FALLBACK_VOICE.get(lan, "vi-VN-HoaiMyNeural")
+            audio_bytes = edge_tts_synthesize_audio(text_chunk, fb, rate=rate)
+            if audio_bytes and len(audio_bytes) > 0:
+                return idx, audio_bytes, int(len(text_chunk) / 150 * 1000)
+        except Exception:
+            pass
+        return idx, None, 0
+
+    # ── 2. Edge-TTS Neural voices (e.g. Hoai My, Nam Minh, Jenny) ──
+    if is_edge_tts_voice(voice):
+        try:
+            audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate)
+            if audio_bytes and len(audio_bytes) > 0:
+                est_duration = int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, est_duration
+        except Exception as ex:
+            print(f"Edge TTS error chunk {idx+1}: {ex}")
+        return idx, None, 0
+
+    # ── 3. Original CapCut voices with automatic retry ──
     for retry in range(3):
         try:
             create_res = client.create_tts_task(texts=text_chunk, voice=voice, resource_id=resource_id, rate=rate)
             tasks = (create_res.get("data") or {}).get("tasks") or []
             if not tasks:
-                time.sleep(0.8)
+                time.sleep(0.6)
                 continue
 
             task_id, token = tasks[0]["id"], tasks[0]["token"]
 
-            for attempt in range(15):
+            for attempt in range(16):
                 query_res = client.query_tts_task(task_id, token)
                 query_tasks = (query_res.get("data") or {}).get("tasks") or []
                 if query_tasks:
@@ -101,31 +338,45 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate):
                         if subtitles:
                             speech_url = subtitles[0].get("speech_url")
                             duration = subtitles[0].get("duration", 0)
-                            resp = requests.get(speech_url, timeout=30)
+                            resp = requests.get(speech_url, timeout=25)
                             if resp.status_code == 200:
                                 return idx, resp.content, duration
                         break
                     elif qstatus in ("failed", "error"):
                         break
-                time.sleep(0.6)
+                time.sleep(0.5)
         except Exception as ex:
             print(f"Error processing chunk {idx+1} (retry {retry+1}): {ex}")
-            time.sleep(0.8)
+            time.sleep(0.6)
+
+    # ── 4. Multilingual Fallback ──
+    try:
+        fallback_voice = LANGUAGE_FALLBACK_VOICE.get(lan, "vi-VN-HoaiMyNeural")
+        print(f"CapCut fallback chunk {idx+1} voice={voice} -> Edge-TTS {fallback_voice}")
+        audio_bytes = edge_tts_synthesize_audio(text_chunk, fallback_voice, rate=rate)
+        if audio_bytes and len(audio_bytes) > 0:
+            est_duration = int(len(text_chunk) / 150 * 1000)
+            return idx, audio_bytes, est_duration
+    except Exception as ex2:
+        print(f"Fallback failed chunk {idx+1}: {ex2}")
 
     return idx, None, 0
 
-def run_tts_job(job_id, text, voice, resource_id, rate):
+def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
     try:
-        # Clean up old files before generating new one
         cleanup_old_mp3()
 
         chunks = split_text_into_chunks(text, max_chars=180)
         total_chunks = len(chunks)
 
+        if total_chunks == 0:
+            JOBS[job_id] = {"status": "error", "message": "Văn bản rỗng hoặc không hợp lệ."}
+            return
+
         JOBS[job_id] = {
             "status": "processing",
             "progress": 5,
-            "message": f"Đã chia văn bản ({len(text)} ký tự) thành {total_chunks} đoạn...",
+            "message": f"Đã chuẩn hóa văn bản ({len(text):,} ký tự) thành {total_chunks} đoạn...",
             "total_chunks": total_chunks,
             "completed_chunks": 0,
             "result": None,
@@ -135,9 +386,10 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
         durations = [0] * total_chunks
         completed_count = 0
 
+        # Run chunk requests concurrently with safe thread pool
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [
-                executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate)
+                executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate, lan)
                 for i, chunk_text in enumerate(chunks)
             ]
 
@@ -157,8 +409,8 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
                     JOBS[job_id]["message"] = f"Không thể xử lý đoạn {idx+1}/{total_chunks}. Vui lòng thử lại!"
                     return
 
-        JOBS[job_id]["progress"] = 95
-        JOBS[job_id]["message"] = "Đang ghép nối toàn bộ tệp âm thanh MP3..."
+        JOBS[job_id]["progress"] = 96
+        JOBS[job_id]["message"] = "Đang ghép nối mượt mà toàn bộ tệp âm thanh (FFmpeg 48kHz)..."
 
         valid_bytes = [r for r in chunk_results if r is not None]
         if len(valid_bytes) != total_chunks:
@@ -166,19 +418,20 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
             JOBS[job_id]["message"] = "Một số đoạn âm thanh chưa hoàn tất."
             return
 
-        combined_data = b"".join(valid_bytes)
         total_duration_ms = sum(durations)
-
-        # Save temporary file (will be auto-deleted on next generation)
         filename = f"tts_{job_id}_{int(time.time())}.mp3"
         local_path = OUTPUT_DIR / filename
 
-        with open(local_path, "wb") as f:
-            f.write(combined_data)
+        # Stitch all chunks smoothly with FFmpeg
+        stitch_ok = stitch_audio_chunks(valid_bytes, local_path)
+        if not stitch_ok or not local_path.exists():
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["message"] = "Lỗi khi lưu tệp âm thanh hoàn chỉnh."
+            return
 
         JOBS[job_id]["progress"] = 100
         JOBS[job_id]["status"] = "completed"
-        JOBS[job_id]["message"] = "Hoàn tất 100%! Đã tạo xong toàn bộ giọng đọc."
+        JOBS[job_id]["message"] = "Hoàn tất 100%! Đã tạo xong giọng đọc chất lượng cao."
         JOBS[job_id]["result"] = {
             "filename": filename,
             "download_url": f"/output/{filename}",
@@ -191,6 +444,13 @@ def run_tts_job(job_id, text, voice, resource_id, rate):
     except Exception as e:
         JOBS[job_id]["status"] = "error"
         JOBS[job_id]["message"] = f"Lỗi hệ thống: {str(e)}"
+
+@app.after_request
+def add_cache_control_headers(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.route("/")
 def index():
@@ -205,7 +465,7 @@ def get_voices():
 def generate_job():
     try:
         data = request.json or {}
-        text = data.get("text", "").strip()
+        text = normalize_text_input(data.get("text", ""))
         voice = data.get("voice", "BV421_vivn_streaming")
         resource_id = data.get("resource_id", None)
         rate = data.get("rate", "1.0")
@@ -216,6 +476,7 @@ def generate_job():
         vinfo = find_voice_info(voice)
         if vinfo and not resource_id:
             resource_id = vinfo.get("resource_id")
+        lan = vinfo.get("lan", "vi") if vinfo else "vi"
 
         job_id = str(uuid.uuid4())[:8]
         JOBS[job_id] = {
@@ -225,7 +486,11 @@ def generate_job():
             "result": None,
         }
 
-        t = threading.Thread(target=run_tts_job, args=(job_id, text, voice, resource_id, rate), daemon=True)
+        t = threading.Thread(
+            target=run_tts_job,
+            args=(job_id, text, voice, resource_id, rate, lan),
+            daemon=True
+        )
         t.start()
 
         return jsonify({"status": "success", "job_id": job_id})
@@ -271,6 +536,38 @@ def preview_voice():
         else:
             sample_text = "Xin chào, đây là giọng đọc thử nghiệm."
 
+        # ── VieNeu AI voices: preview via official VieNeu model ──
+        if is_vieneu_voice(voice):
+            vieneu_sample = VIENEU_SAMPLE_TEXTS.get(voice, sample_text)
+            try:
+                audio_bytes = vieneu_synthesize_audio(vieneu_sample, voice)
+                if audio_bytes and len(audio_bytes) > 0:
+                    with open(preview_file_path, "wb") as f:
+                        f.write(audio_bytes)
+                    return jsonify({
+                        "status": "success",
+                        "download_url": f"/output/previews/{preview_filename}"
+                    })
+            except Exception as ex:
+                return jsonify({"status": "error", "message": f"Lỗi VieNeu AI: {ex}"}), 500
+            return jsonify({"status": "error", "message": "Không tạo được giọng VieNeu AI."}), 500
+
+        # ── Edge-TTS Neural voices: preview via edge-tts ──
+        if is_edge_tts_voice(voice):
+            try:
+                audio_bytes = edge_tts_synthesize_audio(sample_text, voice, rate="1.0")
+                if audio_bytes and len(audio_bytes) > 0:
+                    with open(preview_file_path, "wb") as f:
+                        f.write(audio_bytes)
+                    return jsonify({
+                        "status": "success",
+                        "download_url": f"/output/previews/{preview_filename}"
+                    })
+            except Exception as ex:
+                return jsonify({"status": "error", "message": f"Lỗi Edge-TTS: {ex}"}), 500
+            return jsonify({"status": "error", "message": "Không tạo được giọng Edge-TTS."}), 500
+
+        # ── Original CapCut voices: unchanged logic ──
         create_res = client.create_tts_task(texts=sample_text, voice=voice, resource_id=resource_id, rate="1.0")
         tasks = (create_res.get("data") or {}).get("tasks") or []
         if not tasks:
@@ -294,6 +591,20 @@ def preview_voice():
             time.sleep(0.6)
 
         if not speech_url:
+            # ── Fallback: CapCut failed, use Edge-TTS instead of showing error ──
+            try:
+                fallback_voice = "vi-VN-HoaiMyNeural"
+                print(f"CapCut preview failed for voice={voice}, fallback to Edge-TTS {fallback_voice}")
+                audio_bytes = edge_tts_synthesize_audio(sample_text, fallback_voice, rate="1.0")
+                if audio_bytes and len(audio_bytes) > 0:
+                    with open(preview_file_path, "wb") as f:
+                        f.write(audio_bytes)
+                    return jsonify({
+                        "status": "success",
+                        "download_url": f"/output/previews/{preview_filename}"
+                    })
+            except Exception as fb_ex:
+                print(f"Edge-TTS fallback also failed: {fb_ex}")
             return jsonify({"status": "error", "message": "Giọng đọc này đang bận hoặc quá tải. Vui lòng thử giọng khác!"}), 500
 
         mp3_resp = requests.get(speech_url, timeout=20)
@@ -305,6 +616,19 @@ def preview_voice():
             "download_url": f"/output/previews/{preview_filename}"
         })
     except Exception as e:
+        # ── Last resort fallback: any unhandled error, try Edge-TTS ──
+        try:
+            fallback_voice = "vi-VN-HoaiMyNeural"
+            audio_bytes = edge_tts_synthesize_audio(sample_text, fallback_voice, rate="1.0")
+            if audio_bytes and len(audio_bytes) > 0:
+                with open(preview_file_path, "wb") as f:
+                    f.write(audio_bytes)
+                return jsonify({
+                    "status": "success",
+                    "download_url": f"/output/previews/{preview_filename}"
+                })
+        except Exception:
+            pass
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/output/<filename>")

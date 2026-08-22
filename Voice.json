@@ -2,6 +2,186 @@
   {
     "lan": "vi",
     "lang": "vi-VN",
+    "voice_type": "vieneu_truc_ly",
+    "display_name": "Trúc Ly (Nữ Bắc - Tự nhiên)",
+    "resource_id": "vieneu_v3_truc_ly",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_ngoc_linh",
+    "display_name": "Ngọc Linh (Nữ Bắc - Kể chuyện)",
+    "resource_id": "vieneu_v3_ngoc_linh",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_doan_trang",
+    "display_name": "Đoan Trang (Nữ Bắc - Tự nhiên)",
+    "resource_id": "vieneu_v3_doan_trang",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_mai_anh",
+    "display_name": "Mai Anh (Nữ Bắc - Tin tức)",
+    "resource_id": "vieneu_v3_mai_anh",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_quynh_anh",
+    "display_name": "Quỳnh Anh (Nữ Bắc - Đọc truyện)",
+    "resource_id": "vieneu_v3_quynh_anh",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_ngoc_huyen",
+    "display_name": "Ngọc Huyền (Nữ Bắc - Tự nhiên)",
+    "resource_id": "vieneu_v3_ngoc_huyen",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thuy_dung",
+    "display_name": "Thùy Dung (Nữ Nam - Tin tức)",
+    "resource_id": "vieneu_v3_thuy_dung",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thuc_doan",
+    "display_name": "Thục Đoan (Nữ Nam - Kể chuyện)",
+    "resource_id": "vieneu_v3_thuc_doan",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_my_duyen",
+    "display_name": "Mỹ Duyên (Nữ Nam - Đọc truyện)",
+    "resource_id": "vieneu_v3_my_duyen",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_kim_thanh",
+    "display_name": "Kim Thanh (Nữ Nam - Đọc truyện)",
+    "resource_id": "vieneu_v3_kim_thanh",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_ngoc_tran",
+    "display_name": "Ngọc Trân (Nữ Trung - Tự nhiên)",
+    "resource_id": "vieneu_v3_ngoc_tran",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_minh_duc",
+    "display_name": "Minh Đức (Nam Bắc - Tin tức)",
+    "resource_id": "vieneu_v3_minh_duc",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_pham_tuyen",
+    "display_name": "Phạm Tuyên (Nam Bắc - Tự nhiên)",
+    "resource_id": "vieneu_v3_pham_tuyen",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thanh_binh",
+    "display_name": "Thanh Bình (Nam Bắc - Kể chuyện)",
+    "resource_id": "vieneu_v3_thanh_binh",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thai_son",
+    "display_name": "Thái Sơn (Nam Nam - Kể chuyện)",
+    "resource_id": "vieneu_v3_thai_son",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_xuan_vinh",
+    "display_name": "Xuân Vĩnh (Nam Nam - Tự nhiên)",
+    "resource_id": "vieneu_v3_xuan_vinh",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_minh_triet",
+    "display_name": "Minh Triết (Nam Nam - Tin tức)",
+    "resource_id": "vieneu_v3_minh_triet",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_duc_tri",
+    "display_name": "Đức Trí (Nam Nam - Đọc truyện)",
+    "resource_id": "vieneu_v3_duc_tri",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_adam",
+    "display_name": "Adam (Nam Nam - Tự nhiên)",
+    "resource_id": "vieneu_v3_adam",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_quang_son",
+    "display_name": "Quang Sơn (Nam Trung - Tự nhiên)",
+    "resource_id": "vieneu_v3_quang_son",
+    "engine": "vieneu",
+    "captured_at": "2026-08-22T20:45:00.000000"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
     "voice_type": "BV421_vivn_streaming",
     "display_name": "Nhỏ Ngọt Ngào",
     "resource_id": "7252594014782755330",
@@ -346,7 +526,7 @@
   {
     "lan": "en",
     "lang": "en-US",
-    "voice_type": "en-US-JennyMultilingualNeural",
+    "voice_type": "en-US-JennyNeural",
     "display_name": "Jenny",
     "resource_id": "7569439521352338689",
     "captured_at": "2026-04-16T18:05:52.828530"
