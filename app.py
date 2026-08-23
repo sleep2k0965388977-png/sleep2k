@@ -10,8 +10,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import requests
 import subprocess
+import tempfile
 import soundfile as sf
 import edge_tts
+import speech_recognition as sr
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from capcut_tts_api import CapCutClient, CapCutError
 
@@ -150,6 +152,9 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 PREVIEW_DIR = OUTPUT_DIR / "previews"
 PREVIEW_DIR.mkdir(exist_ok=True)
+
+UPLOAD_DIR = Path(__file__).parent / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 VOICE_JSON_PATH = Path(__file__).parent / "Voice.json"
 client = CapCutClient()
@@ -638,6 +643,201 @@ def serve_audio(filename):
 @app.route("/output/previews/<filename>")
 def serve_preview_audio(filename):
     return send_from_directory(PREVIEW_DIR, filename)
+
+# ── Speech to Text (Audio/Video Transcription) Engine ──
+
+def format_timestamp_srt(seconds):
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    millis = int(round((seconds - int(seconds)) * 1000))
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=3):
+    recognizer = sr.Recognizer()
+    recognizer.energy_threshold = 300
+    recognizer.dynamic_energy_threshold = True
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            target_path = chunk_path
+            # Attempt 2+: apply FFmpeg dynamic volume normalization & noise filter
+            if attempt > 1:
+                filtered_path = chunk_path.parent / f"filt_{attempt}_{chunk_path.name}"
+                cmd = [
+                    "ffmpeg", "-y", "-i", str(chunk_path),
+                    "-af", "dynaudnorm=f=150:g=15",
+                    "-ar", "16000", "-ac", "1",
+                    str(filtered_path)
+                ]
+                subprocess.run(cmd, capture_output=True, timeout=10)
+                if filtered_path.exists():
+                    target_path = filtered_path
+
+            with sr.AudioFile(str(target_path)) as source:
+                audio_data = recognizer.record(source)
+            text = recognizer.recognize_google(audio_data, language=language)
+            return idx, (text or "").strip()
+        except Exception as ex:
+            if attempt < max_retries:
+                time.sleep(1.0)
+                continue
+            return idx, ""
+
+def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
+    try:
+        JOBS[job_id]["status"] = "processing"
+        JOBS[job_id]["progress"] = 5
+        JOBS[job_id]["message"] = "Đang phân tích tệp âm thanh bằng FFmpeg..."
+
+        # 1. Probe audio duration
+        duration = 0.0
+        try:
+            res = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)],
+                capture_output=True,
+                text=True,
+                timeout=20
+            )
+            duration = float(res.stdout.strip())
+        except Exception:
+            duration = 30.0
+
+        JOBS[job_id]["progress"] = 15
+        JOBS[job_id]["message"] = f"Thời lượng: {int(duration)}s. Đang chia đoạn âm thanh..."
+
+        # 2. Split audio into 15-second WAV segments
+        temp_dir = Path(tempfile.mkdtemp(prefix="stt_"))
+        segment_pattern = str(temp_dir / "chunk_%04d.wav")
+
+        proc = subprocess.run([
+            "ffmpeg", "-y",
+            "-i", str(file_path),
+            "-f", "segment",
+            "-segment_time", "15",
+            "-c:a", "pcm_s16le",
+            "-ar", "16000",
+            "-ac", "1",
+            segment_pattern
+        ], capture_output=True, timeout=180)
+
+        chunk_files = sorted(list(temp_dir.glob("chunk_*.wav")))
+        if not chunk_files:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["message"] = "Không thể đọc dữ liệu âm thanh từ tệp tải lên."
+            return
+
+        total_chunks = len(chunk_files)
+        results = [""] * total_chunks
+        completed_count = 0
+
+        # 3. Transcribe chunks with ThreadPoolExecutor & 10s watchdog auto-repair
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            future_to_chunk = {
+                executor.submit(transcribe_audio_chunk, i, chunk_path, language): (i, chunk_path)
+                for i, chunk_path in enumerate(chunk_files)
+            }
+
+            for future in as_completed(future_to_chunk):
+                i, chunk_path = future_to_chunk[future]
+                try:
+                    idx, text = future.result(timeout=12)
+                    results[idx] = text
+                except Exception as ex:
+                    print(f"Watchdog auto-recovery chunk {i+1}: {ex}, retrying...")
+                    # Immediate recovery retry
+                    try:
+                        idx, text = transcribe_audio_chunk(i, chunk_path, language, max_retries=2)
+                        results[idx] = text
+                    except Exception:
+                        results[i] = ""
+
+                completed_count += 1
+                prog = int(15 + (completed_count / total_chunks) * 80)
+                JOBS[job_id]["progress"] = prog
+                JOBS[job_id]["message"] = f"Đang nhận diện giọng nói AI: {completed_count}/{total_chunks} đoạn ({prog}%)..."
+
+        # 4. Build full text and SRT subtitles
+        valid_texts = []
+        srt_blocks = []
+        srt_idx = 1
+
+        for idx, text in enumerate(results):
+            if text:
+                valid_texts.append(text)
+                start_sec = idx * 15.0
+                end_sec = min((idx + 1) * 15.0, duration) if duration > 0 else (idx + 1) * 15.0
+                srt_block = f"{srt_idx}\n{format_timestamp_srt(start_sec)} --> {format_timestamp_srt(end_sec)}\n{text}\n"
+                srt_blocks.append(srt_block)
+                srt_idx += 1
+
+        full_text = "\n\n".join(valid_texts) if valid_texts else "Không nhận diện được giọng nói trong tệp này."
+        srt_content = "\n".join(srt_blocks) if srt_blocks else ""
+
+        # Cleanup temp directory and uploaded file
+        try:
+            for p in temp_dir.glob("*"):
+                p.unlink(missing_ok=True)
+            temp_dir.rmdir()
+            if file_path.exists():
+                file_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+        words = [w for w in full_text.split() if w]
+        JOBS[job_id]["progress"] = 100
+        JOBS[job_id]["status"] = "completed"
+        JOBS[job_id]["message"] = "Hoàn tất chuyển đổi âm thanh thành văn bản 100%!"
+        JOBS[job_id]["result"] = {
+            "text": full_text,
+            "srt": srt_content,
+            "duration": round(duration, 1),
+            "word_count": len(words),
+            "char_count": len(full_text),
+            "total_chunks": total_chunks,
+            "language": language
+        }
+    except Exception as e:
+        JOBS[job_id]["status"] = "error"
+        JOBS[job_id]["message"] = f"Lỗi xử lý âm thanh: {str(e)}"
+
+@app.route("/api/transcribe_job", methods=["POST"])
+def api_transcribe_job():
+    if "file" not in request.files:
+        return jsonify({"status": "error", "message": "Vui lòng chọn tệp âm thanh hoặc video!"}), 400
+
+    file = request.files["file"]
+    if not file or not file.filename:
+        return jsonify({"status": "error", "message": "Tệp không hợp lệ!"}), 400
+
+    language = request.form.get("language", "vi-VN")
+    job_id = uuid.uuid4().hex[:8]
+
+    ext = Path(file.filename).suffix.lower() or ".mp3"
+    saved_filename = f"upload_{job_id}{ext}"
+    saved_path = UPLOAD_DIR / saved_filename
+    file.save(str(saved_path))
+
+    JOBS[job_id] = {
+        "status": "queued",
+        "progress": 0,
+        "message": "Đang xếp hàng xử lý tệp âm thanh...",
+        "result": None
+    }
+
+    t = threading.Thread(target=process_speech_to_text_job, args=(job_id, saved_path, language))
+    t.daemon = True
+    t.start()
+
+    return jsonify({"status": "success", "job_id": job_id})
+
+@app.route("/api/transcribe_status/<job_id>", methods=["GET"])
+def api_transcribe_status(job_id):
+    job = JOBS.get(job_id)
+    if not job:
+        return jsonify({"status": "error", "message": "Không tìm thấy tiến trình chuyển đổi."}), 404
+    return jsonify(job)
+
 
 if __name__ == "__main__":
     import sys

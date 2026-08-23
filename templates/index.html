@@ -407,6 +407,95 @@
         .lang-count {
             background: rgba(0, 0, 0, 0.25); padding: 2px 6px; border-radius: 10px; font-size: 10px;
         }
+    
+        /* Main Mode Switcher CSS */
+        .main-mode-switcher {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 22px;
+            background: rgba(18, 24, 38, 0.7);
+            padding: 6px;
+            border-radius: 16px;
+            border: 1px solid var(--card-border);
+        }
+        .mode-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.25s ease;
+            position: relative;
+        }
+        .mode-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .mode-btn.active {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: #fff;
+            border-color: rgba(139, 92, 246, 0.4);
+            box-shadow: 0 4px 18px rgba(139, 92, 246, 0.35);
+        }
+        .mode-badge-new {
+            background: #ec4899;
+            color: #fff;
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        /* STT Upload Dropzone CSS */
+        .upload-dropzone {
+            border: 2px dashed rgba(139, 92, 246, 0.4);
+            border-radius: 16px;
+            padding: 32px 20px;
+            text-align: center;
+            background: rgba(139, 92, 246, 0.03);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .upload-dropzone:hover, .upload-dropzone.dragover {
+            border-color: var(--accent-purple);
+            background: rgba(139, 92, 246, 0.09);
+            transform: translateY(-2px);
+        }
+        .dropzone-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(59,130,246,0.2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: var(--accent-purple);
+        }
+        .dropzone-main {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        .dropzone-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
     </style>
 </head>
 <body>
@@ -434,6 +523,22 @@
                 <div class="badge-unlimited"><i class="fa-solid fa-bolt"></i> Không Giới Hạn</div>
             </div>
         </header>
+
+        <!-- Main Mode Navigation Switcher -->
+        <div class="main-mode-switcher">
+            <button class="mode-btn active" id="btnModeTTS" onclick="switchMode('tts')">
+                <i class="fa-solid fa-microphone-lines"></i>
+                <span>Tạo Giọng Nói AI (TTS)</span>
+            </button>
+            <button class="mode-btn" id="btnModeSTT" onclick="switchMode('stt')">
+                <i class="fa-solid fa-file-waveform"></i>
+                <span>Chuyển Âm Thanh Thành Văn Bản (STT)</span>
+                <span class="mode-badge-new">Mới</span>
+            </button>
+        </div>
+
+        <!-- TTS Mode Section -->
+        <div id="sectionTTS">
 
         <div class="flow-banner">
             <div class="flow-step"><i class="fa-solid fa-align-left"></i><span>Văn Bản</span></div>
@@ -547,6 +652,132 @@
 
             </div>
         </div>
+
+                </div>
+        <!-- End Section TTS -->
+
+        <!-- STT Mode Section (Speech to Text) -->
+        <div id="sectionSTT" style="display: none;">
+            <div class="flow-banner">
+                <div class="flow-step"><i class="fa-solid fa-file-arrow-up"></i><span>1. Tải Tệp Audio / Video</span></div>
+                <i class="fa-solid fa-chevron-right flow-arrow"></i>
+                <div class="flow-step"><i class="fa-solid fa-language"></i><span>2. Chọn Ngôn Ngữ</span></div>
+                <i class="fa-solid fa-chevron-right flow-arrow"></i>
+                <div class="flow-step"><i class="fa-solid fa-brain"></i><span>3. Nhận Diện AI Song Song (4x)</span></div>
+                <i class="fa-solid fa-chevron-right flow-arrow"></i>
+                <div class="flow-step" style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1);">
+                    <i class="fa-solid fa-file-lines" style="color: var(--accent-emerald);"></i>
+                    <span style="color: #34d399;">4. Xuất Văn Bản & Phụ Đề SRT</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Tải Lên Tệp Âm Thanh / Video Cần Chuyển Thành Văn Bản
+                </div>
+
+                <!-- Drag & Drop Upload Zone -->
+                <div class="upload-dropzone" id="uploadDropzone" onclick="document.getElementById('sttFileInput').click()">
+                    <input type="file" id="sttFileInput" accept="audio/*,video/*,.mp3,.wav,.m4a,.mp4,.aac,.flac,.ogg,.webm,.mkv" style="display:none;" onchange="handleFileSelected(event)">
+                    <div class="dropzone-icon">
+                        <i class="fa-solid fa-file-audio"></i>
+                    </div>
+                    <div class="dropzone-text">
+                        <p class="dropzone-main" id="dropzoneMainText">Kéo thả tệp âm thanh/video vào đây, hoặc <span style="color:var(--accent-purple);text-decoration:underline;">bấm để duyệt tệp</span></p>
+                        <p class="dropzone-sub">Hỗ trợ: MP3, WAV, M4A, MP4, AAC, FLAC, OGG, WEBM... (Không giới hạn độ dài)</p>
+                    </div>
+                </div>
+
+                <!-- File selected preview box -->
+                <div id="fileInfoBox" style="display:none; margin-top:14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px 16px; align-items:center; justify-content:space-between;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <i class="fa-solid fa-file-lines" style="font-size:22px; color:var(--accent-blue);"></i>
+                        <div>
+                            <div id="sttFileName" style="font-weight:700; color:#fff; font-size:13px;">audio.mp3</div>
+                            <div id="sttFileSize" style="font-size:11px; color:var(--text-muted);">0 MB</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="clearSttFile()" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer;">
+                        <i class="fa-solid fa-trash"></i> Bỏ chọn
+                    </button>
+                </div>
+
+                <!-- Language Selector & Button -->
+                <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; padding-top:16px; border-top:1px solid var(--card-border);">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <label style="font-size:13px; font-weight:600; color:#fff;"><i class="fa-solid fa-globe"></i> Ngôn ngữ:</label>
+                        <select id="sttLanguage" class="speed-select" style="padding:8px 14px; border-radius:10px;">
+                            <option value="vi-VN" selected>🇻🇳 Tiếng Việt (Vietnamese)</option>
+                            <option value="en-US">🇺🇸 Tiếng Anh (English - US)</option>
+                            <option value="en-GB">🇬🇧 Tiếng Anh (English - UK)</option>
+                            <option value="zh-CN">🇨🇳 Tiếng Trung (Chinese)</option>
+                            <option value="ja-JP">🇯🇵 Tiếng Nhật (Japanese)</option>
+                            <option value="ko-KR">🇰🇷 Tiếng Hàn (Korean)</option>
+                            <option value="fr-FR">🇫🇷 Tiếng Pháp (French)</option>
+                            <option value="de-DE">🇩🇪 Tiếng Đức (German)</option>
+                            <option value="es-ES">🇪🇸 Tiếng Tây Ban Nha (Spanish)</option>
+                            <option value="ru-RU">🇷🇺 Tiếng Nga (Russian)</option>
+                            <option value="th-TH">🇹🇭 Tiếng Thái (Thai)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn-generate" id="btnTranscribe" onclick="startTranscription()" style="padding:12px 28px; font-size:14px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress Card for STT -->
+            <div class="progress-card" id="sttProgressCard">
+                <div class="progress-header">
+                    <span class="progress-title"><i class="fa-solid fa-brain"></i> Tiến trình nhận diện âm thanh AI</span>
+                    <span class="progress-percentage" id="sttProgressPercentage">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="sttProgressFill" style="width: 0%;"></div>
+                </div>
+                <div class="progress-status" id="sttProgressStatus">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải tệp lên máy chủ...
+                </div>
+            </div>
+
+            <!-- Result Box for STT -->
+            <div class="card" id="sttResultCard" style="display:none; margin-top:20px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+                    <div class="card-title" style="margin-bottom:0;">
+                        <i class="fa-solid fa-square-poll-vertical" style="color:var(--accent-emerald);"></i> Kết Quả Nhận Diện Thành Công
+                    </div>
+                    <!-- Output Format Switcher -->
+                    <div style="display:flex; gap:8px;">
+                        <button class="lang-tab active" id="tabFormatTxt" onclick="switchOutputFormat('txt')" style="padding:5px 14px; font-size:12px;">
+                            📄 Văn Bản Thuần (.TXT)
+                        </button>
+                        <button class="lang-tab" id="tabFormatSrt" onclick="switchOutputFormat('srt')" style="padding:5px 14px; font-size:12px;">
+                            ⏱️ Khớp Thời Gian Phụ Đề (.SRT)
+                        </button>
+                    </div>
+                </div>
+
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;" id="sttStatsText">
+                    Thời lượng: 0s • 0 từ • 0 ký tự
+                </div>
+
+                <textarea id="sttResultTextarea" style="width:100%; height:260px; background:rgba(11,15,25,0.9); border:1px solid var(--card-border); border-radius:14px; padding:16px; color:#fff; font-size:14px; line-height:1.7; resize:vertical; outline:none; font-family:inherit;"></textarea>
+
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:14px;">
+                    <button class="btn-preview" onclick="copySttResult()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(139,92,246,0.2); border-color:var(--accent-purple); color:#fff;">
+                        <i class="fa-solid fa-copy"></i> Sao Chép
+                    </button>
+                    <button class="btn-preview" onclick="downloadSttTxt()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(59,130,246,0.2); border-color:var(--accent-blue); color:#fff;">
+                        <i class="fa-solid fa-download"></i> Tải Tệp .TXT
+                    </button>
+                    <button class="btn-preview" onclick="downloadSttSrt()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(16,185,129,0.2); border-color:var(--accent-emerald); color:#fff;">
+                        <i class="fa-solid fa-closed-captioning"></i> Tải Tệp Phụ Đề .SRT
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- End Section STT -->
 
         <!-- Support & Contact Footer -->
         <footer class="app-footer">
@@ -854,6 +1085,224 @@
         });
 
         fetchVoices(); updateTextStats();
+    
+        // ── Main Mode Switcher (TTS vs STT) ──
+        function switchMode(mode) {
+            const btnTTS = document.getElementById("btnModeTTS");
+            const btnSTT = document.getElementById("btnModeSTT");
+            const secTTS = document.getElementById("sectionTTS");
+            const secSTT = document.getElementById("sectionSTT");
+
+            if (mode === "tts") {
+                btnTTS.classList.add("active");
+                btnSTT.classList.remove("active");
+                secTTS.style.display = "block";
+                secSTT.style.display = "none";
+            } else {
+                btnTTS.classList.remove("active");
+                btnSTT.classList.add("active");
+                secTTS.style.display = "none";
+                secSTT.style.display = "block";
+            }
+        }
+
+        // ── STT File Handling & Drag Drop ──
+        let selectedSttFile = null;
+        let sttTxtResult = "";
+        let sttSrtResult = "";
+        let currentSttFormat = "txt";
+
+        function handleFileSelected(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            setSttFile(file);
+        }
+
+        function setSttFile(file) {
+            selectedSttFile = file;
+            document.getElementById("sttFileName").innerText = file.name;
+            const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+            document.getElementById("sttFileSize").innerText = `${sizeMb} MB`;
+            document.getElementById("fileInfoBox").style.display = "flex";
+            document.getElementById("uploadDropzone").style.display = "none";
+        }
+
+        function clearSttFile() {
+            selectedSttFile = null;
+            document.getElementById("sttFileInput").value = "";
+            document.getElementById("fileInfoBox").style.display = "none";
+            document.getElementById("uploadDropzone").style.display = "flex";
+            document.getElementById("sttResultCard").style.display = "none";
+        }
+
+        const dropzone = document.getElementById("uploadDropzone");
+        if (dropzone) {
+            ['dragenter', 'dragover'].forEach(name => {
+                dropzone.addEventListener(name, (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.add('dragover'); });
+            });
+            ['dragleave', 'drop'].forEach(name => {
+                dropzone.addEventListener(name, (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('dragover'); });
+            });
+            dropzone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    setSttFile(files[0]);
+                }
+            });
+        }
+
+        // ── Start Audio Transcription ──
+        async function startTranscription() {
+            if (!selectedSttFile) {
+                alert("Vui lòng chọn hoặc kéo thả tệp âm thanh/video vào ô tải lên!");
+                return;
+            }
+
+            const btn = document.getElementById("btnTranscribe");
+            const progressCard = document.getElementById("sttProgressCard");
+            const resultCard = document.getElementById("sttResultCard");
+            const fillEl = document.getElementById("sttProgressFill");
+            const pctEl = document.getElementById("sttProgressPercentage");
+            const statusEl = document.getElementById("sttProgressStatus");
+            const language = document.getElementById("sttLanguage").value;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải tệp lên...';
+            resultCard.style.display = "none";
+            progressCard.classList.add("show");
+            fillEl.style.width = "5%";
+            pctEl.innerText = "5%";
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải tệp âm thanh lên máy chủ...';
+
+            const formData = new FormData();
+            formData.append("file", selectedSttFile);
+            formData.append("language", language);
+
+            try {
+                const resp = await fetch("/api/transcribe_job", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await resp.json();
+                if (data.status !== "success") {
+                    alert("Lỗi: " + (data.message || "Không thể khởi động chuyển đổi."));
+                    progressCard.classList.remove("show");
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                    return;
+                }
+
+                const jobId = data.job_id;
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const sr = await fetch(`/api/transcribe_status/${jobId}`);
+                        if (sr.status === 404) {
+                            clearInterval(pollInterval);
+                            progressCard.classList.remove("show");
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                            return;
+                        }
+                        const sd = await sr.json();
+                        if (sd.status === "processing" || sd.status === "queued") {
+                            const p = sd.progress || 10;
+                            fillEl.style.width = p + "%";
+                            pctEl.innerText = p + "%";
+                            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message || 'Đang nhận diện giọng nói AI...');
+                        } else if (sd.status === "completed") {
+                            clearInterval(pollInterval);
+                            fillEl.style.width = "100%";
+                            pctEl.innerText = "100%";
+                            statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> ' + sd.message;
+
+                            setTimeout(() => {
+                                progressCard.classList.remove("show");
+                                const res = sd.result;
+                                sttTxtResult = res.text || "";
+                                sttSrtResult = res.srt || "";
+                                document.getElementById("sttResultTextarea").value = sttTxtResult;
+                                document.getElementById("sttStatsText").innerText = `Thời lượng: ${res.duration}s • ${res.word_count.toLocaleString()} từ • ${res.char_count.toLocaleString()} ký tự`;
+                                switchOutputFormat('txt');
+                                resultCard.style.display = "block";
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                            }, 500);
+                        } else if (sd.status === "error") {
+                            clearInterval(pollInterval);
+                            alert("Lỗi: " + sd.message);
+                            progressCard.classList.remove("show");
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                        }
+                    } catch (err) {
+                        console.error("Poll error:", err);
+                    }
+                }, 700);
+
+            } catch (e) {
+                alert("Lỗi kết nối máy chủ: " + e.message);
+                progressCard.classList.remove("show");
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+            }
+        }
+
+        // ── STT Result Actions ──
+        function switchOutputFormat(fmt) {
+            currentSttFormat = fmt;
+            const tabTxt = document.getElementById("tabFormatTxt");
+            const tabSrt = document.getElementById("tabFormatSrt");
+            const txtarea = document.getElementById("sttResultTextarea");
+
+            if (fmt === "txt") {
+                tabTxt.classList.add("active");
+                tabSrt.classList.remove("active");
+                txtarea.value = sttTxtResult;
+            } else {
+                tabTxt.classList.remove("active");
+                tabSrt.classList.add("active");
+                txtarea.value = sttSrtResult;
+            }
+        }
+
+        function copySttResult() {
+            const txt = document.getElementById("sttResultTextarea").value;
+            if (!txt) return;
+            navigator.clipboard.writeText(txt).then(() => {
+                setTimeout(() => {
+                    showDonateModal();
+                }, 400);
+            });
+        }
+
+        function downloadSttTxt() {
+            if (!sttTxtResult) return;
+            const blob = new Blob([sttTxtResult], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `transcript_${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                showDonateModal();
+            }, 400);
+        }
+
+        function downloadSttSrt() {
+            if (!sttSrtResult) return;
+            const blob = new Blob([sttSrtResult], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `subtitles_${Date.now()}.srt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                showDonateModal();
+            }, 400);
+        }
+
     </script>
 </body>
 </html>
