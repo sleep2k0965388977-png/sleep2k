@@ -636,6 +636,15 @@ def preview_voice():
             pass
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route("/health", methods=["GET", "HEAD"])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "service": "SLEEP2K TTS & STT",
+        "timestamp": int(time.time()),
+        "uptime": "ok"
+    }), 200
+
 @app.route("/output/<filename>")
 def serve_audio(filename):
     return send_from_directory(OUTPUT_DIR, filename)
