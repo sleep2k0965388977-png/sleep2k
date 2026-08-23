@@ -166,21 +166,20 @@ client = CapCutClient()
 # Global job status store
 JOBS = {}
 
-# ── Concurrency Limiter: max 2 jobs processing at once (Render Free = 512MB RAM) ──
-# Nền tảng cố định ~430MB, mỗi job ~30-50MB → chỉ đủ cho 2 job đồng thời
+# ── Concurrency Limiters (Render Free = 512MB RAM) ──
 MAX_CONCURRENT_JOBS = 2
 _job_semaphore = threading.Semaphore(MAX_CONCURRENT_JOBS)
+_heavy_job_semaphore = threading.Semaphore(1)  # Max 1 heavy video job (>50MB) at a time
 _queue_counter = 0
 _queue_lock = threading.Lock()
 
 def get_queue_position():
     """Return how many jobs are waiting in queue."""
     with _queue_lock:
-        # Count jobs with status 'queued'
         return sum(1 for j in JOBS.values() if j.get("status") == "queued")
 
 def run_with_queue(job_id, target_func, *args, **kwargs):
-    """Wrapper that enforces concurrency limit with queue feedback."""
+    """Wrapper that enforces standard concurrency limit with queue feedback."""
     global _queue_counter
     JOBS[job_id]["status"] = "queued"
     JOBS[job_id]["message"] = "Đang chờ trong hàng đợi... Máy chủ đang bận, bạn sẽ được xử lý ngay khi có slot trống."
@@ -191,6 +190,29 @@ def run_with_queue(job_id, target_func, *args, **kwargs):
         target_func(job_id, *args, **kwargs)
     finally:
         _job_semaphore.release()
+
+def run_stt_with_adaptive_queue(job_id, saved_path, language):
+    """Adaptive queue runner: 1 concurrent slot for heavy files (>50MB), 2 for lighter ones."""
+    file_size = 0
+    try:
+        file_size = Path(saved_path).stat().st_size
+    except Exception:
+        pass
+
+    JOBS[job_id]["status"] = "queued"
+    is_heavy = file_size > 50 * 1024 * 1024
+    if is_heavy:
+        JOBS[job_id]["message"] = "Tệp dung lượng lớn (>50MB): Đang xếp hàng xử lý độc quyền 1 slot an toàn..."
+    else:
+        JOBS[job_id]["message"] = "Đang chờ trong hàng đợi xử lý..."
+    JOBS[job_id]["progress"] = 0
+
+    sem = _heavy_job_semaphore if is_heavy else _job_semaphore
+    sem.acquire()
+    try:
+        process_speech_to_text_job(job_id, saved_path, language)
+    finally:
+        sem.release()
 
 def load_voices():
     if VOICE_JSON_PATH.exists():
@@ -496,6 +518,9 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
 
 @app.after_request
 def add_cache_control_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -854,6 +879,56 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         JOBS[job_id]["status"] = "error"
         JOBS[job_id]["message"] = f"Lỗi xử lý âm thanh: {str(e)}"
 
+@app.route("/api/upload_chunk", methods=["POST"])
+def api_upload_chunk():
+    """Receive sequential 5MB file chunks, assemble, and trigger adaptive queue STT."""
+    try:
+        upload_id = request.form.get("upload_id")
+        chunk_index = int(request.form.get("chunk_index", 0))
+        total_chunks = int(request.form.get("total_chunks", 1))
+        filename = request.form.get("filename", "upload.mp4")
+        language = request.form.get("language", "vi-VN")
+
+        if "file" not in request.files or not upload_id:
+            return jsonify({"status": "error", "message": "Dữ liệu mảnh tệp không hợp lệ."}), 400
+
+        chunk_file = request.files["file"]
+        chunk_path = UPLOAD_DIR / f"{upload_id}_part_{chunk_index:05d}.tmp"
+        chunk_file.save(str(chunk_path))
+
+        # When last chunk arrives, assemble all parts in strict sequence
+        if chunk_index == total_chunks - 1:
+            ext = Path(filename).suffix.lower() or ".mp4"
+            assembled_path = UPLOAD_DIR / f"upload_{upload_id}{ext}"
+
+            with open(assembled_path, "wb") as outfile:
+                for idx in range(total_chunks):
+                    part_file = UPLOAD_DIR / f"{upload_id}_part_{idx:05d}.tmp"
+                    if part_file.exists():
+                        with open(part_file, "rb") as infile:
+                            outfile.write(infile.read())
+                        try:
+                            part_file.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+
+            JOBS[upload_id] = {
+                "status": "queued",
+                "progress": 0,
+                "message": "Đã ghép nối các mảnh tệp hoàn tất! Đang xếp hàng xử lý âm thanh AI...",
+                "result": None
+            }
+
+            t = threading.Thread(target=run_stt_with_adaptive_queue, args=(upload_id, assembled_path, language))
+            t.daemon = True
+            t.start()
+
+            return jsonify({"status": "completed", "job_id": upload_id})
+
+        return jsonify({"status": "chunk_received", "chunk_index": chunk_index})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route("/api/transcribe_job", methods=["POST"])
 def api_transcribe_job():
     if "file" not in request.files:
@@ -878,7 +953,7 @@ def api_transcribe_job():
         "result": None
     }
 
-    t = threading.Thread(target=run_with_queue, args=(job_id, process_speech_to_text_job, saved_path, language))
+    t = threading.Thread(target=run_stt_with_adaptive_queue, args=(job_id, saved_path, language))
     t.daemon = True
     t.start()
 

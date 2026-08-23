@@ -1229,7 +1229,35 @@
             }
         }
 
-        // ── Start Audio Transcription with Resilient XHR & Audio Compression ──
+        // ── 5MB Sequential Chunked Upload with Auto-Retry ──
+        async function uploadChunkWithRetry(uploadId, chunkIndex, totalChunks, chunkBlob, filename, language, maxRetries = 3) {
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const formData = new FormData();
+                    formData.append("upload_id", uploadId);
+                    formData.append("chunk_index", chunkIndex);
+                    formData.append("total_chunks", totalChunks);
+                    formData.append("filename", filename);
+                    formData.append("language", language);
+                    formData.append("file", chunkBlob);
+
+                    const resp = await fetch("/api/upload_chunk", {
+                        method: "POST",
+                        body: formData
+                    });
+                    if (resp.ok) {
+                        return await resp.json();
+                    }
+                    throw new Error(`HTTP ${resp.status}`);
+                } catch (e) {
+                    console.warn(`Chunk ${chunkIndex + 1}/${totalChunks} attempt ${attempt} failed:`, e);
+                    if (attempt === maxRetries) throw e;
+                    await new Promise(r => setTimeout(r, 1000 * attempt));
+                }
+            }
+        }
+
+        // ── Start Audio Transcription with 5MB Chunked Sequential Upload & Adaptive Queue ──
         async function startTranscription() {
             if (!selectedSttFile) {
                 alert("Vui lòng chọn hoặc kéo thả tệp âm thanh/video vào ô tải lên!");
@@ -1245,71 +1273,59 @@
             const language = document.getElementById("sttLanguage").value;
 
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang chuẩn bị tệp...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang khởi tạo...';
             resultCard.style.display = "none";
             progressCard.classList.add("show");
             fillEl.style.width = "3%";
             pctEl.innerText = "3%";
-            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích và nén âm thanh...';
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang chuẩn bị truyền tệp...';
 
-            let fileToUpload = selectedSttFile;
-            // If video or file > 8MB, extract audio locally in browser to avoid timeout and 500MB network payload
-            const isVideoOrHeavy = selectedSttFile.size > 8 * 1024 * 1024 || selectedSttFile.type.startsWith("video") || selectedSttFile.name.match(/\.(mp4|mkv|webm|mov|avi|flv)$/i);
-            if (isVideoOrHeavy && window.AudioContext) {
-                try {
-                    fileToUpload = await extractAudioInBrowser(selectedSttFile, (msg) => {
-                        statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${msg}`;
-                    });
-                } catch (e) {
-                    console.warn("Audio extraction skipped:", e);
-                }
-            }
+            let jobId = null;
+            const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
 
-            const formData = new FormData();
-            formData.append("file", fileToUpload);
-            formData.append("language", language);
+            try {
+                if (selectedSttFile.size <= CHUNK_SIZE) {
+                    // Small file <= 5MB: Direct single upload
+                    statusEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Đang nạp tệp âm thanh...';
+                    const formData = new FormData();
+                    formData.append("file", selectedSttFile);
+                    formData.append("language", language);
 
-            statusEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up fa-fade"></i> Đang tải tệp âm thanh lên máy chủ...';
-            fillEl.style.width = "6%";
-            pctEl.innerText = "6%";
+                    const resp = await fetch("/api/transcribe_job", { method: "POST", body: formData });
+                    const data = await resp.json();
+                    if (!resp.ok || data.status !== "success") {
+                        throw new Error(data.message || "Lỗi máy chủ khi khởi tạo.");
+                    }
+                    jobId = data.job_id;
+                } else {
+                    // Heavy file (>5MB, e.g. 434MB Video): 5MB Sequential Chunked Upload with Retry
+                    const totalChunks = Math.ceil(selectedSttFile.size / CHUNK_SIZE);
+                    const uploadId = Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
 
-            // Use XMLHttpRequest for real-time upload progress tracking with unlimited timeout
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", "/api/transcribe_job", true);
-            xhr.timeout = 0; // No client-side timeout
+                    for (let i = 0; i < totalChunks; i++) {
+                        const start = i * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, selectedSttFile.size);
+                        const chunkBlob = selectedSttFile.slice(start, end);
+                        
+                        const uploadProgressPct = Math.round(((i + 1) / totalChunks) * 15);
+                        fillEl.style.width = (3 + uploadProgressPct) + "%";
+                        pctEl.innerText = (3 + uploadProgressPct) + "%";
+                        const loadedMb = (end / (1024 * 1024)).toFixed(1);
+                        const totalMb = (selectedSttFile.size / (1024 * 1024)).toFixed(1);
+                        statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Đang tải mảnh ${i + 1}/${totalChunks} [${loadedMb}MB / ${totalMb}MB]...`;
 
-            xhr.upload.onprogress = (e) => {
-                if (e.lengthComputable) {
-                    const uploadPct = Math.round((e.loaded / e.total) * 10);
-                    fillEl.style.width = (5 + uploadPct) + "%";
-                    pctEl.innerText = (5 + uploadPct) + "%";
-                    const uploadedMb = (e.loaded / (1024*1024)).toFixed(1);
-                    const totalMb = (e.total / (1024*1024)).toFixed(1);
-                    statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Đang tải tệp: ${uploadedMb}MB / ${totalMb}MB (${Math.round((e.loaded/e.total)*100)}%)...`;
-                }
-            };
-
-            xhr.onload = () => {
-                let data;
-                try {
-                    data = JSON.parse(xhr.responseText);
-                } catch (err) {
-                    alert("Tệp quá lớn hoặc mạng bị ngắt quãng. Hãy mở link Local http://127.0.0.1:5000 để xử lý video nặng tức thì nhé!");
-                    progressCard.classList.remove("show");
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
-                    return;
+                        const res = await uploadChunkWithRetry(uploadId, i, totalChunks, chunkBlob, selectedSttFile.name, language);
+                        if (i === totalChunks - 1 && res && res.job_id) {
+                            jobId = res.job_id;
+                        }
+                    }
                 }
 
-                if (xhr.status !== 200 || data.status !== "success") {
-                    alert("Thông báo: " + (data.message || "Không thể khởi tạo tiến trình."));
-                    progressCard.classList.remove("show");
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
-                    return;
+                if (!jobId) {
+                    throw new Error("Không nhận được mã tiến trình từ máy chủ.");
                 }
 
-                const jobId = data.job_id;
+                // Poll transcription status
                 const pollInterval = setInterval(async () => {
                     try {
                         const sr = await fetch(`/api/transcribe_status/${jobId}`);
@@ -1322,7 +1338,7 @@
                         }
                         const sd = await sr.json();
                         if (sd.status === "processing" || sd.status === "queued") {
-                            const p = sd.progress || 15;
+                            const p = sd.progress || 20;
                             fillEl.style.width = p + "%";
                             pctEl.innerText = p + "%";
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message || 'Đang nhận diện giọng nói AI...');
@@ -1355,23 +1371,14 @@
                         console.error("Poll error:", err);
                     }
                 }, 700);
-            };
 
-            xhr.onerror = () => {
-                alert("Đường truyền mạng bị gián đoạn khi tải lên. Vui lòng thử lại hoặc mở trên Local http://127.0.0.1:5000!");
+            } catch (err) {
+                console.error("Upload error:", err);
+                alert("Lỗi tải tệp: " + (err.message || "Mạng gián đoạn. Vui lòng thử lại!"));
                 progressCard.classList.remove("show");
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
-            };
-
-            xhr.ontimeout = () => {
-                alert("Quá thời gian tải lên máy chủ. Hãy thử lại trên link Local nhé!");
-                progressCard.classList.remove("show");
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
-            };
-
-            xhr.send(formData);
+            }
         }
 
         // ── STT Result Actions ──
