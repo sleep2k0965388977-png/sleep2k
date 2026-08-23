@@ -17,6 +17,9 @@ import speech_recognition as sr
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from capcut_tts_api import CapCutClient, CapCutError
 
+# Load HF_TOKEN from environment if set
+HF_TOKEN = os.environ.get("HF_TOKEN")
+
 # ── VieNeu-TTS Official Neural Model (20 distinct preset voices) ──
 _vieneu_tts_instance = None
 _vieneu_lock = threading.Lock()

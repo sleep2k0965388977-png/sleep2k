@@ -1273,10 +1273,10 @@
             fillEl.style.width = "6%";
             pctEl.innerText = "6%";
 
-            // Use XMLHttpRequest for real-time upload progress tracking and timeout safety
+            // Use XMLHttpRequest for real-time upload progress tracking with unlimited timeout
             const xhr = new XMLHttpRequest();
             xhr.open("POST", "/api/transcribe_job", true);
-            xhr.timeout = 180000; // 3 minutes timeout
+            xhr.timeout = 0; // No client-side timeout
 
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {
@@ -1285,7 +1285,7 @@
                     pctEl.innerText = (5 + uploadPct) + "%";
                     const uploadedMb = (e.loaded / (1024*1024)).toFixed(1);
                     const totalMb = (e.total / (1024*1024)).toFixed(1);
-                    statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Đang nạp lên máy chủ: ${uploadedMb}MB / ${totalMb}MB (${Math.round((e.loaded/e.total)*100)}%)...`;
+                    statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Đang tải tệp: ${uploadedMb}MB / ${totalMb}MB (${Math.round((e.loaded/e.total)*100)}%)...`;
                 }
             };
 
@@ -1294,7 +1294,7 @@
                 try {
                     data = JSON.parse(xhr.responseText);
                 } catch (err) {
-                    alert("Máy chủ đang bận hoặc tệp quá lớn. Vui lòng thử lại!");
+                    alert("Tệp quá lớn hoặc mạng bị ngắt quãng. Hãy mở link Local http://127.0.0.1:5000 để xử lý video nặng tức thì nhé!");
                     progressCard.classList.remove("show");
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
@@ -1302,7 +1302,7 @@
                 }
 
                 if (xhr.status !== 200 || data.status !== "success") {
-                    alert("Lỗi máy chủ: " + (data.message || "Không thể khởi tạo tiến trình."));
+                    alert("Thông báo: " + (data.message || "Không thể khởi tạo tiến trình."));
                     progressCard.classList.remove("show");
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
@@ -1358,14 +1358,14 @@
             };
 
             xhr.onerror = () => {
-                alert("Lỗi kết nối mạng khi tải lên. Vui lòng thử lại!");
+                alert("Đường truyền mạng bị gián đoạn khi tải lên. Vui lòng thử lại hoặc mở trên Local http://127.0.0.1:5000!");
                 progressCard.classList.remove("show");
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
             };
 
             xhr.ontimeout = () => {
-                alert("Quá thời gian tải lên máy chủ. Vui lòng chọn tệp nhỏ hơn hoặc thử lại!");
+                alert("Quá thời gian tải lên máy chủ. Hãy thử lại trên link Local nhé!");
                 progressCard.classList.remove("show");
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
