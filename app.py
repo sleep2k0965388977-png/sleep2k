@@ -999,6 +999,28 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         JOBS[job_id]["status"] = "error"
         JOBS[job_id]["message"] = f"Lỗi xử lý âm thanh: {str(e)}"
 
+@app.route("/api/upload_progress/<upload_id>", methods=["GET"])
+def api_upload_progress(upload_id):
+    """Return list of chunk indices that have already been uploaded for this upload_id to enable true resume."""
+    try:
+        part_files = list(UPLOAD_DIR.glob(f"{upload_id}_part_*.tmp"))
+        uploaded_indices = []
+        for p in part_files:
+            try:
+                idx_str = p.stem.split("_part_")[-1]
+                uploaded_indices.append(int(idx_str))
+            except Exception:
+                pass
+        uploaded_indices.sort()
+        return jsonify({
+            "status": "success",
+            "upload_id": upload_id,
+            "uploaded_chunks": uploaded_indices,
+            "count": len(uploaded_indices)
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route("/api/upload_chunk", methods=["POST"])
 def api_upload_chunk():
     """Receive sequential 5MB file chunks, assemble, and trigger adaptive queue STT."""

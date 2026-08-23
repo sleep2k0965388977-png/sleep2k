@@ -1229,8 +1229,19 @@
             }
         }
 
-        // ── 5MB Sequential Chunked Upload with Auto-Retry ──
-        async function uploadChunkWithRetry(uploadId, chunkIndex, totalChunks, chunkBlob, filename, language, maxRetries = 3) {
+        // ── Deterministic File Fingerprint for Persistent Resume ──
+        function getFileFingerprint(file) {
+            const raw = `${file.name}_${file.size}_${file.lastModified || 0}`;
+            let hash = 0;
+            for (let i = 0; i < raw.length; i++) {
+                hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+                hash |= 0;
+            }
+            return "upl_" + Math.abs(hash).toString(36) + "_" + file.size.toString(36);
+        }
+
+        // ── 5MB Sequential Chunked Upload with Persistent Resume & Auto-Retry ──
+        async function uploadChunkWithRetry(uploadId, chunkIndex, totalChunks, chunkBlob, filename, language, maxRetries = 5) {
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
                     const formData = new FormData();
@@ -1252,7 +1263,11 @@
                 } catch (e) {
                     console.warn(`Chunk ${chunkIndex + 1}/${totalChunks} attempt ${attempt} failed:`, e);
                     if (attempt === maxRetries) throw e;
-                    await new Promise(r => setTimeout(r, 1000 * attempt));
+                    const statusEl = document.getElementById("sttProgressStatus");
+                    if (statusEl) {
+                        statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-amber);"></i> Mạng gián đoạn... Đang tự động thử lại mảnh ${chunkIndex + 1} (lần ${attempt}/${maxRetries})...`;
+                    }
+                    await new Promise(r => setTimeout(r, 1500 * attempt));
                 }
             }
         }
@@ -1278,7 +1293,7 @@
             progressCard.classList.add("show");
             fillEl.style.width = "3%";
             pctEl.innerText = "3%";
-            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang chuẩn bị truyền tệp...';
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang kiểm tra tiến trình tải lên...';
 
             let jobId = null;
             const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
@@ -1298,9 +1313,27 @@
                     }
                     jobId = data.job_id;
                 } else {
-                    // Heavy file (>5MB, e.g. 434MB Video): 5MB Sequential Chunked Upload with Retry
+                    // Heavy file (>5MB, e.g. 500MB – 3GB Video): 5MB Sequential Chunked Upload with Persistent Resume
                     const totalChunks = Math.ceil(selectedSttFile.size / CHUNK_SIZE);
-                    const uploadId = Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+                    const uploadId = getFileFingerprint(selectedSttFile);
+
+                    // Check existing uploaded chunks on server for instant resume
+                    let uploadedSet = new Set();
+                    try {
+                        const progResp = await fetch(`/api/upload_progress/${uploadId}`);
+                        if (progResp.ok) {
+                            const progData = await progResp.json();
+                            if (progData.uploaded_chunks && Array.isArray(progData.uploaded_chunks)) {
+                                uploadedSet = new Set(progData.uploaded_chunks);
+                                if (uploadedSet.size > 0) {
+                                    statusEl.innerHTML = `<i class="fa-solid fa-bolt" style="color:var(--accent-amber);"></i> Đang khôi phục tiến trình cũ: Đã có ${uploadedSet.size}/${totalChunks} mảnh...`;
+                                    await new Promise(r => setTimeout(r, 600));
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Upload progress check skipped:", e);
+                    }
 
                     for (let i = 0; i < totalChunks; i++) {
                         const start = i * CHUNK_SIZE;
@@ -1312,7 +1345,15 @@
                         pctEl.innerText = (3 + uploadProgressPct) + "%";
                         const loadedMb = (end / (1024 * 1024)).toFixed(1);
                         const totalMb = (selectedSttFile.size / (1024 * 1024)).toFixed(1);
-                        statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Đang tải mảnh ${i + 1}/${totalChunks} [${loadedMb}MB / ${totalMb}MB]...`;
+                        const overallPct = Math.round(((i + 1) / totalChunks) * 100);
+
+                        // If already uploaded previously, skip transfer
+                        if (uploadedSet.has(i) && i < totalChunks - 1) {
+                            statusEl.innerHTML = `<i class="fa-solid fa-bolt" style="color:var(--accent-amber);"></i> Đã tải sẵn mảnh ${i + 1}/${totalChunks} [${loadedMb}MB / ${totalMb}MB] (${overallPct}%)...`;
+                            continue;
+                        }
+
+                        statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Đang tải mảnh ${i + 1}/${totalChunks} [${loadedMb}MB / ${totalMb}MB] (${overallPct}%)...`;
 
                         const res = await uploadChunkWithRetry(uploadId, i, totalChunks, chunkBlob, selectedSttFile.name, language);
                         if (i === totalChunks - 1 && res && res.job_id) {
