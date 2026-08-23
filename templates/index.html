@@ -684,7 +684,7 @@
                     </div>
                     <div class="dropzone-text">
                         <p class="dropzone-main" id="dropzoneMainText">Kéo thả tệp âm thanh/video vào đây, hoặc <span style="color:var(--accent-purple);text-decoration:underline;">bấm để duyệt tệp</span></p>
-                        <p class="dropzone-sub">Hỗ trợ: MP3, WAV, M4A, MP4, AAC, FLAC, OGG, WEBM... (Không giới hạn độ dài)</p>
+                        <p class="dropzone-sub">Hỗ trợ: MP3, WAV, M4A, MP4, AAC, FLAC, MKV... (Tối đa 1.5 GB trên phiên bản Free)</p>
                     </div>
                 </div>
 
@@ -1276,6 +1276,12 @@
         async function startTranscription() {
             if (!selectedSttFile) {
                 alert("Vui lòng chọn hoặc kéo thả tệp âm thanh/video vào ô tải lên!");
+                return;
+            }
+
+            const MAX_ALLOWED_SIZE = 1.5 * 1024 * 1024 * 1024; // 1.5 GB
+            if (selectedSttFile.size > MAX_ALLOWED_SIZE) {
+                alert("⚠️ Dung lượng tệp vượt quá 1.5 GB (giới hạn an toàn trên máy chủ Render Free).\n\nĐể đảm bảo quá trình tải lên và bóc tách âm thanh mượt mà không bị ngắt kết nối mạng, vui lòng chọn video ≤ 1.5 GB hoặc sử dụng máy chủ VPS chuyên dụng!");
                 return;
             }
 
