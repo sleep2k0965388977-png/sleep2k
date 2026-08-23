@@ -163,6 +163,32 @@ client = CapCutClient()
 # Global job status store
 JOBS = {}
 
+# ── Concurrency Limiter: max 2 jobs processing at once (Render Free = 512MB RAM) ──
+# Nền tảng cố định ~430MB, mỗi job ~30-50MB → chỉ đủ cho 2 job đồng thời
+MAX_CONCURRENT_JOBS = 2
+_job_semaphore = threading.Semaphore(MAX_CONCURRENT_JOBS)
+_queue_counter = 0
+_queue_lock = threading.Lock()
+
+def get_queue_position():
+    """Return how many jobs are waiting in queue."""
+    with _queue_lock:
+        # Count jobs with status 'queued'
+        return sum(1 for j in JOBS.values() if j.get("status") == "queued")
+
+def run_with_queue(job_id, target_func, *args, **kwargs):
+    """Wrapper that enforces concurrency limit with queue feedback."""
+    global _queue_counter
+    JOBS[job_id]["status"] = "queued"
+    JOBS[job_id]["message"] = "Đang chờ trong hàng đợi... Máy chủ đang bận, bạn sẽ được xử lý ngay khi có slot trống."
+    JOBS[job_id]["progress"] = 0
+
+    _job_semaphore.acquire()
+    try:
+        target_func(job_id, *args, **kwargs)
+    finally:
+        _job_semaphore.release()
+
 def load_voices():
     if VOICE_JSON_PATH.exists():
         with open(VOICE_JSON_PATH, "r", encoding="utf-8") as f:
@@ -507,8 +533,8 @@ def generate_job():
         }
 
         t = threading.Thread(
-            target=run_tts_job,
-            args=(job_id, text, voice, resource_id, rate, lan),
+            target=run_with_queue,
+            args=(job_id, run_tts_job, text, voice, resource_id, rate, lan),
             daemon=True
         )
         t.start()
@@ -849,7 +875,7 @@ def api_transcribe_job():
         "result": None
     }
 
-    t = threading.Thread(target=process_speech_to_text_job, args=(job_id, saved_path, language))
+    t = threading.Thread(target=run_with_queue, args=(job_id, process_speech_to_text_job, saved_path, language))
     t.daemon = True
     t.start()
 
