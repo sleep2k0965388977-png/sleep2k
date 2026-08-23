@@ -160,6 +160,45 @@ PREVIEW_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
+CHECKPOINTS_DIR.mkdir(exist_ok=True)
+
+def save_atomic_checkpoint(job_id, data):
+    """Save checkpoint atomically using temporary file + fsync + atomic rename."""
+    checkpoint_path = CHECKPOINTS_DIR / f"{job_id}_checkpoint.json"
+    tmp_path = CHECKPOINTS_DIR / f"{job_id}_checkpoint.tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        tmp_path.replace(checkpoint_path)
+    except Exception as e:
+        print(f"Error saving atomic checkpoint for {job_id}: {e}")
+
+def load_checkpoint(job_id):
+    """Safely read checkpoint JSON."""
+    checkpoint_path = CHECKPOINTS_DIR / f"{job_id}_checkpoint.json"
+    if checkpoint_path.exists():
+        try:
+            with open(checkpoint_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+    return None
+
+def delete_checkpoint(job_id):
+    """Delete checkpoint when job is finalized."""
+    try:
+        p = CHECKPOINTS_DIR / f"{job_id}_checkpoint.json"
+        if p.exists():
+            p.unlink(missing_ok=True)
+        tmp_p = CHECKPOINTS_DIR / f"{job_id}_checkpoint.tmp"
+        if tmp_p.exists():
+            tmp_p.unlink(missing_ok=True)
+    except Exception:
+        pass
+
 VOICE_JSON_PATH = Path(__file__).parent / "Voice.json"
 client = CapCutClient()
 
@@ -766,7 +805,7 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
     try:
         JOBS[job_id]["status"] = "processing"
         JOBS[job_id]["progress"] = 5
-        JOBS[job_id]["message"] = "Đang phân tích tệp âm thanh bằng FFmpeg..."
+        JOBS[job_id]["message"] = "Đang phân tích tệp âm thanh và trích xuất mốc thời gian..."
 
         # 1. Probe audio duration
         duration = 0.0
@@ -781,11 +820,12 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         except Exception:
             duration = 30.0
 
-        JOBS[job_id]["progress"] = 15
-        JOBS[job_id]["message"] = f"Thời lượng: {int(duration)}s. Đang chia đoạn âm thanh..."
+        JOBS[job_id]["progress"] = 10
+        JOBS[job_id]["message"] = f"Thời lượng: {int(duration)}s. Đang bóc tách luồng âm thanh..."
 
-        # 2. Split audio into 15-second WAV segments
+        # 2. Split audio into 15-second WAV segments with exact CSV timestamping
         temp_dir = Path(tempfile.mkdtemp(prefix="stt_"))
+        csv_list_path = temp_dir / "segments.csv"
         segment_pattern = str(temp_dir / "chunk_%04d.wav")
 
         proc = subprocess.run([
@@ -793,80 +833,145 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             "-i", str(file_path),
             "-f", "segment",
             "-segment_time", "15",
+            "-segment_list", str(csv_list_path),
+            "-segment_list_type", "csv",
             "-c:a", "pcm_s16le",
             "-ar", "16000",
             "-ac", "1",
             segment_pattern
-        ], capture_output=True, timeout=180)
+        ], capture_output=True, timeout=300)
 
-        chunk_files = sorted(list(temp_dir.glob("chunk_*.wav")))
-
-        # Immediately delete original heavy upload file (e.g. 450MB MP4) to free disk space
+        # Immediately delete original heavy upload file (e.g. 450MB/2-3GB MP4) to free storage
         try:
-            if file_path.exists():
-                file_path.unlink(missing_ok=True)
+            if file_path and Path(file_path).exists():
+                Path(file_path).unlink(missing_ok=True)
         except Exception:
             pass
 
-        if not chunk_files:
+        # 3. Parse segments metadata with exact timestamps
+        segments_meta = []
+        if csv_list_path.exists():
+            try:
+                with open(csv_list_path, "r", encoding="utf-8") as f:
+                    for idx, line in enumerate(f):
+                        parts = line.strip().split(",")
+                        if len(parts) >= 3:
+                            fn, st, et = parts[0], float(parts[1]), float(parts[2])
+                            chunk_p = temp_dir / fn
+                            segments_meta.append({
+                                "index": idx,
+                                "file_path": str(chunk_p),
+                                "start_time": st,
+                                "end_time": et
+                            })
+            except Exception:
+                pass
+
+        if not segments_meta:
+            chunk_files = sorted(list(temp_dir.glob("chunk_*.wav")))
+            for idx, cp in enumerate(chunk_files):
+                st = idx * 15.0
+                et = min((idx + 1) * 15.0, duration) if duration > 0 else (idx + 1) * 15.0
+                segments_meta.append({
+                    "index": idx,
+                    "file_path": str(cp),
+                    "start_time": st,
+                    "end_time": et
+                })
+
+        if not segments_meta:
             JOBS[job_id]["status"] = "error"
             JOBS[job_id]["message"] = "Không thể đọc dữ liệu âm thanh từ tệp tải lên."
             return
 
-        total_chunks = len(chunk_files)
-        results = [""] * total_chunks
-        completed_count = 0
+        total_chunks = len(segments_meta)
 
-        # 3. Transcribe chunks with ThreadPoolExecutor & 10s watchdog auto-repair
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            future_to_chunk = {
-                executor.submit(transcribe_audio_chunk, i, chunk_path, language): (i, chunk_path)
-                for i, chunk_path in enumerate(chunk_files)
+        # 4. Check for existing checkpoint (Resume support)
+        chk = load_checkpoint(job_id)
+        if not chk or chk.get("total_segments") != total_chunks:
+            chk = {
+                "job_id": job_id,
+                "language": language,
+                "total_duration": duration,
+                "total_segments": total_chunks,
+                "status": "processing",
+                "segments": {}
             }
+            save_atomic_checkpoint(job_id, chk)
 
-            for future in as_completed(future_to_chunk):
-                i, chunk_path = future_to_chunk[future]
-                try:
-                    idx, text = future.result(timeout=12)
-                    results[idx] = text
-                except Exception as ex:
-                    print(f"Watchdog auto-recovery chunk {i+1}: {ex}, retrying...")
-                    # Immediate recovery retry
+        # 5. Process segments sequentially with atomic checkpoint & per-segment early cleanup
+        completed_count = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
+
+        for meta in segments_meta:
+            idx = meta["index"]
+            idx_str = str(idx)
+            chunk_p = Path(meta["file_path"])
+
+            # Check if this segment is already completed in checkpoint
+            if idx_str in chk.get("segments", {}) and chk["segments"][idx_str].get("status") == "completed":
+                if chunk_p.exists():
                     try:
-                        idx, text = transcribe_audio_chunk(i, chunk_path, language, max_retries=2)
-                        results[idx] = text
+                        chunk_p.unlink(missing_ok=True)
                     except Exception:
-                        results[i] = ""
+                        pass
+                continue
 
-                completed_count += 1
-                prog = int(15 + (completed_count / total_chunks) * 80)
-                JOBS[job_id]["progress"] = prog
-                JOBS[job_id]["message"] = f"Đang nhận diện giọng nói AI: {completed_count}/{total_chunks} đoạn ({prog}%)..."
+            # Transcribe segment with watchdog normalization
+            transcript = ""
+            if chunk_p.exists():
+                try:
+                    _, transcript = transcribe_audio_chunk(idx, chunk_p, language, max_retries=3)
+                except Exception as ex:
+                    print(f"Segment {idx+1} transcription error: {ex}")
+                    transcript = ""
+                finally:
+                    # Immediately delete chunk WAV from disk to keep disk usage near zero
+                    try:
+                        chunk_p.unlink(missing_ok=True)
+                    except Exception:
+                        pass
 
-        # 4. Build full text and SRT subtitles
+            # Update Checkpoint atomically
+            chk["segments"][idx_str] = {
+                "index": idx,
+                "start_time": meta["start_time"],
+                "end_time": meta["end_time"],
+                "status": "completed",
+                "transcript": transcript,
+                "completed_at": time.time()
+            }
+            save_atomic_checkpoint(job_id, chk)
+
+            completed_count += 1
+            prog = int(10 + (completed_count / total_chunks) * 85)
+            JOBS[job_id]["progress"] = prog
+            JOBS[job_id]["message"] = f"Đang nhận diện giọng nói AI: {completed_count}/{total_chunks} đoạn ({prog}%)..."
+
+        # 6. Build final complete TXT and SRT subtitles from checkpoint data
         valid_texts = []
         srt_blocks = []
         srt_idx = 1
 
-        for idx, text in enumerate(results):
-            if text:
-                valid_texts.append(text)
-                start_sec = idx * 15.0
-                end_sec = min((idx + 1) * 15.0, duration) if duration > 0 else (idx + 1) * 15.0
-                srt_block = f"{srt_idx}\n{format_timestamp_srt(start_sec)} --> {format_timestamp_srt(end_sec)}\n{text}\n"
+        for i in range(total_chunks):
+            seg_data = chk.get("segments", {}).get(str(i), {})
+            txt = (seg_data.get("transcript") or "").strip()
+            if txt:
+                valid_texts.append(txt)
+                st = seg_data.get("start_time", i * 15.0)
+                et = seg_data.get("end_time", (i + 1) * 15.0)
+                srt_block = f"{srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n"
                 srt_blocks.append(srt_block)
                 srt_idx += 1
 
         full_text = "\n\n".join(valid_texts) if valid_texts else "Không nhận diện được giọng nói trong tệp này."
         srt_content = "\n".join(srt_blocks) if srt_blocks else ""
 
-        # Cleanup temp directory and uploaded file
+        # 7. Final cleanup
         try:
             for p in temp_dir.glob("*"):
                 p.unlink(missing_ok=True)
             temp_dir.rmdir()
-            if file_path.exists():
-                file_path.unlink(missing_ok=True)
+            delete_checkpoint(job_id)
         except Exception:
             pass
 
@@ -881,7 +986,6 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             "word_count": len(words),
             "char_count": len(full_text),
             "total_chunks": total_chunks,
-            "language": language
         }
     except Exception as e:
         JOBS[job_id]["status"] = "error"
@@ -971,6 +1075,18 @@ def api_transcribe_job():
 def api_transcribe_status(job_id):
     job = JOBS.get(job_id)
     if not job:
+        # Fallback to persistent checkpoint if in-memory state was reset
+        chk = load_checkpoint(job_id)
+        if chk:
+            total = chk.get("total_segments", 1)
+            completed = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
+            prog = int(10 + (completed / total) * 85)
+            return jsonify({
+                "status": "processing",
+                "progress": prog,
+                "message": f"Đang nhận diện giọng nói AI (tự động phục hồi): {completed}/{total} đoạn ({prog}%)...",
+                "result": None
+            })
         return jsonify({"status": "error", "message": "Không tìm thấy tiến trình chuyển đổi."}), 404
     return jsonify(job)
 
