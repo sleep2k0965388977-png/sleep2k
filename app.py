@@ -1017,6 +1017,10 @@ def api_upload_progress(upload_id):
             "upload_id": upload_id,
             "uploaded_chunks": uploaded_indices,
             "count": len(uploaded_indices)
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # ── Multi-Part Pipeline Engine for Large Videos (1.5GB - 5.0GB) ──
 
 def process_multipart_part_job(session_id, part_index, part_file_path, language="vi-VN"):
