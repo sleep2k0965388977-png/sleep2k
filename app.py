@@ -1023,7 +1023,7 @@ def api_upload_progress(upload_id):
 
 # ── Multi-Part Pipeline Engine for Large Videos (1.5GB - 5.0GB) ──
 
-def process_multipart_part_job(session_id, part_index, part_file_path, language="vi-VN"):
+def process_multipart_part_job(job_key, session_id, part_index, part_file_path, language="vi-VN"):
     """
     Process a single valid media Part (<= 500MB):
     1. Probe duration with ffprobe.
