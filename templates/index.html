@@ -1160,7 +1160,76 @@
             });
         }
 
-        // ── Start Audio Transcription ──
+        
+        // ── Helper: Extract & Compress Audio in Browser to Mono 16kHz WAV ──
+        function writeWavString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        function audioBufferToWavBlob(audioBuffer) {
+            const sampleRate = 16000;
+            // Downmix channels to mono
+            let channelData;
+            if (audioBuffer.numberOfChannels === 1) {
+                channelData = audioBuffer.getChannelData(0);
+            } else {
+                const left = audioBuffer.getChannelData(0);
+                const right = audioBuffer.getChannelData(1);
+                channelData = new Float32Array(left.length);
+                for (let i = 0; i < left.length; i++) {
+                    channelData[i] = (left[i] + right[i]) / 2;
+                }
+            }
+
+            const buffer = new ArrayBuffer(44 + channelData.length * 2);
+            const view = new DataView(buffer);
+
+            // RIFF chunk descriptor
+            writeWavString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + channelData.length * 2, true);
+            writeWavString(view, 8, 'WAVE');
+            // FMT sub-chunk
+            writeWavString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM
+            view.setUint16(22, 1, true); // mono
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true); // 16-bit
+            // Data sub-chunk
+            writeWavString(view, 36, 'data');
+            view.setUint32(40, channelData.length * 2, true);
+
+            let offset = 44;
+            for (let i = 0; i < channelData.length; i++, offset += 2) {
+                let s = Math.max(-1, Math.min(1, channelData[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        async function extractAudioInBrowser(file, statusCallback) {
+            try {
+                if (statusCallback) statusCallback("Đang giải mã âm thanh siêu nhẹ trong trình duyệt...");
+                const arrayBuffer = await file.arrayBuffer();
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                const audioCtx = new AudioContextClass({ sampleRate: 16000 });
+                const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                if (statusCallback) statusCallback("Đang nén về chuẩn WAV 16kHz tiết kiệm 98% dung lượng...");
+                const wavBlob = audioBufferToWavBlob(decodedBuffer);
+                audioCtx.close();
+                return new File([wavBlob], file.name.replace(/\.[^/.]+$/, "") + ".wav", { type: "audio/wav" });
+            } catch (err) {
+                console.warn("Client-side audio decode fallback to direct upload:", err);
+                return file;
+            }
+        }
+
+        // ── Start Audio Transcription with Resilient XHR & Audio Compression ──
         async function startTranscription() {
             if (!selectedSttFile) {
                 alert("Vui lòng chọn hoặc kéo thả tệp âm thanh/video vào ô tải lên!");
@@ -1176,25 +1245,64 @@
             const language = document.getElementById("sttLanguage").value;
 
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải tệp lên...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang chuẩn bị tệp...';
             resultCard.style.display = "none";
             progressCard.classList.add("show");
-            fillEl.style.width = "5%";
-            pctEl.innerText = "5%";
-            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang tải tệp âm thanh lên máy chủ...';
+            fillEl.style.width = "3%";
+            pctEl.innerText = "3%";
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích và nén âm thanh...';
+
+            let fileToUpload = selectedSttFile;
+            // If video or file > 8MB, extract audio locally in browser to avoid timeout and 500MB network payload
+            const isVideoOrHeavy = selectedSttFile.size > 8 * 1024 * 1024 || selectedSttFile.type.startsWith("video") || selectedSttFile.name.match(/\.(mp4|mkv|webm|mov|avi|flv)$/i);
+            if (isVideoOrHeavy && window.AudioContext) {
+                try {
+                    fileToUpload = await extractAudioInBrowser(selectedSttFile, (msg) => {
+                        statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${msg}`;
+                    });
+                } catch (e) {
+                    console.warn("Audio extraction skipped:", e);
+                }
+            }
 
             const formData = new FormData();
-            formData.append("file", selectedSttFile);
+            formData.append("file", fileToUpload);
             formData.append("language", language);
 
-            try {
-                const resp = await fetch("/api/transcribe_job", {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await resp.json();
-                if (data.status !== "success") {
-                    alert("Lỗi: " + (data.message || "Không thể khởi động chuyển đổi."));
+            statusEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up fa-fade"></i> Đang tải tệp âm thanh lên máy chủ...';
+            fillEl.style.width = "6%";
+            pctEl.innerText = "6%";
+
+            // Use XMLHttpRequest for real-time upload progress tracking and timeout safety
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/api/transcribe_job", true);
+            xhr.timeout = 180000; // 3 minutes timeout
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const uploadPct = Math.round((e.loaded / e.total) * 10);
+                    fillEl.style.width = (5 + uploadPct) + "%";
+                    pctEl.innerText = (5 + uploadPct) + "%";
+                    const uploadedMb = (e.loaded / (1024*1024)).toFixed(1);
+                    const totalMb = (e.total / (1024*1024)).toFixed(1);
+                    statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Đang nạp lên máy chủ: ${uploadedMb}MB / ${totalMb}MB (${Math.round((e.loaded/e.total)*100)}%)...`;
+                }
+            };
+
+            xhr.onload = () => {
+                let data;
+                try {
+                    data = JSON.parse(xhr.responseText);
+                } catch (err) {
+                    alert("Máy chủ đang bận hoặc tệp quá lớn. Vui lòng thử lại!");
+                    progressCard.classList.remove("show");
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                    return;
+                }
+
+                if (xhr.status !== 200 || data.status !== "success") {
+                    alert("Lỗi máy chủ: " + (data.message || "Không thể khởi tạo tiến trình."));
                     progressCard.classList.remove("show");
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
@@ -1214,7 +1322,7 @@
                         }
                         const sd = await sr.json();
                         if (sd.status === "processing" || sd.status === "queued") {
-                            const p = sd.progress || 10;
+                            const p = sd.progress || 15;
                             fillEl.style.width = p + "%";
                             pctEl.innerText = p + "%";
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message || 'Đang nhận diện giọng nói AI...');
@@ -1247,13 +1355,23 @@
                         console.error("Poll error:", err);
                     }
                 }, 700);
+            };
 
-            } catch (e) {
-                alert("Lỗi kết nối máy chủ: " + e.message);
+            xhr.onerror = () => {
+                alert("Lỗi kết nối mạng khi tải lên. Vui lòng thử lại!");
                 progressCard.classList.remove("show");
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
-            }
+            };
+
+            xhr.ontimeout = () => {
+                alert("Quá thời gian tải lên máy chủ. Vui lòng chọn tệp nhỏ hơn hoặc thử lại!");
+                progressCard.classList.remove("show");
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+            };
+
+            xhr.send(formData);
         }
 
         // ── STT Result Actions ──

@@ -145,6 +145,7 @@ def vieneu_synthesize_audio(text, voice_type):
     return wav_bytes
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB upload limit
 
 # Temporary output directory (files auto-cleaned on each new generation)
 OUTPUT_DIR = Path(__file__).parent / "output_audio"
