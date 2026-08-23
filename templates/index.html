@@ -1279,9 +1279,11 @@
                 return;
             }
 
-            const MAX_ALLOWED_SIZE = 1.5 * 1024 * 1024 * 1024; // 1.5 GB
+            const MULTIPART_THRESHOLD = 1.5 * 1024 * 1024 * 1024; // 1.5 GB
+            const MAX_ALLOWED_SIZE = 5.0 * 1024 * 1024 * 1024; // 5.0 GB
+
             if (selectedSttFile.size > MAX_ALLOWED_SIZE) {
-                alert("⚠️ Dung lượng tệp vượt quá 1.5 GB (giới hạn an toàn trên máy chủ Render Free).\n\nĐể đảm bảo quá trình tải lên và bóc tách âm thanh mượt mà không bị ngắt kết nối mạng, vui lòng chọn video ≤ 1.5 GB hoặc sử dụng máy chủ VPS chuyên dụng!");
+                alert("⚠️ Dung lượng tệp vượt quá 5.0 GB.\nVui lòng chọn video dưới 5.0 GB để đảm bảo quá trình xử lý an toàn!");
                 return;
             }
 
@@ -1305,7 +1307,115 @@
             const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
 
             try {
-                if (selectedSttFile.size <= CHUNK_SIZE) {
+                if (selectedSttFile.size > MULTIPART_THRESHOLD) {
+                    // ── MULTI-PART PIPELINE (1.5 GB – 5.0 GB): Split into discrete sequential parts ≤ 400MB ──
+                    const PART_SIZE = 400 * 1024 * 1024; // 400 MB per Part
+                    const totalParts = Math.ceil(selectedSttFile.size / PART_SIZE);
+                    const sessionId = getFileFingerprint(selectedSttFile);
+
+                    statusEl.innerHTML = `<i class="fa-solid fa-layer-group" style="color:var(--accent-cyan);"></i> Video lớn (${(selectedSttFile.size/(1024*1024*1024)).toFixed(2)}GB): Đang kích hoạt Multi-Part Pipeline (${totalParts} phần)...`;
+                    
+                    // Init multi-part session
+                    await fetch("/api/multipart/init_session", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            filename: selectedSttFile.name,
+                            total_parts: totalParts,
+                            language: language
+                        })
+                    });
+
+                    // Check existing session status for completed parts
+                    let completedParts = [];
+                    try {
+                        const sResp = await fetch(`/api/multipart/session_status/${sessionId}`);
+                        if (sResp.ok) {
+                            const sData = await sResp.json();
+                            completedParts = sData.completed_parts || [];
+                        }
+                    } catch (e) {}
+
+                    for (let p = 0; p < totalParts; p++) {
+                        const pStr = p.toString();
+                        if (completedParts.includes(pStr)) {
+                            statusEl.innerHTML = `<i class="fa-solid fa-check" style="color:var(--accent-emerald);"></i> Phần ${p+1}/${totalParts} đã có sẵn kết quả trong Checkpoint!`;
+                            continue;
+                        }
+
+                        const pStart = p * PART_SIZE;
+                        const pEnd = Math.min(pStart + PART_SIZE, selectedSttFile.size);
+                        const partBlob = selectedSttFile.slice(pStart, pEnd);
+                        const partTotalChunks = Math.ceil(partBlob.size / CHUNK_SIZE);
+
+                        for (let c = 0; c < partTotalChunks; c++) {
+                            const cStart = c * CHUNK_SIZE;
+                            const cEnd = Math.min(cStart + CHUNK_SIZE, partBlob.size);
+                            const chunkBlob = partBlob.slice(cStart, cEnd);
+
+                            const partProgressPct = Math.round(((p + (c + 1) / partTotalChunks) / totalParts) * 85);
+                            fillEl.style.width = (5 + partProgressPct) + "%";
+                            pctEl.innerText = (5 + partProgressPct) + "%";
+                            const pLoadedMb = (cEnd / (1024 * 1024)).toFixed(1);
+                            const pTotalMb = (partBlob.size / (1024 * 1024)).toFixed(1);
+
+                            statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Phần ${p+1}/${totalParts}: Đang tải mảnh ${c+1}/${partTotalChunks} [${pLoadedMb}MB / ${pTotalMb}MB]...`;
+
+                            const formData = new FormData();
+                            formData.append("session_id", sessionId);
+                            formData.append("part_index", p);
+                            formData.append("chunk_index", c);
+                            formData.append("total_chunks", partTotalChunks);
+                            formData.append("filename", `part_${p}_${selectedSttFile.name}`);
+                            formData.append("language", language);
+                            formData.append("file", chunkBlob);
+
+                            let ok = false;
+                            for (let att = 1; att <= 5; att++) {
+                                try {
+                                    const r = await fetch("/api/multipart/upload_part_chunk", { method: "POST", body: formData });
+                                    if (r.ok) { ok = true; break; }
+                                } catch (e) {
+                                    await new Promise(res => setTimeout(res, 1500 * att));
+                                }
+                            }
+                            if (!ok) throw new Error(`Lỗi tải mảnh ${c+1} của Phần ${p+1}. Vui lòng thử lại!`);
+                        }
+
+                        // Wait for Part P to finish transcription on server before moving to next part
+                        statusEl.innerHTML = `<i class="fa-solid fa-gears fa-spin" style="color:var(--accent-purple);"></i> Đang bóc tách và nhận diện âm thanh Phần ${p+1}/${totalParts}...`;
+                        let partDone = false;
+                        for (let poll = 0; poll < 120; poll++) {
+                            await new Promise(res => setTimeout(res, 2000));
+                            const sResp = await fetch(`/api/multipart/session_status/${sessionId}`);
+                            if (sResp.ok) {
+                                const sData = await sResp.json();
+                                if ((sData.completed_parts || []).includes(pStr) || sData.status === "completed") {
+                                    partDone = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Poll final session result
+                    for (let poll = 0; poll < 60; poll++) {
+                        const sResp = await fetch(`/api/multipart/session_status/${sessionId}`);
+                        if (sResp.ok) {
+                            const sData = await sResp.json();
+                            if (sData.status === "completed" && sData.result) {
+                                fillEl.style.width = "100%";
+                                pctEl.innerText = "100%";
+                                statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> Hoàn tất toàn bộ các phần!';
+                                showSttResult(sData.result);
+                                return;
+                            }
+                        }
+                        await new Promise(res => setTimeout(res, 2000));
+                    }
+                    throw new Error("Quá thời gian xử lý phiên Multi-Part.");
+                } else if (selectedSttFile.size <= CHUNK_SIZE) {
                     // Small file <= 5MB: Direct single upload
                     statusEl.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Đang nạp tệp âm thanh...';
                     const formData = new FormData();
@@ -1319,7 +1429,7 @@
                     }
                     jobId = data.job_id;
                 } else {
-                    // Heavy file (>5MB, e.g. 500MB – 3GB Video): 5MB Sequential Chunked Upload with Persistent Resume
+                    // Heavy file (5MB – 1.5GB): Standard 5MB Sequential Chunked Upload with Persistent Resume
                     const totalChunks = Math.ceil(selectedSttFile.size / CHUNK_SIZE);
                     const uploadId = getFileFingerprint(selectedSttFile);
 

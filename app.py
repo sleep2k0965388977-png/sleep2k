@@ -1017,7 +1017,299 @@ def api_upload_progress(upload_id):
             "upload_id": upload_id,
             "uploaded_chunks": uploaded_indices,
             "count": len(uploaded_indices)
+# ── Multi-Part Pipeline Engine for Large Videos (1.5GB - 5.0GB) ──
+
+def process_multipart_part_job(session_id, part_index, part_file_path, language="vi-VN"):
+    """
+    Process a single valid media Part (<= 500MB):
+    1. Probe duration with ffprobe.
+    2. Split into 15s WAV segments with exact CSV timestamps.
+    3. Delete part_file_path immediately.
+    4. Transcribe 15s segments with watchdog recovery.
+    5. Delete WAV segments immediately.
+    6. Save Part results to session checkpoint.
+    7. If all parts completed, compile final merged TXT and continuous offset SRT.
+    """
+    session = load_checkpoint(f"session_{session_id}")
+    if not session:
+        session = {
+            "session_id": session_id,
+            "total_parts": 1,
+            "language": language,
+            "status": "in_progress",
+            "parts": {}
+        }
+
+    job_key = f"{session_id}_p{part_index}"
+    try:
+        JOBS[job_key] = {
+            "status": "processing",
+            "progress": 10,
+            "message": f"Phần {part_index+1}: Đang bóc tách âm thanh bằng FFmpeg...",
+            "result": None
+        }
+
+        # 1. Probe duration
+        duration = 0.0
+        try:
+            res = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(part_file_path)],
+                capture_output=True, text=True, timeout=20
+            )
+            duration = float(res.stdout.strip())
+        except Exception:
+            duration = 30.0
+
+        # 2. Split audio into 15s WAV segments with CSV timestamps
+        temp_dir = Path(tempfile.mkdtemp(prefix=f"stt_p{part_index}_"))
+        csv_list_path = temp_dir / "segments.csv"
+        segment_pattern = str(temp_dir / "chunk_%04d.wav")
+
+        subprocess.run([
+            "ffmpeg", "-y", "-i", str(part_file_path),
+            "-f", "segment", "-segment_time", "15",
+            "-segment_list", str(csv_list_path), "-segment_list_type", "csv",
+            "-c:a", "pcm_s16le", "-ar", "16000", "-ac", "1",
+            segment_pattern
+        ], capture_output=True, timeout=300)
+
+        # 3. Immediately delete the uploaded Part file (<= 500MB) from disk
+        try:
+            if Path(part_file_path).exists():
+                Path(part_file_path).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+        # 4. Parse segments metadata
+        segments_meta = []
+        if csv_list_path.exists():
+            try:
+                with open(csv_list_path, "r", encoding="utf-8") as f:
+                    for idx, line in enumerate(f):
+                        parts = line.strip().split(",")
+                        if len(parts) >= 3:
+                            segments_meta.append({
+                                "index": idx,
+                                "file_path": str(temp_dir / parts[0]),
+                                "start_time": float(parts[1]),
+                                "end_time": float(parts[2])
+                            })
+            except Exception:
+                pass
+
+        if not segments_meta:
+            for idx, cp in enumerate(sorted(list(temp_dir.glob("chunk_*.wav")))):
+                segments_meta.append({
+                    "index": idx,
+                    "file_path": str(cp),
+                    "start_time": idx * 15.0,
+                    "end_time": min((idx + 1) * 15.0, duration)
+                })
+
+        total_chunks = len(segments_meta)
+        part_segments = []
+
+        # 5. Transcribe each 15s segment & delete WAV immediately
+        for idx, meta in enumerate(segments_meta):
+            chunk_p = Path(meta["file_path"])
+            text = ""
+            if chunk_p.exists():
+                try:
+                    _, text = transcribe_audio_chunk(idx, chunk_p, language, max_retries=3)
+                except Exception:
+                    text = ""
+                finally:
+                    try:
+                        chunk_p.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+
+            if text and text.strip():
+                part_segments.append({
+                    "start_time": meta["start_time"],
+                    "end_time": meta["end_time"],
+                    "text": text.strip()
+                })
+
+            prog = int(10 + ((idx + 1) / max(total_chunks, 1)) * 85)
+            JOBS[job_key]["progress"] = prog
+            JOBS[job_key]["message"] = f"Phần {part_index+1}: Đã nhận diện {idx+1}/{total_chunks} đoạn ({prog}%)..."
+
+        # Cleanup temp directory
+        try:
+            for p in temp_dir.glob("*"):
+                p.unlink(missing_ok=True)
+            temp_dir.rmdir()
+        except Exception:
+            pass
+
+        # 6. Save Part to Session Checkpoint
+        session = load_checkpoint(f"session_{session_id}") or session
+        if "parts" not in session:
+            session["parts"] = {}
+        session["parts"][str(part_index)] = {
+            "part_index": part_index,
+            "duration": duration,
+            "segments": part_segments,
+            "status": "completed",
+            "completed_at": time.time()
+        }
+        save_atomic_checkpoint(f"session_{session_id}", session)
+
+        JOBS[job_key]["status"] = "completed"
+        JOBS[job_key]["progress"] = 100
+        JOBS[job_key]["message"] = f"Hoàn tất xử lý Phần {part_index+1} 100%!"
+
+        # 7. Check if all parts completed -> Merge full video TXT and cumulative continuous SRT
+        total_parts = session.get("total_parts", 1)
+        if len(session["parts"]) == total_parts:
+            all_texts = []
+            srt_blocks = []
+            srt_idx = 1
+            cumulative_offset = 0.0
+
+            for p_idx in range(total_parts):
+                p_data = session["parts"].get(str(p_idx), {})
+                p_dur = p_data.get("duration", 0.0)
+                for seg in p_data.get("segments", []):
+                    all_texts.append(seg["text"])
+                    st = seg["start_time"] + cumulative_offset
+                    et = seg["end_time"] + cumulative_offset
+                    srt_block = f"{srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{seg['text']}\n"
+                    srt_blocks.append(srt_block)
+                    srt_idx += 1
+                cumulative_offset += p_dur
+
+            final_text = "\n\n".join(all_texts) if all_texts else "Không nhận diện được giọng nói trong video."
+            final_srt = "\n".join(srt_blocks) if srt_blocks else ""
+
+            session["status"] = "completed"
+            session["final_result"] = {
+                "text": final_text,
+                "srt": final_srt,
+                "total_duration": round(cumulative_offset, 1),
+                "total_parts": total_parts,
+                "word_count": len(final_text.split()),
+                "char_count": len(final_text)
+            }
+            save_atomic_checkpoint(f"session_{session_id}", session)
+
+            JOBS[session_id] = {
+                "status": "completed",
+                "progress": 100,
+                "message": f"Đã hoàn thành toàn bộ {total_parts} phần video thành công 100%!",
+                "result": session["final_result"]
+            }
+    except Exception as e:
+        JOBS[job_key]["status"] = "error"
+        JOBS[job_key]["message"] = f"Lỗi xử lý phần {part_index+1}: {str(e)}"
+
+@app.route("/api/multipart/init_session", methods=["POST"])
+def api_multipart_init_session():
+    try:
+        data = request.get_json(force=True) or {}
+        session_id = data.get("session_id") or uuid.uuid4().hex[:12]
+        filename = data.get("filename", "video.mp4")
+        total_parts = int(data.get("total_parts", 1))
+        language = data.get("language", "vi-VN")
+
+        session_data = {
+            "session_id": session_id,
+            "filename": filename,
+            "total_parts": total_parts,
+            "language": language,
+            "created_at": time.time(),
+            "status": "in_progress",
+            "parts": {}
+        }
+        save_atomic_checkpoint(f"session_{session_id}", session_data)
+        JOBS[session_id] = {
+            "status": "in_progress",
+            "progress": 0,
+            "message": f"Đang khởi tạo phiên xử lý Multi-Part ({total_parts} phần)...",
+            "result": None
+        }
+        return jsonify({"status": "success", "session_id": session_id})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/multipart/session_status/<session_id>", methods=["GET"])
+def api_multipart_session_status(session_id):
+    session = load_checkpoint(f"session_{session_id}")
+    if not session:
+        return jsonify({"status": "error", "message": "Không tìm thấy phiên xử lý."}), 404
+    
+    total_parts = session.get("total_parts", 1)
+    completed_parts = list(session.get("parts", {}).keys())
+    
+    global_job = JOBS.get(session_id, {})
+    if session.get("status") == "completed":
+        return jsonify({
+            "status": "completed",
+            "progress": 100,
+            "message": f"Hoàn tất toàn bộ {total_parts} phần video!",
+            "result": session.get("final_result"),
+            "completed_parts": completed_parts,
+            "total_parts": total_parts
         })
+    
+    overall_progress = int((len(completed_parts) / max(total_parts, 1)) * 100)
+    return jsonify({
+        "status": "in_progress",
+        "progress": overall_progress,
+        "message": f"Đang xử lý Multi-Part: {len(completed_parts)}/{total_parts} phần hoàn tất...",
+        "completed_parts": completed_parts,
+        "total_parts": total_parts
+    })
+
+@app.route("/api/multipart/upload_part_chunk", methods=["POST"])
+def api_multipart_upload_part_chunk():
+    try:
+        session_id = request.form.get("session_id")
+        part_index = int(request.form.get("part_index", 0))
+        chunk_index = int(request.form.get("chunk_index", 0))
+        total_chunks = int(request.form.get("total_chunks", 1))
+        filename = request.form.get("filename", "part.mp4")
+        language = request.form.get("language", "vi-VN")
+
+        if "file" not in request.files or not session_id:
+            return jsonify({"status": "error", "message": "Dữ liệu mảnh không hợp lệ."}), 400
+
+        chunk_file = request.files["file"]
+        part_chunk_path = UPLOAD_DIR / f"{session_id}_p{part_index:03d}_chk{chunk_index:05d}.tmp"
+        chunk_file.save(str(part_chunk_path))
+
+        # When last chunk of this part arrives, assemble this single part
+        if chunk_index == total_chunks - 1:
+            ext = Path(filename).suffix.lower() or ".mp4"
+            assembled_part_path = UPLOAD_DIR / f"upload_{session_id}_p{part_index}{ext}"
+
+            with open(assembled_part_path, "wb") as outfile:
+                for idx in range(total_chunks):
+                    pc_file = UPLOAD_DIR / f"{session_id}_p{part_index:03d}_chk{idx:05d}.tmp"
+                    if pc_file.exists():
+                        with open(pc_file, "rb") as infile:
+                            outfile.write(infile.read())
+                        try:
+                            pc_file.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+
+            job_key = f"{session_id}_p{part_index}"
+            JOBS[job_key] = {
+                "status": "queued",
+                "progress": 5,
+                "message": f"Phần {part_index+1}: Đã nhận đủ các mảnh, đang xếp hàng bóc tách âm thanh...",
+                "result": None
+            }
+
+            t = threading.Thread(target=run_with_queue, args=(job_key, process_multipart_part_job, session_id, part_index, assembled_part_path, language))
+            t.daemon = True
+            t.start()
+
+            return jsonify({"status": "part_assembled", "part_index": part_index, "job_key": job_key})
+
+        return jsonify({"status": "chunk_received", "part_index": part_index, "chunk_index": chunk_index})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
