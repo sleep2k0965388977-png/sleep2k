@@ -800,6 +800,14 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         ], capture_output=True, timeout=180)
 
         chunk_files = sorted(list(temp_dir.glob("chunk_*.wav")))
+
+        # Immediately delete original heavy upload file (e.g. 450MB MP4) to free disk space
+        try:
+            if file_path.exists():
+                file_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
         if not chunk_files:
             JOBS[job_id]["status"] = "error"
             JOBS[job_id]["message"] = "Không thể đọc dữ liệu âm thanh từ tệp tải lên."
