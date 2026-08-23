@@ -223,13 +223,27 @@ def split_text_into_chunks(text, max_chars=180):
         chunks.append(current_chunk)
     return chunks if chunks else [text]
 
-def cleanup_old_mp3(max_age_seconds=1800):
-    """Auto-delete generated MP3 files older than 30 minutes to save disk space while keeping recent downloads safe."""
+def cleanup_all_temp_files(max_age_seconds=600):
+    """Auto-delete generated audio older than 10 minutes and purge any leftover uploads to guarantee Zero-Storage footprint."""
     now = time.time()
     for p in OUTPUT_DIR.glob("tts_*.mp3"):
         try:
             if now - p.stat().st_mtime > max_age_seconds:
-                p.unlink()
+                p.unlink(missing_ok=True)
+        except Exception:
+            pass
+    for p in UPLOAD_DIR.glob("*"):
+        try:
+            if now - p.stat().st_mtime > 300:
+                p.unlink(missing_ok=True)
+        except Exception:
+            pass
+    for p in OUTPUT_DIR.glob("temp_*"):
+        try:
+            if p.is_dir() and now - p.stat().st_mtime > 300:
+                for sub in p.glob("*"):
+                    sub.unlink(missing_ok=True)
+                p.rmdir()
         except Exception:
             pass
 
@@ -370,7 +384,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
 
 def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
     try:
-        cleanup_old_mp3()
+        cleanup_all_temp_files()
 
         chunks = split_text_into_chunks(text, max_chars=180)
         total_chunks = len(chunks)
@@ -853,7 +867,7 @@ if __name__ == "__main__":
     import sys
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    # Clean up any leftover MP3 files on startup
-    cleanup_old_mp3()
+    # Clean up any leftover temporary files on startup
+    cleanup_all_temp_files()
     print("CapCut TTS Web Interface running at http://127.0.0.1:5000")
     app.run(host="0.0.0.0", port=5000, debug=False)
