@@ -746,11 +746,19 @@ def preview_voice():
 
 @app.route("/health", methods=["GET", "HEAD"])
 def health_check():
+    import shutil
+    total, used, free = shutil.disk_usage("/")
     return jsonify({
         "status": "healthy",
         "service": "SLEEP2K TTS & STT",
         "timestamp": int(time.time()),
-        "uptime": "ok"
+        "uptime": "ok",
+        "disk": {
+            "total_gb": round(total / (1024**3), 2),
+            "used_gb": round(used / (1024**3), 2),
+            "free_gb": round(free / (1024**3), 2),
+            "free_mb": round(free / (1024**2), 1)
+        }
     }), 200
 
 @app.route("/output/<filename>")
