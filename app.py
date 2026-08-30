@@ -258,7 +258,7 @@ def find_voice_info(voice_type):
     return None
 
 def normalize_text_input(text):
-    """Clean and normalize input text for robust, expressive TTS generation with emotion cues."""
+    """Clean and normalize input text for robust, expressive human-like TTS generation."""
     if not text:
         return ""
     text = text.replace("…", "...").replace("“", '"').replace("”", '"').replace("’", "'").replace("‘", "'")
@@ -267,6 +267,9 @@ def normalize_text_input(text):
     text = text.replace("[cười]", "... haha, ...").replace("[cười nhẹ]", "... hihi, ...")
     text = text.replace("[thở dài]", "... (thở dài) ...").replace("[hắng giọng]", "... ừm, ...")
     text = text.replace("[nghỉ 1s]", "... ").replace("[nghỉ]", "... ")
+    # Add natural breathing micro-pauses after sentences
+    text = re.sub(r'([.!?])\s+', r'\1 ... ', text)
+    text = re.sub(r'\.{4,}', '...', text)
     text = "".join(ch for ch in text if ch in ('\n', '\t') or ord(ch) >= 32)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
