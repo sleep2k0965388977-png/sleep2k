@@ -556,10 +556,20 @@
         </div>
 
         <div class="card">
-            <div class="card-header">
-                <div class="card-title"><i class="fa-solid fa-pen-to-square"></i> Nhập Văn Bản & Chọn Giọng Đọc</div>
-                <button onclick="clearText()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px;">
-                    <i class="fa-solid fa-trash-can"></i> Xóa văn bản
+            <!-- Expressive Emotion Cues Quick Badges -->
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px; font-size:12px;">
+                <span style="color:var(--text-muted); font-weight:600;"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-purple);"></i> Biểu cảm AI:</span>
+                <button type="button" onclick="insertEmotionCue('[cười] ')" style="background:rgba(236,72,153,0.15); border:1px solid rgba(236,72,153,0.3); color:#f472b6; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;">
+                    😄 [cười]
+                </button>
+                <button type="button" onclick="insertEmotionCue('[thở dài] ')" style="background:rgba(147,197,253,0.15); border:1px solid rgba(147,197,253,0.3); color:#93c5fd; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;">
+                    😮‍💨 [thở dài]
+                </button>
+                <button type="button" onclick="insertEmotionCue('[hắng giọng] ')" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3); color:#fbbf24; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;">
+                    🎙️ [hắng giọng]
+                </button>
+                <button type="button" onclick="insertEmotionCue('... ')" style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#34d399; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;">
+                    ⏱️ [nghỉ nhịp]
                 </button>
             </div>
 
@@ -866,6 +876,17 @@
         }
 
         function clearText() { document.getElementById("textInput").value = ""; updateTextStats(); }
+
+        function insertEmotionCue(cue) {
+            const ta = document.getElementById("textInput");
+            const start = ta.selectionStart || ta.value.length;
+            const end = ta.selectionEnd || ta.value.length;
+            const text = ta.value;
+            ta.value = text.substring(0, start) + cue + text.substring(end);
+            ta.selectionStart = ta.selectionEnd = start + cue.length;
+            ta.focus();
+            updateTextStats();
+        }
 
         let currentLangFilter = "all";
 
