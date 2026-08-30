@@ -497,46 +497,68 @@ def cleanup_all_temp_files(max_age_seconds=600):
         except Exception:
             pass
 
+STUDIO_DSP_FILTER = (
+    "highpass=f=75,"                                # 1. Cut sub-bass rumble (<75Hz)
+    "equalizer=f=250:width_type=q:w=1.2:g=-3.0,"     # 2. De-mud (removes 250Hz boxy boominess & muffled sound)
+    "equalizer=f=3400:width_type=q:w=1.5:g=+2.5,"    # 3. Presence boost (crystal clear consonant articulation & speech intelligibility)
+    "equalizer=f=10000:width_type=q:w=1.0:g=+1.8,"   # 4. Air & shimmer high frequency detail (8kHz - 14kHz)
+    "acompressor=threshold=-18dB:ratio=2.5:attack=15:release=120," # 5. Smooth transparent dynamic compression
+    "loudnorm=I=-16:TP=-1.5:LRA=10"                  # 6. Broadcast LUFS loudness normalization (-16 LUFS)
+)
+
 def stitch_audio_chunks(chunk_bytes_list, output_file_path):
     """
-    Concatenate audio chunks seamlessly using FFmpeg.
-    Standardizes sample rate to 48kHz, 192kbps MP3 without clicks/pops.
-    Falls back to binary join if FFmpeg fails.
+    Concatenate and master audio chunks seamlessly using 5-Stage Studio Broadcast DSP Chain.
+    Standardizes sample rate to 48kHz, 192kbps HD MP3 with studio de-mud, presence boost & loudness normalization.
     """
     if not chunk_bytes_list:
         return False
-        
-    if len(chunk_bytes_list) == 1:
-        with open(output_file_path, "wb") as f:
-            f.write(chunk_bytes_list[0])
-        return True
 
     temp_dir = OUTPUT_DIR / f"temp_{uuid.uuid4().hex[:8]}"
     temp_dir.mkdir(exist_ok=True)
     try:
-        concat_list_file = temp_dir / "concat_list.txt"
-        with open(concat_list_file, "w", encoding="utf-8") as f_list:
-            for i, chunk_bytes in enumerate(chunk_bytes_list):
-                chunk_file = temp_dir / f"chunk_{i:04d}.mp3"
-                with open(chunk_file, "wb") as fc:
-                    fc.write(chunk_bytes)
-                f_list.write(f"file '{chunk_file.resolve().as_posix()}'\n")
+        if len(chunk_bytes_list) == 1:
+            raw_file = temp_dir / "raw_single.mp3"
+            with open(raw_file, "wb") as f:
+                f.write(chunk_bytes_list[0])
 
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", str(concat_list_file),
-            "-c:a", "libmp3lame",
-            "-b:a", "192k",
-            "-ar", "48000",
-            str(output_file_path)
-        ]
-        proc = subprocess.run(cmd, capture_output=True, timeout=60)
-        if proc.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
-            return True
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", str(raw_file),
+                "-af", STUDIO_DSP_FILTER,
+                "-c:a", "libmp3lame",
+                "-b:a", "192k",
+                "-ar", "48000",
+                str(output_file_path)
+            ]
+            proc = subprocess.run(cmd, capture_output=True, timeout=45)
+            if proc.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
+                return True
+        else:
+            concat_list_file = temp_dir / "concat_list.txt"
+            with open(concat_list_file, "w", encoding="utf-8") as f_list:
+                for i, chunk_bytes in enumerate(chunk_bytes_list):
+                    chunk_file = temp_dir / f"chunk_{i:04d}.mp3"
+                    with open(chunk_file, "wb") as fc:
+                        fc.write(chunk_bytes)
+                    f_list.write(f"file '{chunk_file.resolve().as_posix()}'\n")
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", str(concat_list_file),
+                "-af", STUDIO_DSP_FILTER,
+                "-c:a", "libmp3lame",
+                "-b:a", "192k",
+                "-ar", "48000",
+                str(output_file_path)
+            ]
+            proc = subprocess.run(cmd, capture_output=True, timeout=90)
+            if proc.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
+                return True
     except Exception as ex:
-        print(f"FFmpeg stitch warning: {ex}")
+        print(f"FFmpeg studio mastering warning: {ex}")
     finally:
         try:
             for p in temp_dir.glob("*"):
