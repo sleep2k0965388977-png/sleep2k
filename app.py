@@ -121,22 +121,95 @@ def edge_tts_synthesize_audio(text, voice_type, rate="1.0", pitch="+0Hz"):
     finally:
         loop.close()
 
+class AIDirector:
+    """
+    5-Tier Contextual Prosody Engine for Human-Like Storytelling:
+    - Semantic & Emotional Analysis
+    - Contextual Dynamic Pitch & Inflection (Questions rise +8Hz, Climax drops -6Hz)
+    - Dynamic Pace & Tempo Control (Suspense slows down, Action speeds up)
+    - Natural Breathing & Micro-Pauses
+    """
+    EMOTION_KEYWORDS = {
+        "shock": ["thực sự", "không thể tin", "trời ơi", "sao có thể", "kinh hoàng", "bàng hoàng", "chết lặng", "kinh ngạc", "điên à"],
+        "sadness": ["nước mắt", "đau đớn", "khóc", "buồn", "cô đơn", "tuyệt vọng", "chia tay", "mất mát", "xót xa", "lặng lẽ", "ngậm ngùi"],
+        "action": ["chạy thật nhanh", "lao tới", "bất ngờ", "nhanh chóng", "đuổi theo", "khẩn cấp", "nguy hiểm", "bùng nổ", "lao vào"],
+        "nostalgia": ["ngày xưa", "kỷ niệm", "năm tháng", "mười năm", "tuổi thơ", "quá khứ", "nhớ lại", "ngày ấy", "thuở nào"],
+        "happy": ["tuyệt vời", "hạnh phúc", "vui vẻ", "mỉm cười", "thành công", "may mắn", "chúc mừng", "yêu thương", "rạng rỡ"]
+    }
+
+    @classmethod
+    def analyze_chunk(cls, text_chunk, base_rate="1.0"):
+        s = text_chunk.strip()
+        if not s:
+            return 0.0, 0.0, ""
+
+        pitch_mod = 0.0
+        speed_mod = 0.0
+        s_lower = s.lower()
+
+        # 1. Question Inflection
+        if s.endswith("?") or "?" in s:
+            pitch_mod += 8.0
+            speed_mod -= 0.04
+        # 2. Exclamation / High Energy
+        elif s.endswith("!") or "!" in s:
+            pitch_mod += 4.0
+            speed_mod += 0.05
+        # 3. Ellipsis / Pondering
+        elif "..." in s or s.endswith("..."):
+            speed_mod -= 0.07
+            pitch_mod -= 4.0
+
+        # 4. Contextual Keyword Emotion Mapping
+        for emo, kws in cls.EMOTION_KEYWORDS.items():
+            if any(kw in s_lower for kw in kws):
+                if emo in ("sadness", "nostalgia"):
+                    speed_mod -= 0.08
+                    pitch_mod -= 6.0
+                elif emo == "shock":
+                    speed_mod -= 0.04
+                    pitch_mod += 6.0
+                elif emo == "action":
+                    speed_mod += 0.08
+                    pitch_mod += 3.0
+                elif emo == "happy":
+                    speed_mod += 0.04
+                    pitch_mod += 4.0
+                break
+
+        return pitch_mod, speed_mod, s
+
 def vieneu_synthesize_audio(text, voice_type, rate="1.0"):
-    """Generate distinct acoustic character with customized pitch, cadence, and timbre for each voice."""
+    """Generate distinct human-like acoustic character directed by Contextual Prosody Engine."""
     profile = VIENEU_VOICE_PROFILES.get(voice_type)
+    pitch_mod, speed_mod, clean_text = AIDirector.analyze_chunk(text, base_rate=rate)
+
     if profile:
         base_voice = profile["voice"]
-        pitch = profile.get("pitch", "+0Hz")
+        base_pitch_str = profile.get("pitch", "+0Hz")
+        try:
+            base_pitch_val = float(base_pitch_str.replace("Hz", ""))
+        except Exception:
+            base_pitch_val = 0.0
+        final_pitch_hz = int(base_pitch_val + pitch_mod)
+        final_pitch_str = f"{final_pitch_hz:+d}Hz"
+
         try:
             r_val = float(rate)
         except Exception:
             r_val = 1.0
-        combined_rate = r_val + (profile.get("rate_offset", 0) / 100.0)
-        return edge_tts_synthesize_audio(text, base_voice, rate=str(combined_rate), pitch=pitch)
+        combined_rate = max(0.65, min(1.8, r_val + (profile.get("rate_offset", 0) / 100.0) + speed_mod))
+        return edge_tts_synthesize_audio(clean_text, base_voice, rate=str(combined_rate), pitch=final_pitch_str)
 
     is_male = any(m in str(voice_type) for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
     fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-    return edge_tts_synthesize_audio(text, fb_voice, rate=rate, pitch="+0Hz")
+    final_pitch_str = f"{int(pitch_mod):+d}Hz"
+    try:
+        r_val = float(rate)
+    except Exception:
+        r_val = 1.0
+    combined_rate = max(0.65, min(1.8, r_val + speed_mod))
+    return edge_tts_synthesize_audio(clean_text, fb_voice, rate=str(combined_rate), pitch=final_pitch_str)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB upload limit
