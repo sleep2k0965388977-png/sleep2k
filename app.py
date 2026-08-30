@@ -14,7 +14,7 @@ import tempfile
 import soundfile as sf
 import edge_tts
 import speech_recognition as sr
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 from capcut_tts_api import CapCutClient, CapCutError
 
 # Load HF_TOKEN from environment if set
@@ -560,6 +560,10 @@ def add_cache_control_headers(response):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/favicon.ico")
+def favicon():
+    return Response(status=204)
 
 @app.route("/api/voices", methods=["GET"])
 def get_voices():
@@ -1400,5 +1404,9 @@ if __name__ == "__main__":
     # Clean up any leftover temporary files on startup
     cleanup_all_temp_files()
     port = int(os.environ.get("PORT", 7860 if os.environ.get("SPACE_ID") else 5000))
-    print(f"SLEEP2K Server running on port {port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    print(f"SLEEP2K Production Server (Waitress Multi-Threaded) running on port {port}")
+    try:
+        from waitress import serve
+        serve(app, host="0.0.0.0", port=port, threads=8, channel_timeout=180)
+    except ImportError:
+        app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

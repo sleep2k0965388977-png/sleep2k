@@ -6,3 +6,4 @@ edge-tts>=7.2.8
 soundfile>=0.14.0
 onnxruntime>=1.20.0
 SpeechRecognition>=3.10.0
+waitress>=3.0.0
