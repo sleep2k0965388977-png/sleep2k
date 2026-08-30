@@ -126,29 +126,7 @@ def edge_tts_synthesize_audio(text, voice_type, rate="1.0"):
     return asyncio.run(_gen())
 
 def vieneu_synthesize_audio(text, voice_type, rate="1.0"):
-    """Generate true distinct neural MP3 audio with instant high-quality Edge-TTS fallback."""
-    preset_name = VIENEU_PRESET_MAP.get(voice_type, voice_type)
-    try:
-        tts = get_vieneu_tts()
-        if tts:
-            with _vieneu_lock:
-                audio = tts.infer(text=text, voice=preset_name, denoise=True)
-            buf = io.BytesIO()
-            sf.write(buf, audio, tts.sample_rate, format="WAV")
-            wav_bytes = buf.getvalue()
-            proc = subprocess.Popen(
-                ["ffmpeg", "-y", "-i", "pipe:0", "-f", "mp3", "-b:a", "192k", "pipe:1"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL
-            )
-            mp3_bytes, _ = proc.communicate(input=wav_bytes)
-            if mp3_bytes and len(mp3_bytes) > 0:
-                return mp3_bytes
-    except Exception as ex:
-        print(f"VieNeu synth note: {ex}")
-    
-    # Instant high-quality neural voice fallback with proper male/female matching
+    """Generate distinct neural MP3 audio with instant high-quality Edge-TTS Neural synthesis."""
     is_male = any(m in voice_type for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
     fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
     return edge_tts_synthesize_audio(text, fb_voice, rate=rate)
