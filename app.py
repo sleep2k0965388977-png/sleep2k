@@ -1310,12 +1310,17 @@ def api_upload_chunk():
             ext = Path(filename).suffix.lower() or ".mp4"
             assembled_path = UPLOAD_DIR / f"upload_{upload_id}{ext}"
 
+            # High-speed buffered stream assembly to prevent any timeout
             with open(assembled_path, "wb") as outfile:
                 for idx in range(total_chunks):
                     part_file = UPLOAD_DIR / f"{upload_id}_part_{idx:05d}.tmp"
                     if part_file.exists():
                         with open(part_file, "rb") as infile:
-                            outfile.write(infile.read())
+                            while True:
+                                chunk = infile.read(2 * 1024 * 1024) # 2MB buffer
+                                if not chunk:
+                                    break
+                                outfile.write(chunk)
                         try:
                             part_file.unlink(missing_ok=True)
                         except Exception:

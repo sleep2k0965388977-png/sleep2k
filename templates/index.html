@@ -1243,8 +1243,8 @@
             return "upl_" + Math.abs(hash).toString(36) + "_" + file.size.toString(36);
         }
 
-        // ── 5MB Sequential Chunked Upload with Persistent Resume & Auto-Retry ──
-        async function uploadChunkWithRetry(uploadId, chunkIndex, totalChunks, chunkBlob, filename, language, maxRetries = 5) {
+        // ── 10MB Sequential Chunked Upload with Persistent Resume & Auto-Retry ──
+        async function uploadChunkWithRetry(uploadId, chunkIndex, totalChunks, chunkBlob, filename, language, maxRetries = 8) {
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
                     const formData = new FormData();
@@ -1255,10 +1255,16 @@
                     formData.append("language", language);
                     formData.append("file", chunkBlob);
 
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
+
                     const resp = await fetch("/api/upload_chunk", {
                         method: "POST",
-                        body: formData
+                        body: formData,
+                        signal: controller.signal
                     });
+                    clearTimeout(timeoutId);
+
                     if (resp.ok) {
                         return await resp.json();
                     }
@@ -1268,14 +1274,14 @@
                     if (attempt === maxRetries) throw e;
                     const statusEl = document.getElementById("sttProgressStatus");
                     if (statusEl) {
-                        statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-amber);"></i> Mạng gián đoạn... Đang tự động thử lại mảnh ${chunkIndex + 1} (lần ${attempt}/${maxRetries})...`;
+                        statusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up" style="color:var(--accent-cyan);"></i> Đang duy trì kết nối ổn định... Tự động gửi lại mảnh ${chunkIndex + 1}/${totalChunks} (lần ${attempt}/${maxRetries})...`;
                     }
-                    await new Promise(r => setTimeout(r, 1500 * attempt));
+                    await new Promise(r => setTimeout(r, 1200 * attempt));
                 }
             }
         }
 
-        // ── Start Audio Transcription with 5MB Chunked Sequential Upload & Adaptive Queue ──
+        // ── Start Audio Transcription with 10MB Chunked Sequential Upload & Adaptive Queue ──
         async function startTranscription() {
             if (!selectedSttFile) {
                 alert("Vui lòng chọn hoặc kéo thả tệp âm thanh/video vào ô tải lên!");
@@ -1307,7 +1313,7 @@
             statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang kiểm tra tiến trình tải lên...';
 
             let jobId = null;
-            const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
+            const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB per chunk
 
             try {
                 if (selectedSttFile.size > MULTIPART_THRESHOLD) {
