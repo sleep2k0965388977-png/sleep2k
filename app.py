@@ -743,6 +743,8 @@ def preview_voice():
             print(f"Universal preview fallback error: {fb_err}")
 
         return jsonify({"status": "error", "message": "Không thể nạp giọng đọc này lúc này."}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/health", methods=["GET", "HEAD"])
 def health_check():
