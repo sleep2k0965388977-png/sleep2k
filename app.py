@@ -406,7 +406,8 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
         except Exception as ex:
             print(f"VieNeu TTS error chunk {idx+1}: {ex}")
         try:
-            fb = LANGUAGE_FALLBACK_VOICE.get(lan, "vi-VN-HoaiMyNeural")
+            is_male = any(m in voice for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
+            fb = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
             audio_bytes = edge_tts_synthesize_audio(text_chunk, fb, rate=rate)
             if audio_bytes and len(audio_bytes) > 0:
                 return idx, audio_bytes, int(len(text_chunk) / 150 * 1000)
@@ -649,7 +650,7 @@ def preview_voice():
         else:
             sample_text = "Xin chào, đây là giọng đọc thử nghiệm."
 
-        # ── VieNeu AI voices: preview via official VieNeu model ──
+        # ── VieNeu AI voices: preview via official VieNeu model with smart male/female fallback ──
         if is_vieneu_voice(voice):
             vieneu_sample = VIENEU_SAMPLE_TEXTS.get(voice, sample_text)
             try:
@@ -662,8 +663,21 @@ def preview_voice():
                         "download_url": f"/output/previews/{preview_filename}"
                     })
             except Exception as ex:
-                return jsonify({"status": "error", "message": f"Lỗi VieNeu AI: {ex}"}), 500
-            return jsonify({"status": "error", "message": "Không tạo được giọng VieNeu AI."}), 500
+                print(f"VieNeu preview warning: {ex}")
+            try:
+                is_male = any(m in voice for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
+                fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
+                audio_bytes = edge_tts_synthesize_audio(vieneu_sample, fb_voice, rate="1.0")
+                if audio_bytes and len(audio_bytes) > 0:
+                    with open(preview_file_path, "wb") as f:
+                        f.write(audio_bytes)
+                    return jsonify({
+                        "status": "success",
+                        "download_url": f"/output/previews/{preview_filename}"
+                    })
+            except Exception as fb_ex:
+                print(f"Edge fallback error: {fb_ex}")
+            return jsonify({"status": "error", "message": "Không tạo được giọng đọc thử."}), 500
 
         # ── Edge-TTS Neural voices: preview via edge-tts ──
         if is_edge_tts_voice(voice):
@@ -680,58 +694,43 @@ def preview_voice():
                 return jsonify({"status": "error", "message": f"Lỗi Edge-TTS: {ex}"}), 500
             return jsonify({"status": "error", "message": "Không tạo được giọng Edge-TTS."}), 500
 
-        # ── Original CapCut voices: unchanged logic ──
-        create_res = client.create_tts_task(texts=sample_text, voice=voice, resource_id=resource_id, rate="1.0")
-        tasks = (create_res.get("data") or {}).get("tasks") or []
-        if not tasks:
-            return jsonify({"status": "error", "message": "Không thể kết nối CapCut API"}), 500
-
-        task_id = tasks[0]["id"]
-        token = tasks[0]["token"]
-
-        speech_url = None
-        for attempt in range(18):
-            query_res = client.query_tts_task(task_id, token)
-            query_tasks = (query_res.get("data") or {}).get("tasks") or []
-            if query_tasks:
-                qtask = query_tasks[0]
-                if qtask.get("status") in ("succeed", "success"):
-                    payload_data = json.loads(qtask.get("payload", "{}"))
-                    subtitles = payload_data.get("audio_subtitles", [])
-                    if subtitles:
-                        speech_url = subtitles[0].get("speech_url")
-                    break
-            time.sleep(0.6)
-
-        if not speech_url:
-            # ── Fallback: CapCut failed, use Edge-TTS instead of showing error ──
-            try:
-                fallback_voice = "vi-VN-HoaiMyNeural"
-                print(f"CapCut preview failed for voice={voice}, fallback to Edge-TTS {fallback_voice}")
-                audio_bytes = edge_tts_synthesize_audio(sample_text, fallback_voice, rate="1.0")
-                if audio_bytes and len(audio_bytes) > 0:
-                    with open(preview_file_path, "wb") as f:
-                        f.write(audio_bytes)
-                    return jsonify({
-                        "status": "success",
-                        "download_url": f"/output/previews/{preview_filename}"
-                    })
-            except Exception as fb_ex:
-                print(f"Edge-TTS fallback also failed: {fb_ex}")
-            return jsonify({"status": "error", "message": "Giọng đọc này đang bận hoặc quá tải. Vui lòng thử giọng khác!"}), 500
-
-        mp3_resp = requests.get(speech_url, timeout=20)
-        with open(preview_file_path, "wb") as f:
-            f.write(mp3_resp.content)
-
-        return jsonify({
-            "status": "success",
-            "download_url": f"/output/previews/{preview_filename}"
-        })
-    except Exception as e:
-        # ── Last resort fallback: any unhandled error, try Edge-TTS ──
+        # ── Original CapCut voices with automatic fallback ──
         try:
-            fallback_voice = "vi-VN-HoaiMyNeural"
+            create_res = client.create_tts_task(texts=sample_text, voice=voice, resource_id=resource_id, rate="1.0")
+            tasks = (create_res.get("data") or {}).get("tasks") or []
+            if tasks:
+                task_id = tasks[0]["id"]
+                token = tasks[0]["token"]
+
+                speech_url = None
+                for attempt in range(12):
+                    query_res = client.query_tts_task(task_id, token)
+                    query_tasks = (query_res.get("data") or {}).get("tasks") or []
+                    if query_tasks:
+                        qtask = query_tasks[0]
+                        if qtask.get("status") in ("succeed", "success"):
+                            payload_data = json.loads(qtask.get("payload", "{}"))
+                            subtitles = payload_data.get("audio_subtitles", [])
+                            if subtitles:
+                                speech_url = subtitles[0].get("speech_url")
+                            break
+                    time.sleep(0.5)
+
+                if speech_url:
+                    mp3_resp = requests.get(speech_url, timeout=15)
+                    if mp3_resp.status_code == 200 and len(mp3_resp.content) > 0:
+                        with open(preview_file_path, "wb") as f:
+                            f.write(mp3_resp.content)
+                        return jsonify({
+                            "status": "success",
+                            "download_url": f"/output/previews/{preview_filename}"
+                        })
+        except Exception as capcut_ex:
+            print(f"CapCut preview warning: {capcut_ex}")
+
+        # ── Universal Seamless Fallback to Edge-TTS ──
+        try:
+            fallback_voice = LANGUAGE_FALLBACK_VOICE.get(lan, "vi-VN-HoaiMyNeural")
             audio_bytes = edge_tts_synthesize_audio(sample_text, fallback_voice, rate="1.0")
             if audio_bytes and len(audio_bytes) > 0:
                 with open(preview_file_path, "wb") as f:
@@ -740,9 +739,10 @@ def preview_voice():
                     "status": "success",
                     "download_url": f"/output/previews/{preview_filename}"
                 })
-        except Exception:
-            pass
-        return jsonify({"status": "error", "message": str(e)}), 500
+        except Exception as fb_err:
+            print(f"Universal preview fallback error: {fb_err}")
+
+        return jsonify({"status": "error", "message": "Không thể nạp giọng đọc này lúc này."}), 500
 
 @app.route("/health", methods=["GET", "HEAD"])
 def health_check():

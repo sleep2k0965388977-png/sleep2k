@@ -1002,23 +1002,26 @@
             btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Nạp...'; btnEl.disabled = true;
             try {
                 const resp = await fetch("/api/preview_voice", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({voice:voiceType,lan:lan}) });
-                if (!resp.ok) {
-                    throw new Error("Máy chủ đang cập nhật phiên bản mới. Vui lòng bấm thử lại sau 5 giây!");
-                }
                 const rawText = await resp.text();
                 let data;
                 try {
                     data = JSON.parse(rawText);
                 } catch(pe) {
-                    throw new Error("Máy chủ đang khởi động lại hoặc tải phiên bản mới. Vui lòng bấm thử lại!");
+                    throw new Error("Không thể nạp giọng đọc thử. Vui lòng bấm thử lại!");
                 }
-                if (data.status === "success") {
+                if (data.status === "success" && data.download_url) {
                     previewAudioEl.src = data.download_url; previewAudioEl.play();
                     activePreviewBtn = btnEl; btnEl.classList.add("playing");
                     btnEl.innerHTML = '<i class="fa-solid fa-pause"></i> Đang phát';
                     previewAudioEl.onended = () => { btnEl.classList.remove("playing"); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; activePreviewBtn = null; };
-                } else { alert("Thông báo: " + (data.message || "Thử giọng khác!")); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
-            } catch (e) { alert(e.message || "Lỗi kết nối máy chủ"); btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
+                } else {
+                    alert("Thông báo: " + (data.message || "Không thể tải giọng đọc này. Vui lòng thử giọng khác!"));
+                    btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử';
+                }
+            } catch (e) {
+                alert(e.message || "Lỗi kết nối máy chủ");
+                btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử';
+            }
             finally { btnEl.disabled = false; }
         }
 
