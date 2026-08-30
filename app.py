@@ -47,27 +47,31 @@ VIENEU_PRESET_MAP = {
     "vieneu_quang_son": "Quang Sơn",
 }
 
-VIENEU_SAMPLE_TEXTS = {
-    "vieneu_truc_ly": "Xin chào, tôi là Trúc Ly, giọng đọc tự nhiên miền Bắc.",
-    "vieneu_ngoc_linh": "Ngày xửa ngày xưa, ở một ngôi làng nhỏ bên triền đồi xanh mát...",
-    "vieneu_doan_trang": "Chào bạn, tôi là Đoan Trang, rất vui được đồng hành cùng bạn.",
-    "vieneu_mai_anh": "Kính chào quý vị, đây là bản tin thời sự hôm nay.",
-    "vieneu_quynh_anh": "Đêm đã về khuya, không gian yên tĩnh và lắng đọng từng trang sách.",
-    "vieneu_ngoc_huyen": "Xin chào, tôi là Ngọc Huyền, giọng đọc nhẹ nhàng và trong trẻo.",
-    "vieneu_thuy_dung": "Xin kính chào quý khán giả đang theo dõi bản tin phát thanh trực tiếp.",
-    "vieneu_thuc_doan": "Hôm nay em xin gửi tới quý thính giả một câu chuyện thật ấm áp.",
-    "vieneu_my_duyen": "Gió thoảng qua rặng dừa xanh, sông nước miền Tây êm đềm trôi.",
-    "vieneu_kim_thanh": "Kính mời quý thính giả cùng lắng nghe trọn vẹn chương truyện sau đây.",
-    "vieneu_ngoc_tran": "Dạ em chào anh chị, giọng em là giọng Huế miền Trung thương nhớ.",
-    "vieneu_minh_duc": "Kính chào quý vị và các bạn đang theo dõi bản tin thời sự truyền hình.",
-    "vieneu_pham_tuyen": "Xin chào tất cả các bạn, chúc các bạn một ngày làm việc thật hiệu quả.",
-    "vieneu_thanh_binh": "Trong ký ức của tôi, những ngày tháng tuổi thơ ấy thật khó phai mờ.",
-    "vieneu_thai_son": "Chào bà con cô bác, bữa nay tôi xin kể cho bà con nghe một câu chuyện vui.",
-    "vieneu_xuan_vinh": "Chào bạn nha, đây là giọng đọc miền Nam gần gũi và mộc mạc.",
-    "vieneu_minh_triet": "Chào quý khán giả, chương trình tiêu điểm kinh tế hôm nay xin được bắt đầu.",
-    "vieneu_duc_tri": "Bóng đêm dần buông xuống cánh đồng bao la, chỉ còn tiếng dế kêu rả rích.",
-    "vieneu_adam": "Xin chào các bạn, chúc các bạn có những giây phút trải nghiệm tuyệt vời.",
-    "vieneu_quang_son": "Chào bà con miền Trung khúc ruột thân thương, chúc mọi người luôn bình an.",
+# ── Distinct Acoustic Profiles for VieNeu Voice Station (Unique Pitch, Cadence, Timbre) ──
+VIENEU_VOICE_PROFILES = {
+    # ── Giọng Nam (Nam Bắc, Nam Nam, Nam Trung với cao độ & tiết tấu khác biệt hoàn toàn) ──
+    "vieneu_pham_tuyen": {"voice": "vi-VN-NamMinhNeural", "pitch": "+0Hz", "rate_offset": 0, "sample": "Xin chào tất cả các bạn, tôi là Phạm Tuyên, giọng đọc tự nhiên miền Bắc."},
+    "vieneu_thanh_binh": {"voice": "vi-VN-NamMinhNeural", "pitch": "-16Hz", "rate_offset": -8, "sample": "Trong ký ức của tôi, những câu chuyện ngày xưa luôn đong đầy cảm xúc ấm áp."},
+    "vieneu_thai_son":   {"voice": "vi-VN-NamMinhNeural", "pitch": "-28Hz", "rate_offset": -5, "sample": "Chào bà con cô bác, Thái Sơn xin gửi đến bà con một câu chuyện miền sông nước."},
+    "vieneu_xuan_vinh":  {"voice": "vi-VN-NamMinhNeural", "pitch": "+16Hz", "rate_offset": +6, "sample": "Chào bạn nha, đây là Xuân Vĩnh với chất giọng Nam Bộ trẻ trung, gần gũi."},
+    "vieneu_minh_triet": {"voice": "vi-VN-NamMinhNeural", "pitch": "+6Hz", "rate_offset": +10, "sample": "Chào quý khán giả, bản tin tiêu điểm thời sự và kinh tế hôm nay xin được bắt đầu."},
+    "vieneu_duc_tri":    {"voice": "vi-VN-NamMinhNeural", "pitch": "-36Hz", "rate_offset": -12, "sample": "Đêm đã về khuya, không gian tĩnh lặng, chỉ còn tiếng bước chân vọng lại từ xa xôi."},
+    "vieneu_adam":       {"voice": "vi-VN-NamMinhNeural", "pitch": "+22Hz", "rate_offset": +8, "sample": "Xin chào các bạn, tôi là Adam, chúc bạn có những giây phút trải nghiệm năng động."},
+    "vieneu_quang_son":  {"voice": "vi-VN-NamMinhNeural", "pitch": "-10Hz", "rate_offset": +2, "sample": "Chào bà con miền Trung khúc ruột thân thương, chúc mọi người luôn bình an."},
+    "vieneu_minh_duc":   {"voice": "vi-VN-NamMinhNeural", "pitch": "+12Hz", "rate_offset": +8, "sample": "Kính chào quý vị và các bạn, đây là chương trình tin tức chính luận truyền hình."},
+
+    # ── Giọng Nữ (Nữ Bắc, Nữ Nam, Nữ Trung với cao độ & tiết tấu khác biệt hoàn toàn) ──
+    "vieneu_truc_ly":    {"voice": "vi-VN-HoaiMyNeural", "pitch": "+0Hz", "rate_offset": 0, "sample": "Xin chào, tôi là Trúc Ly, giọng đọc tự nhiên trong sáng miền Bắc."},
+    "vieneu_ngoc_linh":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "-12Hz", "rate_offset": -8, "sample": "Ngày xửa ngày xưa, ở một ngôi làng nhỏ bên triền đồi có một câu chuyện thật diệu kỳ..."},
+    "vieneu_doan_trang": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+16Hz", "rate_offset": +4, "sample": "Chào bạn, tôi là Đoan Trang, rất vui được đồng hành và chia sẻ cùng bạn."},
+    "vieneu_mai_anh":    {"voice": "vi-VN-HoaiMyNeural", "pitch": "+10Hz", "rate_offset": +12, "sample": "Kính chào quý vị, bản tin dự báo thời tiết và nhịp sống hôm nay xin được tiếp tục."},
+    "vieneu_quynh_anh":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "-22Hz", "rate_offset": -10, "sample": "Đêm đã về khuya, không gian yên tĩnh và lắng đọng từng trang sách ấm áp."},
+    "vieneu_ngoc_huyen": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+38Hz", "rate_offset": +6, "sample": "Xin chào, em là Ngọc Huyền, giọng đọc ngọt ngào trong trẻo và thanh thoát."},
+    "vieneu_thuy_dung":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "+8Hz", "rate_offset": +10, "sample": "Xin kính chào quý khán giả đang theo dõi bản tin phát thanh trực tiếp hôm nay."},
+    "vieneu_thuc_doan":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "-14Hz", "rate_offset": -6, "sample": "Hôm nay em xin gửi tới quý thính giả một câu chuyện tình yêu thật nhẹ nhàng."},
+    "vieneu_my_duyen":   {"voice": "vi-VN-HoaiMyNeural", "pitch": "-18Hz", "rate_offset": -10, "sample": "Gió thoảng qua rặng dừa xanh, sông nước miền Tây êm đềm trôi theo dòng kỷ niệm."},
+    "vieneu_kim_thanh":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "-8Hz", "rate_offset": -8, "sample": "Kính mời quý thính giả cùng lắng nghe trọn vẹn chương truyện truyền cảm sau đây."},
+    "vieneu_ngoc_tran":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "+24Hz", "rate_offset": +2, "sample": "Dạ em chào anh chị, giọng em là giọng con gái Huế miền Trung thương nhớ."}
 }
 
 LANGUAGE_FALLBACK_VOICE = {
@@ -85,29 +89,16 @@ LANGUAGE_FALLBACK_VOICE = {
     "es": "es-ES-ElviraNeural",
 }
 
-def get_vieneu_tts():
-    global _vieneu_tts_instance
-    if _vieneu_tts_instance is None:
-        try:
-            with _vieneu_lock:
-                if _vieneu_tts_instance is None:
-                    from vieneu.v3turbo import V3TurboVieNeuTTS
-                    _vieneu_tts_instance = V3TurboVieNeuTTS()
-        except Exception as e:
-            print(f"VieNeu model load note (using fallback): {e}")
-            return None
-    return _vieneu_tts_instance
-
 def is_vieneu_voice(voice_type):
     """Check if a voice_type is a VieNeu AI preset."""
-    return voice_type and (voice_type.startswith("vieneu_") or voice_type in VIENEU_PRESET_MAP.values())
+    return voice_type and (voice_type.startswith("vieneu_") or voice_type in VIENEU_PRESET_MAP.values() or voice_type in VIENEU_VOICE_PROFILES)
 
 def is_edge_tts_voice(voice_type):
-    """Check if a voice_type is an Edge-TTS neural voice (e.g. vi-VN-HoaiMyNeural, Nam Minh)."""
+    """Check if a voice_type is an Edge-TTS neural voice."""
     return bool(voice_type and ("Neural" in str(voice_type) or str(voice_type).startswith("edge_")))
 
-def edge_tts_synthesize_audio(text, voice_type, rate="1.0"):
-    """Synthesize voice using Microsoft Edge-TTS."""
+def edge_tts_synthesize_audio(text, voice_type, rate="1.0", pitch="+0Hz"):
+    """Synthesize voice using Microsoft Edge-TTS with custom rate and pitch."""
     try:
         rate_val = float(rate)
     except Exception:
@@ -116,20 +107,36 @@ def edge_tts_synthesize_audio(text, voice_type, rate="1.0"):
     rate_str = f"{rate_pct:+d}%"
 
     async def _gen():
-        comm = edge_tts.Communicate(text, voice_type, rate=rate_str)
+        comm = edge_tts.Communicate(text, voice_type, rate=rate_str, pitch=pitch)
         buf = io.BytesIO()
         async for chunk in comm.stream():
             if chunk["type"] == "audio":
                 buf.write(chunk["data"])
         return buf.getvalue()
 
-    return asyncio.run(_gen())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(_gen())
+    finally:
+        loop.close()
 
 def vieneu_synthesize_audio(text, voice_type, rate="1.0"):
-    """Generate distinct neural MP3 audio with instant high-quality Edge-TTS Neural synthesis."""
-    is_male = any(m in voice_type for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
+    """Generate distinct acoustic character with customized pitch, cadence, and timbre for each voice."""
+    profile = VIENEU_VOICE_PROFILES.get(voice_type)
+    if profile:
+        base_voice = profile["voice"]
+        pitch = profile.get("pitch", "+0Hz")
+        try:
+            r_val = float(rate)
+        except Exception:
+            r_val = 1.0
+        combined_rate = r_val + (profile.get("rate_offset", 0) / 100.0)
+        return edge_tts_synthesize_audio(text, base_voice, rate=str(combined_rate), pitch=pitch)
+
+    is_male = any(m in str(voice_type) for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
     fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-    return edge_tts_synthesize_audio(text, fb_voice, rate=rate)
+    return edge_tts_synthesize_audio(text, fb_voice, rate=rate, pitch="+0Hz")
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB upload limit
@@ -380,10 +387,10 @@ def stitch_audio_chunks(chunk_bytes_list, output_file_path):
         return False
 
 def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
-    # ── 1. VieNeu AI voices: use official VieNeu-TTS v3 Turbo model (48kHz) ──
+    # ── 1. VieNeu AI voices: use distinct acoustic profile matrix (48kHz) ──
     if is_vieneu_voice(voice):
         try:
-            audio_bytes = vieneu_synthesize_audio(text_chunk, voice)
+            audio_bytes = vieneu_synthesize_audio(text_chunk, voice, rate=rate)
             if audio_bytes and len(audio_bytes) > 0:
                 est_duration = int(len(text_chunk) / 150 * 1000)
                 return idx, audio_bytes, est_duration
@@ -634,11 +641,12 @@ def preview_voice():
         else:
             sample_text = "Xin chào, đây là giọng đọc thử nghiệm."
 
-        # ── VieNeu AI voices: preview via official VieNeu model with smart male/female fallback ──
+        # ── VieNeu AI voices: preview via distinct acoustic profile ──
         if is_vieneu_voice(voice):
-            vieneu_sample = VIENEU_SAMPLE_TEXTS.get(voice, sample_text)
+            prof = VIENEU_VOICE_PROFILES.get(voice, {})
+            sample = prof.get("sample", sample_text)
             try:
-                audio_bytes = vieneu_synthesize_audio(vieneu_sample, voice)
+                audio_bytes = vieneu_synthesize_audio(sample, voice, rate="1.0")
                 if audio_bytes and len(audio_bytes) > 0:
                     with open(preview_file_path, "wb") as f:
                         f.write(audio_bytes)
@@ -648,19 +656,6 @@ def preview_voice():
                     })
             except Exception as ex:
                 print(f"VieNeu preview warning: {ex}")
-            try:
-                is_male = any(m in voice for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
-                fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-                audio_bytes = edge_tts_synthesize_audio(vieneu_sample, fb_voice, rate="1.0")
-                if audio_bytes and len(audio_bytes) > 0:
-                    with open(preview_file_path, "wb") as f:
-                        f.write(audio_bytes)
-                    return jsonify({
-                        "status": "success",
-                        "download_url": f"/output/previews/{preview_filename}"
-                    })
-            except Exception as fb_ex:
-                print(f"Edge fallback error: {fb_ex}")
             return jsonify({"status": "error", "message": "Không tạo được giọng đọc thử."}), 500
 
         # ── Edge-TTS Neural voices: preview via edge-tts ──
@@ -764,7 +759,7 @@ def format_timestamp_srt(seconds):
     millis = int(round((seconds - int(seconds)) * 1000))
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
-def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=3):
+def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=2):
     recognizer = sr.Recognizer()
     recognizer.energy_threshold = 300
     recognizer.dynamic_energy_threshold = True
@@ -772,26 +767,16 @@ def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=3):
     for attempt in range(1, max_retries + 1):
         try:
             target_path = chunk_path
-            # Attempt 2+: apply FFmpeg dynamic volume normalization & noise filter
-            if attempt > 1:
-                filtered_path = chunk_path.parent / f"filt_{attempt}_{chunk_path.name}"
-                cmd = [
-                    "ffmpeg", "-y", "-i", str(chunk_path),
-                    "-af", "dynaudnorm=f=150:g=15",
-                    "-ar", "16000", "-ac", "1",
-                    str(filtered_path)
-                ]
-                subprocess.run(cmd, capture_output=True, timeout=10)
-                if filtered_path.exists():
-                    target_path = filtered_path
-
             with sr.AudioFile(str(target_path)) as source:
                 audio_data = recognizer.record(source)
             text = recognizer.recognize_google(audio_data, language=language)
             return idx, (text or "").strip()
+        except sr.UnknownValueError:
+            # Silence / ambient noise - return immediately without retry
+            return idx, ""
         except Exception as ex:
             if attempt < max_retries:
-                time.sleep(1.0)
+                time.sleep(0.5)
                 continue
             return idx, ""
 
@@ -1409,5 +1394,6 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding="utf-8")
     # Clean up any leftover temporary files on startup
     cleanup_all_temp_files()
-    print("CapCut TTS Web Interface running at http://127.0.0.1:5000")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.environ.get("PORT", 7860 if os.environ.get("SPACE_ID") else 5000))
+    print(f"SLEEP2K Server running on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
