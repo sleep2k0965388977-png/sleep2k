@@ -452,13 +452,13 @@ def normalize_text_input(text):
     return text.strip()
 
 def split_text_into_chunks(text, max_chars=180):
-    """Split text intelligently at punctuation and word boundaries."""
+    """Split text intelligently at punctuation and word boundaries, ensuring every chunk has verbal content."""
     text = normalize_text_input(text)
     if not text:
         return []
 
     sentences = re.split(r'(?<=[.!?;\n])\s+', text)
-    chunks = []
+    raw_chunks = []
     current_chunk = ''
 
     for s in sentences:
@@ -469,7 +469,7 @@ def split_text_into_chunks(text, max_chars=180):
             current_chunk = (current_chunk + ' ' + s).strip()
         else:
             if current_chunk:
-                chunks.append(current_chunk)
+                raw_chunks.append(current_chunk)
             if len(s) > max_chars:
                 words = s.split(' ')
                 sub = ''
@@ -478,15 +478,30 @@ def split_text_into_chunks(text, max_chars=180):
                         sub = (sub + ' ' + w).strip()
                     else:
                         if sub:
-                            chunks.append(sub)
+                            raw_chunks.append(sub)
                         sub = w
                 current_chunk = sub if sub else ''
             else:
                 current_chunk = s
-
     if current_chunk:
-        chunks.append(current_chunk)
-    return chunks if chunks else [text]
+        raw_chunks.append(current_chunk)
+
+    # Post-process: Merge any punctuation-only or symbol-only orphan chunk into neighboring chunks
+    final_chunks = []
+    for c in raw_chunks:
+        c = c.strip()
+        if not c:
+            continue
+        has_letters = bool(re.search(r'[a-zA-Z0-9\u00C0-\u1EF9]', c))
+        if has_letters:
+            final_chunks.append(c)
+        else:
+            if final_chunks:
+                final_chunks[-1] = (final_chunks[-1] + " " + c).strip()
+            else:
+                final_chunks.append(c)
+
+    return final_chunks if final_chunks else [text]
 
 def cleanup_all_temp_files(max_age_seconds=600):
     """Auto-delete generated audio older than 10 minutes and purge any leftover uploads to guarantee Zero-Storage footprint."""
