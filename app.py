@@ -1012,24 +1012,35 @@ def format_hms(seconds):
     secs = int(seconds % 60)
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
-def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=2):
+def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=5):
+    """Transcribe a single audio chunk with anti-rate-limit exponential backoff."""
     recognizer = sr.Recognizer()
     recognizer.energy_threshold = 300
     recognizer.dynamic_energy_threshold = True
 
     for attempt in range(1, max_retries + 1):
         try:
-            target_path = chunk_path
-            with sr.AudioFile(str(target_path)) as source:
+            with sr.AudioFile(str(chunk_path)) as source:
                 audio_data = recognizer.record(source)
             text = recognizer.recognize_google(audio_data, language=language)
             return idx, (text or "").strip()
         except sr.UnknownValueError:
             # Silence / ambient noise - return immediately without retry
             return idx, ""
-        except Exception as ex:
+        except sr.RequestError as ex:
+            # Google API rate limit or network error — MUST retry with backoff
+            backoff = min(2 ** attempt, 30)  # 2s, 4s, 8s, 16s, 30s
+            print(f"[STT] Minute {idx+1} attempt {attempt}/{max_retries} - Google API error: {ex} — waiting {backoff}s...")
             if attempt < max_retries:
-                time.sleep(0.5)
+                time.sleep(backoff)
+                continue
+            print(f"[STT] Minute {idx+1} FAILED after {max_retries} attempts - returning empty.")
+            return idx, ""
+        except Exception as ex:
+            backoff = min(2 ** attempt, 20)
+            print(f"[STT] Minute {idx+1} attempt {attempt}/{max_retries} - Error: {ex} — waiting {backoff}s...")
+            if attempt < max_retries:
+                time.sleep(backoff)
                 continue
             return idx, ""
 
@@ -1166,7 +1177,13 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             completed_count += 1
             prog = int(10 + (completed_count / total_chunks) * 85)
             JOBS[job_id]["progress"] = prog
-            JOBS[job_id]["message"] = f"✅ ĐÃ LẤY TEXT XONG & ĐÁNH DẤU: {marker_label} ➔ Phút {idx+1}/{total_chunks} ({prog}%)..."
+
+            has_text = "✅" if transcript else "⏭️"
+            JOBS[job_id]["message"] = f"{has_text} ĐÁNH DẤU: {marker_label} ➔ Phút {idx+1}/{total_chunks} ({prog}%)..."
+
+            # Anti-rate-limit cooldown: pause 1.5s between API calls to prevent Google from blocking
+            if idx < total_chunks - 1:
+                time.sleep(1.5)
 
         # 5. Build final complete TXT and SRT subtitles from checkpoint data
         valid_texts = []
