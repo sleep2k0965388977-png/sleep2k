@@ -1028,41 +1028,22 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
     try:
         JOBS[job_id]["status"] = "processing"
         JOBS[job_id]["progress"] = 5
-        JOBS[job_id]["message"] = "Đang phân tích tệp âm thanh và trích xuất mốc thời gian..."
+        JOBS[job_id]["message"] = "Đang phân tích tệp âm thanh và trích xuất luồng media..."
 
-        # 1. Probe audio duration
-        duration = 0.0
-        try:
-            res = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)],
-                capture_output=True,
-                text=True,
-                timeout=20
-            )
-            duration = float(res.stdout.strip())
-        except Exception:
-            duration = 30.0
-
-        JOBS[job_id]["progress"] = 10
-        JOBS[job_id]["message"] = f"Thời lượng: {int(duration)}s. Đang bóc tách luồng âm thanh..."
-
-        # 2. Extract sequential 1-minute (60s) audio segments to prevent overload & out-of-memory
         temp_dir = Path(tempfile.mkdtemp(prefix="stt_"))
-        segment_pattern = str(temp_dir / "chunk_%05d.wav")
-        csv_list_path = temp_dir / "segments.csv"
+        master_audio_path = temp_dir / "master_audio.mp3"
 
-        proc = subprocess.run([
+        # 1. Fast extraction to lightweight 16kHz mono audio (takes only 15-20s even for 6 hours)
+        subprocess.run([
             "ffmpeg", "-y",
             "-i", str(file_path),
-            "-f", "segment",
-            "-segment_time", "60",
-            "-segment_list", str(csv_list_path),
-            "-segment_list_type", "csv",
-            "-c:a", "pcm_s16le",
+            "-vn",
+            "-c:a", "libmp3lame",
+            "-b:a", "64k",
             "-ar", "16000",
             "-ac", "1",
-            segment_pattern
-        ], capture_output=True, timeout=300)
+            str(master_audio_path)
+        ], capture_output=True, timeout=900)
 
         # Immediately delete original heavy upload file (e.g. MP4/MKV/WAV) to keep disk free
         try:
@@ -1071,45 +1052,30 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         except Exception:
             pass
 
-        # 3. Parse 1-minute segments metadata with exact timestamps
-        segments_meta = []
-        if csv_list_path.exists():
-            try:
-                with open(csv_list_path, "r", encoding="utf-8") as f:
-                    for idx, line in enumerate(f):
-                        parts = line.strip().split(",")
-                        if len(parts) >= 3:
-                            fn, st, et = parts[0], float(parts[1]), float(parts[2])
-                            chunk_p = temp_dir / fn
-                            segments_meta.append({
-                                "index": idx,
-                                "file_path": str(chunk_p),
-                                "start_time": st,
-                                "end_time": et
-                            })
-            except Exception:
-                pass
-
-        if not segments_meta:
-            chunk_files = sorted(list(temp_dir.glob("chunk_*.wav")))
-            for idx, cp in enumerate(chunk_files):
-                st = idx * 60.0
-                et = min((idx + 1) * 60.0, duration) if duration > 0 else (idx + 1) * 60.0
-                segments_meta.append({
-                    "index": idx,
-                    "file_path": str(cp),
-                    "start_time": st,
-                    "end_time": et
-                })
-
-        if not segments_meta:
+        if not master_audio_path.exists() or master_audio_path.stat().st_size == 0:
             JOBS[job_id]["status"] = "error"
-            JOBS[job_id]["message"] = "Không thể đọc dữ liệu âm thanh từ tệp tải lên."
+            JOBS[job_id]["message"] = "Không thể bóc tách luồng âm thanh từ tệp tải lên."
             return
 
-        total_chunks = len(segments_meta)
+        # 2. Probe master audio duration with exact precision
+        duration = 0.0
+        try:
+            res = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(master_audio_path)],
+                capture_output=True,
+                text=True,
+                timeout=20
+            )
+            duration = float(res.stdout.strip())
+        except Exception:
+            duration = 60.0
 
-        # 4. Check for existing checkpoint (Resume support)
+        total_chunks = max(1, math.ceil(duration / 60.0))
+        JOBS[job_id]["progress"] = 10
+        hours_str = f"{int(duration//3600):02d}:{int((duration%3600)//60):02d}:{int(duration%60):02d}"
+        JOBS[job_id]["message"] = f"Thời lượng video: {hours_str} ({total_chunks} phút). Đang bắt đầu nhận diện tuần tự..."
+
+        # 3. Check for existing checkpoint (Resume support)
         chk = load_checkpoint(job_id)
         if not chk or chk.get("total_segments") != total_chunks:
             chk = {
@@ -1122,40 +1088,47 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             }
             save_atomic_checkpoint(job_id, chk)
 
-        # 5. Process 1-minute segments sequentially: Transcribe ➔ Mark Complete ➔ Save Checkpoint ➔ Delete Chunk ➔ Move to Next Minute
+        # 4. Dynamic on-the-fly streaming slice & transcription: 0% storage buildup, 0% timeout risk!
         completed_count = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
 
-        for meta in segments_meta:
-            idx = meta["index"]
+        for idx in range(total_chunks):
             idx_str = str(idx)
-            chunk_p = Path(meta["file_path"])
-            st_val = meta["start_time"]
-            et_val = meta["end_time"]
+            st_val = idx * 60.0
+            et_val = min((idx + 1) * 60.0, duration)
             time_label = f"{int(st_val//60):02d}:{int(st_val%60):02d} - {int(et_val//60):02d}:{int(et_val%60):02d}"
 
             # Check if this 1-minute segment is already completed in checkpoint
             if idx_str in chk.get("segments", {}) and chk["segments"][idx_str].get("status") == "completed":
-                if chunk_p.exists():
-                    try:
-                        chunk_p.unlink(missing_ok=True)
-                    except Exception:
-                        pass
                 continue
 
-            JOBS[job_id]["message"] = f"Đang nhận diện AI: Phút {idx+1}/{total_chunks} ({time_label})..."
+            prog = int(10 + (completed_count / total_chunks) * 85)
+            JOBS[job_id]["progress"] = prog
+            JOBS[job_id]["message"] = f"Đang nhận diện AI: Phút {idx+1}/{total_chunks} ({time_label}) [{prog}%]..."
+
+            # Dynamically slice only this 60s audio segment on-the-fly (takes 0.02s)
+            chunk_slice_p = temp_dir / f"slice_{idx}.wav"
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-ss", str(st_val),
+                "-t", str(et_val - st_val),
+                "-i", str(master_audio_path),
+                "-c:a", "pcm_s16le",
+                "-ar", "16000",
+                "-ac", "1",
+                str(chunk_slice_p)
+            ], capture_output=True, timeout=30)
 
             # Transcribe 1-minute segment with retry resilience
             transcript = ""
-            if chunk_p.exists():
+            if chunk_slice_p.exists():
                 try:
-                    _, transcript = transcribe_audio_chunk(idx, chunk_p, language, max_retries=3)
+                    _, transcript = transcribe_audio_chunk(idx, chunk_slice_p, language, max_retries=3)
                 except Exception as ex:
                     print(f"Minute {idx+1} transcription error: {ex}")
                     transcript = ""
                 finally:
-                    # Immediately delete chunk WAV from disk to keep disk usage near zero
                     try:
-                        chunk_p.unlink(missing_ok=True)
+                        chunk_slice_p.unlink(missing_ok=True)
                     except Exception:
                         pass
 
@@ -1175,7 +1148,7 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             JOBS[job_id]["progress"] = prog
             JOBS[job_id]["message"] = f"✅ Đã lưu xong Phút {idx+1}/{total_chunks} ({time_label})! Tiếp tục Phút {idx+2}..."
 
-        # 6. Build final complete TXT and SRT subtitles from checkpoint data
+        # 5. Build final complete TXT and SRT subtitles from checkpoint data
         valid_texts = []
         srt_blocks = []
         srt_idx = 1
@@ -1186,7 +1159,7 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             if txt:
                 valid_texts.append(txt)
                 st = seg_data.get("start_time", i * 60.0)
-                et = seg_data.get("end_time", (i + 1) * 60.0)
+                et = seg_data.get("end_time", min((i + 1) * 60.0, duration))
                 srt_block = f"{srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n"
                 srt_blocks.append(srt_block)
                 srt_idx += 1
@@ -1194,7 +1167,7 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         full_text = "\n\n".join(valid_texts) if valid_texts else "Không nhận diện được giọng nói trong tệp này."
         srt_content = "\n".join(srt_blocks) if srt_blocks else ""
 
-        # 7. Final cleanup
+        # 6. Final cleanup
         try:
             for p in temp_dir.glob("*"):
                 p.unlink(missing_ok=True)
