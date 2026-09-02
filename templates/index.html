@@ -774,16 +774,35 @@
 
                 <textarea id="sttResultTextarea" style="width:100%; height:260px; background:rgba(11,15,25,0.9); border:1px solid var(--card-border); border-radius:14px; padding:16px; color:#fff; font-size:14px; line-height:1.7; resize:vertical; outline:none; font-family:inherit;"></textarea>
 
-                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:14px;">
-                    <button class="btn-preview" onclick="copySttResult()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(139,92,246,0.2); border-color:var(--accent-purple); color:#fff;">
-                        <i class="fa-solid fa-copy"></i> Sao Chép
-                    </button>
-                    <button class="btn-preview" onclick="downloadSttTxt()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(59,130,246,0.2); border-color:var(--accent-blue); color:#fff;">
-                        <i class="fa-solid fa-download"></i> Tải Tệp .TXT
-                    </button>
-                    <button class="btn-preview" onclick="downloadSttSrt()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(16,185,129,0.2); border-color:var(--accent-emerald); color:#fff;">
-                        <i class="fa-solid fa-closed-captioning"></i> Tải Tệp Phụ Đề .SRT
-                    </button>
+                <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:14px;">
+                    <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                        <button class="btn-preview" onclick="copySttResult()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(139,92,246,0.2); border-color:var(--accent-purple); color:#fff;">
+                            <i class="fa-solid fa-copy"></i> Sao Chép
+                        </button>
+                        <button class="btn-preview" onclick="downloadSttTxt()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(59,130,246,0.2); border-color:var(--accent-blue); color:#fff;">
+                            <i class="fa-solid fa-download"></i> Tải Tệp .TXT
+                        </button>
+                        <button class="btn-preview" onclick="downloadSttSrt()" style="padding:9px 18px; font-size:13px; border-radius:10px; background:rgba(16,185,129,0.2); border-color:var(--accent-emerald); color:#fff;">
+                            <i class="fa-solid fa-closed-captioning"></i> Tải Tệp Phụ Đề .SRT
+                        </button>
+                    </div>
+
+                    <!-- 2 Translation Controls: Target Language Selector & AI Translate Action -->
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <select id="translateTargetLang" class="speed-select" style="padding:9px 12px; border-radius:10px; background:rgba(255,255,255,0.08); font-size:13px; border:1px solid rgba(255,255,255,0.15);">
+                            <option value="vi" selected>🇻🇳 Tiếng Việt (Vietnamese)</option>
+                            <option value="en">🇺🇸 Tiếng Anh (English)</option>
+                            <option value="zh-CN">🇨🇳 Tiếng Trung (Chinese)</option>
+                            <option value="ja">🇯🇵 Tiếng Nhật (Japanese)</option>
+                            <option value="ko">🇰🇷 Tiếng Hàn (Korean)</option>
+                            <option value="fr">🇫🇷 Tiếng Pháp (French)</option>
+                            <option value="de">🇩🇪 Tiếng Đức (German)</option>
+                            <option value="th">🇹🇭 Tiếng Thái (Thai)</option>
+                        </select>
+                        <button class="btn-generate" id="btnTranslateResult" onclick="translateSttResult()" style="padding:9px 20px; font-size:13px; border-radius:10px; background:linear-gradient(135deg, #ec4899, #8b5cf6); border:none; color:#fff; font-weight:700; cursor:pointer; box-shadow:0 4px 15px rgba(236,72,153,0.3);">
+                            <i class="fa-solid fa-language"></i> Dịch Văn Bản AI
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1631,6 +1650,71 @@
             setTimeout(() => {
                 showDonateModal();
             }, 400);
+        }
+
+        // ── Translate STT Result (Replaces Previous Text with Zero-Overload Translation) ──
+        async function translateSttResult() {
+            if (!sttTxtResult && !sttSrtResult) {
+                alert("Chưa có văn bản nhận diện để dịch!");
+                return;
+            }
+
+            const targetLang = document.getElementById("translateTargetLang").value;
+            const btn = document.getElementById("btnTranslateResult");
+            const txtarea = document.getElementById("sttResultTextarea");
+            const statsEl = document.getElementById("sttStatsText");
+            const langSelect = document.getElementById("translateTargetLang");
+            const langName = langSelect.options[langSelect.selectedIndex].text;
+
+            const oldBtnHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang Dịch Thuật AI...';
+
+            try {
+                const resp = await fetch("/api/translate_content", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        text: sttTxtResult,
+                        srt: sttSrtResult,
+                        target_lang: targetLang,
+                        source_lang: "auto"
+                    })
+                });
+
+                if (!resp.ok) {
+                    const err = await resp.json();
+                    throw new Error(err.message || "Lỗi máy chủ khi dịch thuật.");
+                }
+
+                const data = await resp.json();
+                if (data.status === "success") {
+                    // Update global in-memory state with translated text and SRT
+                    sttTxtResult = data.translated_text;
+                    sttSrtResult = data.translated_srt;
+
+                    // Immediately replace textarea content with translated version
+                    if (currentSttFormat === "txt") {
+                        txtarea.value = sttTxtResult;
+                    } else {
+                        txtarea.value = sttSrtResult;
+                    }
+
+                    // Smooth visual feedback on stats
+                    statsEl.innerHTML = `Thời lượng: ${sttDuration}s • ${data.word_count} từ • ${data.char_count} ký tự • <span style="color:var(--accent-emerald); font-weight:700;"><i class="fa-solid fa-circle-check"></i> Đã dịch sang ${langName}</span>`;
+
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Đã Dịch Xong!';
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="fa-solid fa-language"></i> Dịch Lại / Ngôn Ngữ Khác';
+                    }, 3000);
+                }
+            } catch (e) {
+                console.error("Translate error:", e);
+                alert("Lỗi dịch thuật: " + (e.message || "Không thể dịch lúc này."));
+                btn.disabled = false;
+                btn.innerHTML = oldBtnHtml;
+            }
         }
 
     </script>

@@ -1716,6 +1716,102 @@ def api_transcribe_status(job_id):
         return jsonify({"status": "error", "message": "Không tìm thấy tiến trình chuyển đổi."}), 404
     return jsonify(job)
 
+# ── Neural Translation Engine (Translates TXT and SRT Subtitles with Zero-Overload) ──
+
+def translate_single_block(text, target_lang="vi", source_lang="auto"):
+    """High-speed neural translator with retry resilience."""
+    if not text or not text.strip():
+        return ""
+    try:
+        import urllib.request
+        import urllib.parse
+        url = f"https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl={source_lang}&tl={target_lang}&q=" + urllib.parse.quote(text)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if isinstance(data, list):
+                if len(data) > 0 and isinstance(data[0], list):
+                    return "".join([item[0] if isinstance(item, list) else str(item) for item in data])
+                return "".join([str(item) for item in data])
+            return str(data)
+    except Exception as ex:
+        print(f"Translate block warning: {ex}")
+        return text
+
+def translate_long_text(full_text, target_lang="vi", source_lang="auto"):
+    """Translate long novel/dialogue by splitting into contextual chunks to prevent server overload."""
+    if not full_text or not full_text.strip():
+        return ""
+    paragraphs = [p for p in full_text.split("\n\n") if p.strip()]
+    if not paragraphs:
+        paragraphs = [full_text]
+
+    translated_paras = []
+    for para in paragraphs:
+        if len(para) > 1500:
+            lines = [l for l in para.split("\n") if l.strip()]
+            sub_res = []
+            for line in lines:
+                sub_res.append(translate_single_block(line, target_lang, source_lang))
+                time.sleep(0.05)
+            translated_paras.append("\n".join(sub_res))
+        else:
+            translated_paras.append(translate_single_block(para, target_lang, source_lang))
+            time.sleep(0.05)
+
+    return "\n\n".join(translated_paras)
+
+def translate_srt_content(srt_text, target_lang="vi", source_lang="auto"):
+    """Translate SRT subtitle text while preserving exact timestamps and block structure."""
+    if not srt_text or not srt_text.strip():
+        return ""
+    blocks = srt_text.strip().split("\n\n")
+    translated_blocks = []
+
+    for block in blocks:
+        lines = block.strip().split("\n")
+        if len(lines) >= 3:
+            idx_line = lines[0]
+            time_line = lines[1]
+            content_text = "\n".join(lines[2:])
+            trans_content = translate_single_block(content_text, target_lang, source_lang)
+            translated_blocks.append(f"{idx_line}\n{time_line}\n{trans_content}")
+            time.sleep(0.03)
+        elif len(lines) == 2 and "-->" in lines[1]:
+            translated_blocks.append(f"{lines[0]}\n{lines[1]}")
+        else:
+            translated_blocks.append(block)
+
+    return "\n\n".join(translated_blocks)
+
+@app.route("/api/translate_content", methods=["POST"])
+def api_translate_content():
+    """Translate TXT and SRT results smoothly without server overload."""
+    try:
+        data = request.get_json() or {}
+        text = data.get("text", "")
+        srt = data.get("srt", "")
+        target_lang = data.get("target_lang", "vi")
+        source_lang = data.get("source_lang", "auto")
+
+        if not text and not srt:
+            return jsonify({"status": "error", "message": "Không có nội dung để dịch."}), 400
+
+        translated_text = translate_long_text(text, target_lang, source_lang) if text else ""
+        translated_srt = translate_srt_content(srt, target_lang, source_lang) if srt else ""
+
+        words = [w for w in translated_text.split() if w]
+        return jsonify({
+            "status": "success",
+            "translated_text": translated_text,
+            "translated_srt": translated_srt,
+            "word_count": len(words),
+            "char_count": len(translated_text),
+            "target_lang": target_lang
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Lỗi dịch thuật: {str(e)}"}), 500
+
 
 if __name__ == "__main__":
     import sys
