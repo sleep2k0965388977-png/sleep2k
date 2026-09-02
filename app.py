@@ -1536,7 +1536,7 @@ def api_multipart_upload_part_chunk():
 
 @app.route("/api/upload_chunk", methods=["POST"])
 def api_upload_chunk():
-    """Receive sequential 5MB file chunks, assemble, and trigger adaptive queue STT."""
+    """Receive sequential 5MB file chunks, assemble safely, and trigger adaptive queue STT."""
     try:
         upload_id = request.form.get("upload_id")
         chunk_index = int(request.form.get("chunk_index", 0))
@@ -1551,19 +1551,22 @@ def api_upload_chunk():
         chunk_path = UPLOAD_DIR / f"{upload_id}_part_{chunk_index:05d}.tmp"
         chunk_file.save(str(chunk_path))
 
-        # When last chunk arrives, assemble all parts in strict sequence
-        if chunk_index == total_chunks - 1:
+        # Check if ALL chunks from 0 to total_chunks - 1 are present and non-empty on disk
+        existing_parts = [UPLOAD_DIR / f"{upload_id}_part_{idx:05d}.tmp" for idx in range(total_chunks)]
+        all_present = all(p.exists() and p.stat().st_size > 0 for p in existing_parts)
+
+        if all_present:
             ext = Path(filename).suffix.lower() or ".mp4"
             assembled_path = UPLOAD_DIR / f"upload_{upload_id}{ext}"
 
-            # High-speed buffered stream assembly to prevent any timeout
+            # High-speed buffered stream assembly to prevent any corruption
             with open(assembled_path, "wb") as outfile:
                 for idx in range(total_chunks):
                     part_file = UPLOAD_DIR / f"{upload_id}_part_{idx:05d}.tmp"
                     if part_file.exists():
                         with open(part_file, "rb") as infile:
                             while True:
-                                chunk = infile.read(2 * 1024 * 1024) # 2MB buffer
+                                chunk = infile.read(2 * 1024 * 1024)
                                 if not chunk:
                                     break
                                 outfile.write(chunk)
@@ -1585,7 +1588,8 @@ def api_upload_chunk():
 
             return jsonify({"status": "completed", "job_id": upload_id})
 
-        return jsonify({"status": "chunk_received", "chunk_index": chunk_index})
+        uploaded_count = sum(1 for p in existing_parts if p.exists() and p.stat().st_size > 0)
+        return jsonify({"status": "chunk_received", "chunk_index": chunk_index, "uploaded_count": uploaded_count, "total_chunks": total_chunks})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
