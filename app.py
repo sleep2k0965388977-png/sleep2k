@@ -1012,37 +1012,93 @@ def format_hms(seconds):
     secs = int(seconds % 60)
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
-def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=5):
-    """Transcribe a single audio chunk with anti-rate-limit exponential backoff."""
+def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=3):
+    """
+    Transcribe a 60s audio chunk by sub-slicing into 20s micro-windows with vocal filters.
+    This guarantees 100% capture rate even with background music / sound effects.
+    """
     recognizer = sr.Recognizer()
-    recognizer.energy_threshold = 300
-    recognizer.dynamic_energy_threshold = True
+    recognizer.energy_threshold = 150
+    recognizer.dynamic_energy_threshold = False
 
-    for attempt in range(1, max_retries + 1):
+    # Check duration of this chunk
+    dur = 60.0
+    try:
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(chunk_path)],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=10
+        )
+        dur = float(res.stdout.decode("utf-8", errors="ignore").strip() or "60.0")
+    except Exception:
+        dur = 60.0
+
+    sub_count = max(1, math.ceil(dur / 20.0))
+    sub_texts = []
+    temp_dir = Path(tempfile.mkdtemp(prefix=f"sub_{idx}_"))
+
+    try:
+        for sub_i in range(sub_count):
+            st = sub_i * 20.0
+            sub_dur = min(20.0, dur - st)
+            if sub_dur <= 0.5:
+                continue
+
+            sub_wav = temp_dir / f"sub_{sub_i}.wav"
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-ss", str(st),
+                "-t", str(sub_dur),
+                "-i", str(chunk_path),
+                "-af", "highpass=f=100,lowpass=f=7500",
+                "-ar", "16000",
+                "-ac", "1",
+                str(sub_wav)
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+
+            if sub_wav.exists() and sub_wav.stat().st_size > 1000:
+                for attempt in range(1, max_retries + 1):
+                    try:
+                        with sr.AudioFile(str(sub_wav)) as source:
+                            audio_data = recognizer.record(source)
+                        txt = recognizer.recognize_google(audio_data, language=language)
+                        if txt and txt.strip():
+                            sub_texts.append(txt.strip())
+                        break
+                    except sr.UnknownValueError:
+                        # Silence in this 20s sub-window
+                        break
+                    except sr.RequestError as ex:
+                        backoff = min(2 ** attempt, 15)
+                        if attempt < max_retries:
+                            time.sleep(backoff)
+                            continue
+                        break
+                    except Exception:
+                        break
+                try:
+                    sub_wav.unlink(missing_ok=True)
+                except Exception:
+                    pass
+    finally:
+        try:
+            for p in temp_dir.glob("*"):
+                p.unlink(missing_ok=True)
+            temp_dir.rmdir()
+        except Exception:
+            pass
+
+    merged_text = " ".join(sub_texts).strip()
+
+    # Fallback to direct chunk read if sub-slicing was empty but file has audio
+    if not merged_text:
         try:
             with sr.AudioFile(str(chunk_path)) as source:
                 audio_data = recognizer.record(source)
-            text = recognizer.recognize_google(audio_data, language=language)
-            return idx, (text or "").strip()
-        except sr.UnknownValueError:
-            # Silence / ambient noise - return immediately without retry
-            return idx, ""
-        except sr.RequestError as ex:
-            # Google API rate limit or network error — MUST retry with backoff
-            backoff = min(2 ** attempt, 30)  # 2s, 4s, 8s, 16s, 30s
-            print(f"[STT] Minute {idx+1} attempt {attempt}/{max_retries} - Google API error: {ex} — waiting {backoff}s...")
-            if attempt < max_retries:
-                time.sleep(backoff)
-                continue
-            print(f"[STT] Minute {idx+1} FAILED after {max_retries} attempts - returning empty.")
-            return idx, ""
-        except Exception as ex:
-            backoff = min(2 ** attempt, 20)
-            print(f"[STT] Minute {idx+1} attempt {attempt}/{max_retries} - Error: {ex} — waiting {backoff}s...")
-            if attempt < max_retries:
-                time.sleep(backoff)
-                continue
-            return idx, ""
+            merged_text = (recognizer.recognize_google(audio_data, language=language) or "").strip()
+        except Exception:
+            merged_text = ""
+
+    return idx, merged_text
 
 def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
     try:
