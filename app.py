@@ -317,6 +317,13 @@ def vieneu_synthesize_audio(text, voice_type, rate="1.0"):
     return edge_tts_synthesize_audio(clean_text, fb_voice, rate=str(combined_rate), pitch=final_pitch_str)
 
 app = Flask(__name__)
+
+@app.after_request
+def add_header(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB upload limit
 
 # Temporary output directory (files auto-cleaned on each new generation)
