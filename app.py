@@ -1003,6 +1003,14 @@ def format_timestamp_srt(seconds):
     millis = int(round((seconds - int(seconds)) * 1000))
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
+def format_hms(seconds):
+    """Format seconds into HH:MM:SS string for clear timeline checkpoint tracking."""
+    seconds = max(0, float(seconds))
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
 def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=2):
     recognizer = sr.Recognizer()
     recognizer.energy_threshold = 300
@@ -1071,9 +1079,9 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             duration = 60.0
 
         total_chunks = max(1, math.ceil(duration / 60.0))
+        total_time_str = format_hms(duration)
         JOBS[job_id]["progress"] = 10
-        hours_str = f"{int(duration//3600):02d}:{int((duration%3600)//60):02d}:{int(duration%60):02d}"
-        JOBS[job_id]["message"] = f"Thời lượng video: {hours_str} ({total_chunks} phút). Đang bắt đầu nhận diện tuần tự..."
+        JOBS[job_id]["message"] = f"Thời lượng video: [{total_time_str}] ({total_chunks} phút). Đang bắt đầu nhận diện tuần tự..."
 
         # 3. Check for existing checkpoint (Resume support)
         chk = load_checkpoint(job_id)
@@ -1083,19 +1091,22 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
                 "language": language,
                 "total_duration": duration,
                 "total_segments": total_chunks,
+                "total_time": total_time_str,
                 "status": "processing",
                 "segments": {}
             }
             save_atomic_checkpoint(job_id, chk)
 
-        # 4. Dynamic on-the-fly streaming slice & transcription: 0% storage buildup, 0% timeout risk!
+        # 4. Dynamic on-the-fly streaming slice & transcription with exact timeline marker
         completed_count = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
 
         for idx in range(total_chunks):
             idx_str = str(idx)
             st_val = idx * 60.0
             et_val = min((idx + 1) * 60.0, duration)
-            time_label = f"{int(st_val//60):02d}:{int(st_val%60):02d} - {int(et_val//60):02d}:{int(et_val%60):02d}"
+            current_st_str = format_hms(st_val)
+            current_et_str = format_hms(et_val)
+            marker_label = f"[{current_et_str} / {total_time_str}]"
 
             # Check if this 1-minute segment is already completed in checkpoint
             if idx_str in chk.get("segments", {}) and chk["segments"][idx_str].get("status") == "completed":
@@ -1103,7 +1114,7 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
 
             prog = int(10 + (completed_count / total_chunks) * 85)
             JOBS[job_id]["progress"] = prog
-            JOBS[job_id]["message"] = f"Đang nhận diện AI: Phút {idx+1}/{total_chunks} ({time_label}) [{prog}%]..."
+            JOBS[job_id]["message"] = f"⏳ Đang xử lý: [{current_st_str} / {total_time_str}] ➔ Phút {idx+1}/{total_chunks} ({prog}%)..."
 
             # Dynamically slice only this 60s audio segment on-the-fly (takes 0.02s)
             chunk_slice_p = temp_dir / f"slice_{idx}.wav"
@@ -1132,21 +1143,23 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
                     except Exception:
                         pass
 
-            # Mark complete and save to Checkpoint atomically
+            # Mark complete and save to Checkpoint atomically with exact timeline marker
             chk["segments"][idx_str] = {
                 "index": idx,
                 "start_time": st_val,
                 "end_time": et_val,
+                "timeline": f"{current_st_str} - {current_et_str}",
                 "status": "completed",
                 "transcript": transcript,
                 "completed_at": time.time()
             }
+            chk["last_checkpoint_time"] = current_et_str
             save_atomic_checkpoint(job_id, chk)
 
             completed_count += 1
             prog = int(10 + (completed_count / total_chunks) * 85)
             JOBS[job_id]["progress"] = prog
-            JOBS[job_id]["message"] = f"✅ Đã lưu xong Phút {idx+1}/{total_chunks} ({time_label})! Tiếp tục Phút {idx+2}..."
+            JOBS[job_id]["message"] = f"✅ ĐÃ LẤY TEXT XONG & ĐÁNH DẤU: {marker_label} ➔ Phút {idx+1}/{total_chunks} ({prog}%)..."
 
         # 5. Build final complete TXT and SRT subtitles from checkpoint data
         valid_texts = []
@@ -1179,11 +1192,12 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         words = [w for w in full_text.split() if w]
         JOBS[job_id]["progress"] = 100
         JOBS[job_id]["status"] = "completed"
-        JOBS[job_id]["message"] = f"Hoàn tất 100%! Đã nhận diện thành công toàn bộ {total_chunks} phút âm thanh."
+        JOBS[job_id]["message"] = f"Hoàn tất 100%! Đã nhận diện toàn bộ [{total_time_str} / {total_time_str}] ({total_chunks} phút) thành công."
         JOBS[job_id]["result"] = {
             "text": full_text,
             "srt": srt_content,
             "duration": round(duration, 1),
+            "total_time": total_time_str,
             "word_count": len(words),
             "char_count": len(full_text),
             "total_chunks": total_chunks,
