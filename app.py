@@ -1041,17 +1041,22 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         temp_dir = Path(tempfile.mkdtemp(prefix="stt_"))
         master_audio_path = temp_dir / "master_audio.mp3"
 
-        # 1. Fast extraction to lightweight 16kHz mono audio (takes only 15-20s even for 6 hours)
-        subprocess.run([
-            "ffmpeg", "-y",
-            "-i", str(file_path),
-            "-vn",
-            "-c:a", "libmp3lame",
-            "-b:a", "64k",
-            "-ar", "16000",
-            "-ac", "1",
-            str(master_audio_path)
-        ], capture_output=True, timeout=900)
+        # 1. Robust multi-strategy audio extraction (immune to special characters, tags #, and codec quirks)
+        extracted = False
+        strategies = [
+            ["ffmpeg", "-y", "-i", str(file_path), "-map", "0:a:0?", "-vn", "-c:a", "libmp3lame", "-b:a", "64k", "-ar", "16000", "-ac", "1", str(master_audio_path)],
+            ["ffmpeg", "-y", "-i", str(file_path), "-vn", "-ar", "16000", "-ac", "1", str(master_audio_path)],
+            ["ffmpeg", "-y", "-i", str(file_path), "-vn", "-c:a", "copy", str(master_audio_path)]
+        ]
+
+        for cmd in strategies:
+            try:
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
+                if master_audio_path.exists() and master_audio_path.stat().st_size > 100:
+                    extracted = True
+                    break
+            except Exception as ex:
+                print(f"Extraction strategy failed: {ex}")
 
         # Immediately delete original heavy upload file (e.g. MP4/MKV/WAV) to keep disk free
         try:
@@ -1060,21 +1065,22 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         except Exception:
             pass
 
-        if not master_audio_path.exists() or master_audio_path.stat().st_size == 0:
+        if not extracted or not master_audio_path.exists() or master_audio_path.stat().st_size == 0:
             JOBS[job_id]["status"] = "error"
             JOBS[job_id]["message"] = "Không thể bóc tách luồng âm thanh từ tệp tải lên."
             return
 
-        # 2. Probe master audio duration with exact precision
+        # 2. Probe master audio duration with exact precision and safe decoding
         duration = 0.0
         try:
             res = subprocess.run(
                 ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(master_audio_path)],
-                capture_output=True,
-                text=True,
-                timeout=20
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                timeout=30
             )
-            duration = float(res.stdout.strip())
+            out_str = res.stdout.decode("utf-8", errors="ignore").strip()
+            duration = float(out_str)
         except Exception:
             duration = 60.0
 
@@ -1127,7 +1133,7 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
                 "-ar", "16000",
                 "-ac", "1",
                 str(chunk_slice_p)
-            ], capture_output=True, timeout=30)
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45)
 
             # Transcribe 1-minute segment with retry resilience
             transcript = ""
