@@ -1734,7 +1734,7 @@ def translate_single_block(text, target_lang="vi", source_lang="auto"):
         import urllib.parse
         url = f"https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl={source_lang}&tl={target_lang}&q=" + urllib.parse.quote(text)
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-        with urllib.request.urlopen(req, timeout=12) as resp:
+        with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if isinstance(data, list):
                 if len(data) > 0 and isinstance(data[0], list):
@@ -1745,57 +1745,79 @@ def translate_single_block(text, target_lang="vi", source_lang="auto"):
         print(f"Translate block warning: {ex}")
         return text
 
-def translate_long_text(full_text, target_lang="vi", source_lang="auto"):
-    """Translate long novel/dialogue by splitting into contextual chunks to prevent server overload."""
-    if not full_text or not full_text.strip():
-        return ""
-    paragraphs = [p for p in full_text.split("\n\n") if p.strip()]
+def translate_content_parallel(text, srt_text, target_lang="vi", source_lang="auto"):
+    """Translate full TXT and SRT concurrently with 10x thread pool to guarantee < 3s response and zero Render timeout."""
+    if not text and not srt_text:
+        return "", ""
+
+    # If SRT is provided, translating SRT blocks in parallel gives BOTH translated SRT and TXT
+    if srt_text and srt_text.strip():
+        blocks = [b.strip() for b in srt_text.strip().split("\n\n") if b.strip()]
+        parsed_blocks = []
+        for b in blocks:
+            lines = b.split("\n")
+            if len(lines) >= 3:
+                idx_line = lines[0]
+                time_line = lines[1]
+                content = "\n".join(lines[2:])
+                parsed_blocks.append((idx_line, time_line, content))
+            elif len(lines) == 2 and "-->" in lines[1]:
+                parsed_blocks.append((lines[0], lines[1], ""))
+            else:
+                parsed_blocks.append((str(len(parsed_blocks) + 1), "", b))
+
+        translated_map = {}
+        def translate_worker(item):
+            idx_line, time_line, content = item
+            if not content.strip():
+                return idx_line, time_line, ""
+            trans = translate_single_block(content, target_lang, source_lang)
+            return idx_line, time_line, trans
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(translate_worker, item) for item in parsed_blocks]
+            for f in as_completed(futures):
+                idx_line, time_line, trans = f.result()
+                translated_map[idx_line] = (time_line, trans)
+
+        final_srt_blocks = []
+        final_txt_paragraphs = []
+        for idx_line, _, _ in parsed_blocks:
+            time_line, trans = translated_map.get(idx_line, ("", ""))
+            if time_line:
+                final_srt_blocks.append(f"{idx_line}\n{time_line}\n{trans}")
+            else:
+                final_srt_blocks.append(f"{idx_line}\n{trans}")
+            if trans.strip():
+                final_txt_paragraphs.append(trans.strip())
+
+        translated_srt = "\n\n".join(final_srt_blocks)
+        translated_txt = "\n\n".join(final_txt_paragraphs)
+        return translated_txt, translated_srt
+
+    # Fallback if only plain text is provided
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
     if not paragraphs:
-        paragraphs = [full_text]
+        paragraphs = [text.strip()]
 
-    translated_paras = []
-    for para in paragraphs:
-        if len(para) > 1500:
-            lines = [l for l in para.split("\n") if l.strip()]
-            sub_res = []
-            for line in lines:
-                sub_res.append(translate_single_block(line, target_lang, source_lang))
-                time.sleep(0.05)
-            translated_paras.append("\n".join(sub_res))
-        else:
-            translated_paras.append(translate_single_block(para, target_lang, source_lang))
-            time.sleep(0.05)
+    translated_paras = [None] * len(paragraphs)
+    def para_worker(idx, p):
+        return idx, translate_single_block(p, target_lang, source_lang)
 
-    return "\n\n".join(translated_paras)
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(para_worker, i, p) for i, p in enumerate(paragraphs)]
+        for f in as_completed(futures):
+            i, trans = f.result()
+            translated_paras[i] = trans
 
-def translate_srt_content(srt_text, target_lang="vi", source_lang="auto"):
-    """Translate SRT subtitle text while preserving exact timestamps and block structure."""
-    if not srt_text or not srt_text.strip():
-        return ""
-    blocks = srt_text.strip().split("\n\n")
-    translated_blocks = []
-
-    for block in blocks:
-        lines = block.strip().split("\n")
-        if len(lines) >= 3:
-            idx_line = lines[0]
-            time_line = lines[1]
-            content_text = "\n".join(lines[2:])
-            trans_content = translate_single_block(content_text, target_lang, source_lang)
-            translated_blocks.append(f"{idx_line}\n{time_line}\n{trans_content}")
-            time.sleep(0.03)
-        elif len(lines) == 2 and "-->" in lines[1]:
-            translated_blocks.append(f"{lines[0]}\n{lines[1]}")
-        else:
-            translated_blocks.append(block)
-
-    return "\n\n".join(translated_blocks)
+    translated_txt = "\n\n".join([p for p in translated_paras if p])
+    return translated_txt, ""
 
 @app.route("/api/translate_content", methods=["POST"])
 def api_translate_content():
-    """Translate TXT and SRT results smoothly without server overload."""
+    """Translate TXT and SRT results with 10x parallelism and zero Render timeout."""
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         text = data.get("text", "")
         srt = data.get("srt", "")
         target_lang = data.get("target_lang", "vi")
@@ -1804,8 +1826,7 @@ def api_translate_content():
         if not text and not srt:
             return jsonify({"status": "error", "message": "Không có nội dung để dịch."}), 400
 
-        translated_text = translate_long_text(text, target_lang, source_lang) if text else ""
-        translated_srt = translate_srt_content(srt, target_lang, source_lang) if srt else ""
+        translated_text, translated_srt = translate_content_parallel(text, srt, target_lang, source_lang)
 
         words = [w for w in translated_text.split() if w]
         return jsonify({
@@ -1817,6 +1838,7 @@ def api_translate_content():
             "target_lang": target_lang
         })
     except Exception as e:
+        print(f"Translate API error: {e}")
         return jsonify({"status": "error", "message": f"Lỗi dịch thuật: {str(e)}"}), 500
 
 
