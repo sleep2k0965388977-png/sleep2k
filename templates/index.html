@@ -1544,20 +1544,28 @@
                     throw new Error("Không nhận được mã tiến trình từ máy chủ.");
                 }
 
-                // Poll transcription status
+                // Poll transcription status with high-resilience retry tolerance
+                let consecutiveErrors = 0;
                 const pollInterval = setInterval(async () => {
                     try {
                         const sr = await fetch(`/api/transcribe_status/${jobId}`);
-                        if (sr.status === 404) {
-                            clearInterval(pollInterval);
-                            progressCard.classList.remove("show");
-                            btn.disabled = false;
-                            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                        if (!sr.ok) {
+                            consecutiveErrors++;
+                            if (consecutiveErrors > 15) {
+                                clearInterval(pollInterval);
+                                alert("Mất kết nối với máy chủ. Vui lòng kiểm tra lại đường truyền mạng!");
+                                progressCard.classList.remove("show");
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                            }
                             return;
                         }
+
+                        consecutiveErrors = 0;
                         const sd = await sr.json();
+
                         if (sd.status === "processing" || sd.status === "queued") {
-                            const p = sd.progress || 20;
+                            const p = Math.max(10, sd.progress || 10);
                             fillEl.style.width = p + "%";
                             pctEl.innerText = p + "%";
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message || 'Đang nhận diện giọng nói AI...');
@@ -1573,9 +1581,10 @@
                                 sttTxtResult = res.text || "";
                                 sttSrtResult = res.srt || "";
                                 document.getElementById("sttResultTextarea").value = sttTxtResult;
-                                document.getElementById("sttStatsText").innerText = `Thời lượng: ${res.duration}s • ${res.word_count.toLocaleString()} từ • ${res.char_count.toLocaleString()} ký tự`;
+                                document.getElementById("sttStatsText").innerText = `Thời lượng: ${res.duration}s [${res.total_time || ''}] • ${res.word_count.toLocaleString()} từ • ${res.char_count.toLocaleString()} ký tự`;
                                 switchOutputFormat('txt');
                                 resultCard.style.display = "block";
+                                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
                             }, 500);
@@ -1587,9 +1596,15 @@
                             btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
                         }
                     } catch (err) {
-                        console.error("Poll error:", err);
+                        consecutiveErrors++;
+                        if (consecutiveErrors > 15) {
+                            clearInterval(pollInterval);
+                            progressCard.classList.remove("show");
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                        }
                     }
-                }, 700);
+                }, 800);
 
             } catch (err) {
                 console.error("Upload error:", err);
