@@ -6,6 +6,8 @@ import time
 import uuid
 import asyncio
 import io
+import urllib.request
+import urllib.parse
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
