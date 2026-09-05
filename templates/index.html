@@ -1795,15 +1795,22 @@
             const statsEl = document.getElementById("sttStatsText");
             if (!statsEl || !currentSttResult) return;
 
+            const durationVal = currentSttResult.duration || 0;
+            const timeStr = currentSttResult.total_time ? ` [${currentSttResult.total_time}]` : '';
+            const wordsVal = (currentSttResult.word_count || 0).toLocaleString();
+            const charsVal = (currentSttResult.char_count || 0).toLocaleString();
+
             if (currentSelectedPart === "all") {
                 const partsCount = (currentSttResult.parts && currentSttResult.parts.length) || 1;
                 const partsInfo = partsCount > 1 ? ` • <span style="color:#38bdf8; font-weight:600;"><i class="fa-solid fa-boxes-stacked"></i> Đã gộp hoàn chỉnh ${partsCount} phần (40p/phần)</span>` : '';
-                statsEl.innerHTML = `Thời lượng: ${currentSttResult.duration}s [${currentSttResult.total_time || ''}] • ${currentSttResult.word_count.toLocaleString()} từ • ${currentSttResult.char_count.toLocaleString()} ký tự${partsInfo}${extraSuffix}`;
+                statsEl.innerHTML = `Thời lượng: ${durationVal}s${timeStr} • ${wordsVal} từ • ${charsVal} ký tự${partsInfo}${extraSuffix}`;
             } else {
                 const idx = parseInt(currentSelectedPart, 10);
                 const part = (currentSttResult.parts && currentSttResult.parts[idx]) || null;
                 if (part) {
-                    statsEl.innerHTML = `<span style="color:#a78bfa; font-weight:700;"><i class="fa-solid fa-layer-group"></i> Đang xem: Phần ${part.part_index} [${part.timeline}]</span> • ${part.word_count.toLocaleString()} từ • ${part.char_count.toLocaleString()} ký tự${extraSuffix}`;
+                    const pWords = (part.word_count || 0).toLocaleString();
+                    const pChars = (part.char_count || 0).toLocaleString();
+                    statsEl.innerHTML = `<span style="color:#a78bfa; font-weight:700;"><i class="fa-solid fa-layer-group"></i> Đang xem: Phần ${part.part_index} [${part.timeline}]</span> • ${pWords} từ • ${pChars} ký tự${extraSuffix}`;
                 }
             }
         }
@@ -1815,18 +1822,18 @@
             const txtarea = document.getElementById("sttResultTextarea");
 
             if (fmt === "txt") {
-                tabTxt.classList.add("active");
-                tabSrt.classList.remove("active");
-                txtarea.value = sttTxtResult;
+                if (tabTxt) tabTxt.classList.add("active");
+                if (tabSrt) tabSrt.classList.remove("active");
+                if (txtarea) txtarea.value = sttTxtResult;
             } else {
-                tabTxt.classList.remove("active");
-                tabSrt.classList.add("active");
-                txtarea.value = sttSrtResult;
+                if (tabTxt) tabTxt.classList.remove("active");
+                if (tabSrt) tabSrt.classList.add("active");
+                if (txtarea) txtarea.value = sttSrtResult;
             }
         }
 
         function copySttResult() {
-            const txt = document.getElementById("sttResultTextarea").value;
+            const txt = document.getElementById("sttResultTextarea")?.value;
             if (!txt) return;
             navigator.clipboard.writeText(txt).then(() => {
                 setTimeout(() => {
@@ -1909,15 +1916,19 @@
                 return;
             }
 
-            const targetLang = document.getElementById("translateTargetLang").value;
+            const targetLangEl = document.getElementById("translateTargetLang");
+            const targetLang = targetLangEl ? targetLangEl.value : "vi";
             const btn = document.getElementById("btnTranslateResult");
             const txtarea = document.getElementById("sttResultTextarea");
-            const langSelect = document.getElementById("translateTargetLang");
-            const langName = langSelect.options[langSelect.selectedIndex].text;
+            const langName = (targetLangEl && targetLangEl.selectedIndex >= 0 && targetLangEl.options[targetLangEl.selectedIndex])
+                ? targetLangEl.options[targetLangEl.selectedIndex].text
+                : targetLang;
 
-            const oldBtnHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang Dịch Thuật AI...';
+            const oldBtnHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang Dịch Thuật AI...';
+            }
 
             try {
                 const resp = await fetch("/api/translate_content", {
