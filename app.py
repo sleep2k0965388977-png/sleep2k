@@ -448,6 +448,15 @@ def normalize_text_input(text):
         return ""
     text = text.replace("…", "...").replace("“", '"').replace("”", '"').replace("’", "'").replace("‘", "'")
     text = text.replace("–", "-").replace("—", "-")
+
+    # ── Auto-apply emotion prosody for raw laughter, sighs, and throat sounds even if tags were omitted ──
+    # Laughter: haha, hehe, hihi, khà khà... -> natural audio laughing cadence
+    text = re.sub(r'(?<!\[cười\]\s?)(?<!\[cười nhẹ\]\s?)\b(ha(\s*ha)+|he(\s*he)+|hi(\s*hi)+|hô(\s*hô)+|hố(\s*hố)+|khà(\s*khà)+|khặc(\s*khặc)+|kakaka)\b', r'... haha, \1 ...', text, flags=re.IGNORECASE)
+    # Sighs: haizz, haz, chậc chậc
+    text = re.sub(r'(?<!\[thở dài\]\s?)\b(haizz+|hazzz+|chậc\s*chậc)\b', r'... (thở dài) \1 ...', text, flags=re.IGNORECASE)
+    # Throat clearing: e hèm, è hèm
+    text = re.sub(r'(?<!\[hắng giọng\]\s?)\b(e\s*hèm|è\s*hèm)\b', r'... ừm, \1 ...', text, flags=re.IGNORECASE)
+
     # Expressive emotion tag natural prosody mapping
     text = text.replace("[cười]", "... haha, ...").replace("[cười nhẹ]", "... hihi, ...")
     text = text.replace("[thở dài]", "... (thở dài) ...").replace("[hắng giọng]", "... ừm, ...")

@@ -559,21 +559,30 @@
         </div>
 
         <div class="card">
-            <!-- Expressive Emotion Cues Quick Badges -->
-            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px; font-size:12px;">
-                <span style="color:var(--text-muted); font-weight:600;"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-purple);"></i> Biểu cảm AI:</span>
-                <button type="button" onclick="insertEmotionCue('[cười] ')" style="background:rgba(236,72,153,0.15); border:1px solid rgba(236,72,153,0.3); color:#f472b6; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;">
-                    😄 [cười]
-                </button>
-                <button type="button" onclick="insertEmotionCue('[thở dài] ')" style="background:rgba(147,197,253,0.15); border:1px solid rgba(147,197,253,0.3); color:#93c5fd; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;">
-                    😮‍💨 [thở dài]
-                </button>
-                <button type="button" onclick="insertEmotionCue('[hắng giọng] ')" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3); color:#fbbf24; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;">
-                    🎙️ [hắng giọng]
-                </button>
-                <button type="button" onclick="insertEmotionCue('... ')" style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#34d399; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;">
-                    ⏱️ [nghỉ nhịp]
-                </button>
+            <!-- Expressive Emotion Cues Quick Badges & Auto-Scan Engine -->
+            <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; font-size:12px;">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                    <span style="color:var(--text-muted); font-weight:600;"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-purple);"></i> Biểu cảm AI:</span>
+                    <button type="button" onclick="insertEmotionCue('[cười] ')" style="background:rgba(236,72,153,0.15); border:1px solid rgba(236,72,153,0.3); color:#f472b6; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;" title="Chèn thẻ cười tại vị trí con trỏ">
+                        😄 [cười]
+                    </button>
+                    <button type="button" onclick="insertEmotionCue('[thở dài] ')" style="background:rgba(147,197,253,0.15); border:1px solid rgba(147,197,253,0.3); color:#93c5fd; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;" title="Chèn thẻ thở dài tại vị trí con trỏ">
+                        😮‍💨 [thở dài]
+                    </button>
+                    <button type="button" onclick="insertEmotionCue('[hắng giọng] ')" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3); color:#fbbf24; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;" title="Chèn thẻ hắng giọng tại vị trí con trỏ">
+                        🎙️ [hắng giọng]
+                    </button>
+                    <button type="button" onclick="insertEmotionCue('... ')" style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#34d399; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;" title="Chèn nhịp nghỉ tự nhiên">
+                        ⏱️ [nghỉ nhịp]
+                    </button>
+                </div>
+                
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" id="btnAutoScanEmotion" onclick="autoScanAndApplyEmotions()" style="background:linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.3)); border:1px solid rgba(168,85,247,0.6); color:#f5d0fe; padding:5px 14px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; box-shadow:0 0 12px rgba(168,85,247,0.3); transition:all 0.2s;" title="Tự động tìm kiếm các tiếng cười (haha, hehe, hihi...), thở dài, hắng giọng trong bài và gắn biểu cảm AI tương ứng">
+                        <i class="fa-solid fa-bolt" style="color:#f472b6;"></i> Tự Động Quét & Gắn Biểu Cảm
+                    </button>
+                    <span id="autoEmotionBadge" style="display:none; font-size:11px; color:#34d399; font-weight:600; padding:4px 10px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:8px;"></span>
+                </div>
             </div>
 
             <div class="textarea-container">
@@ -909,6 +918,95 @@
             ta.selectionStart = ta.selectionEnd = start + cue.length;
             ta.focus();
             updateTextStats();
+        }
+
+        function autoScanAndApplyEmotions() {
+            const ta = document.getElementById("textInput");
+            let text = ta.value;
+            if (!text || !text.trim()) {
+                alert("Vui lòng dán hoặc nhập văn bản trước khi thực hiện quét biểu cảm AI!");
+                return;
+            }
+
+            let laughCount = 0;
+            let sighCount = 0;
+            let throatCount = 0;
+            let pauseCount = 0;
+
+            // 1. Tiếng cười cảm thán tự nhiên: haha, hehe, hihi, hoho, khà khà, khặc khặc, kakaka...
+            text = text.replace(/(?<!\[cười\]\s?)(?<!\[cười nhẹ\]\s?)\b(ha(\s*ha)+|he(\s*he)+|hi(\s*hi)+|hô(\s*hô)+|hố(\s*hố)+|khà(\s*khà)+|khặc(\s*khặc)+|kakaka)\b/gi, (m) => {
+                laughCount++;
+                return '[cười] ' + m;
+            });
+
+            // Tiếng cười theo ngữ cảnh hội thoại: bật cười: / phì cười: / cười lớn: ...
+            text = text.replace(/(?<!\[cười\]\s?)(bật cười|phì cười|cười lớn|khẽ cười|cười khẩy|cười khúc khích|mỉm cười)(:|\s*rồi nói:|\s*nói:)/gi, (m, p1, p2) => {
+                laughCount++;
+                return p1 + p2 + ' [cười]';
+            });
+
+            // 2. Tiếng thở dài: haizz, haz, chậc chậc, thở dài một tiếng...
+            text = text.replace(/(?<!\[thở dài\]\s?)\b(haizz+|hazzz+|chậc\s*chậc)\b/gi, (m) => {
+                sighCount++;
+                return '[thở dài] ' + m;
+            });
+            text = text.replace(/(?<!\[thở dài\]\s?)(thở dài\s*(một tiếng)?|thở hắt ra)(:|\s*rồi nói:|\s*nói:)?/gi, (m) => {
+                sighCount++;
+                return '[thở dài] ' + m;
+            });
+
+            // 3. Hắng giọng / đằng hắng: e hèm, è hèm, khục khục, hắng giọng...
+            text = text.replace(/(?<!\[hắng giọng\]\s?)\b(e\s*hèm|è\s*hèm|khục\s*khục)\b/gi, (m) => {
+                throatCount++;
+                return '[hắng giọng] ' + m;
+            });
+            text = text.replace(/(?<!\[hắng giọng\]\s?)(hắng giọng\s*(một tiếng)?|khẽ ho\s*(một tiếng)?)(:|\s*rồi nói:|\s*nói:)?/gi, (m) => {
+                throatCount++;
+                return '[hắng giọng] ' + m;
+            });
+
+            // 4. Ngập ngừng / ngắt nhịp: ngập ngừng nói, ấp úng nói...
+            text = text.replace(/(?<!\.\.\.\s?)(ngập ngừng|ấp úng|chần chừ)(:|\s*rồi nói:|\s*nói:)/gi, (m, p1, p2) => {
+                pauseCount++;
+                return p1 + p2 + ' ...';
+            });
+
+            const totalFound = laughCount + sighCount + throatCount + pauseCount;
+            const badge = document.getElementById("autoEmotionBadge");
+
+            if (totalFound === 0) {
+                if (badge) {
+                    badge.style.display = "inline-flex";
+                    badge.style.color = "#fbbf24";
+                    badge.style.background = "rgba(251,191,36,0.15)";
+                    badge.style.borderColor = "rgba(251,191,36,0.3)";
+                    badge.innerHTML = `<i class="fa-solid fa-info-circle" style="margin-right:4px;"></i> Đã quét: Chưa có từ cảm thán (haha, hehe, thở dài, e hèm...)`;
+                    setTimeout(() => { badge.style.display = "none"; }, 5000);
+                } else {
+                    alert("Không tìm thấy từ cảm xúc nào (như haha, hehe, hihi, thở dài, e hèm...) trong văn bản.");
+                }
+                return;
+            }
+
+            ta.value = text;
+            updateTextStats();
+
+            if (badge) {
+                let details = [];
+                if (laughCount > 0) details.push(`${laughCount} tiếng cười`);
+                if (sighCount > 0) details.push(`${sighCount} thở dài`);
+                if (throatCount > 0) details.push(`${throatCount} hắng giọng`);
+                if (pauseCount > 0) details.push(`${pauseCount} nghỉ nhịp`);
+
+                badge.style.display = "inline-flex";
+                badge.style.color = "#34d399";
+                badge.style.background = "rgba(16,185,129,0.15)";
+                badge.style.borderColor = "rgba(16,185,129,0.3)";
+                badge.innerHTML = `<i class="fa-solid fa-circle-check" style="margin-right:4px;"></i> Đã tự động gắn ${totalFound} biểu cảm AI (${details.join(", ")})`;
+                setTimeout(() => {
+                    badge.style.display = "none";
+                }, 8000);
+            }
         }
 
         let currentLangFilter = "all";
