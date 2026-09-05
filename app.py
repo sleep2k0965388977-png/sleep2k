@@ -1119,64 +1119,54 @@ def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=3):
 
     return idx, merged_text
 
+def probe_media_duration(media_path):
+    """Probe exact duration in seconds from any audio/video file directly."""
+    try:
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(media_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=30
+        )
+        val = float(res.stdout.decode("utf-8", errors="ignore").strip())
+        if val > 0:
+            return val
+    except Exception:
+        pass
+    try:
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(media_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=30
+        )
+        val = float(res.stdout.decode("utf-8", errors="ignore").strip())
+        if val > 0:
+            return val
+    except Exception:
+        pass
+    return 60.0
+
 def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
+    temp_dir = Path(tempfile.mkdtemp(prefix="stt_"))
     try:
         JOBS[job_id]["status"] = "processing"
         JOBS[job_id]["progress"] = 5
-        JOBS[job_id]["message"] = "Đang phân tích tệp âm thanh và trích xuất luồng media..."
+        JOBS[job_id]["message"] = "Đang phân tích thời lượng thực tế của video/âm thanh..."
 
-        temp_dir = Path(tempfile.mkdtemp(prefix="stt_"))
-        master_audio_path = temp_dir / "master_audio.mp3"
-
-        # 1. Robust multi-strategy audio extraction (immune to special characters, tags #, and codec quirks)
-        extracted = False
-        strategies = [
-            ["ffmpeg", "-y", "-i", str(file_path), "-map", "0:a:0?", "-vn", "-c:a", "libmp3lame", "-b:a", "64k", "-ar", "16000", "-ac", "1", str(master_audio_path)],
-            ["ffmpeg", "-y", "-i", str(file_path), "-vn", "-ar", "16000", "-ac", "1", str(master_audio_path)],
-            ["ffmpeg", "-y", "-i", str(file_path), "-vn", "-c:a", "copy", str(master_audio_path)]
-        ]
-
-        for cmd in strategies:
-            try:
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
-                if master_audio_path.exists() and master_audio_path.stat().st_size > 100:
-                    extracted = True
-                    break
-            except Exception as ex:
-                print(f"Extraction strategy failed: {ex}")
-
-        # Immediately delete original heavy upload file (e.g. MP4/MKV/WAV) to keep disk free
-        try:
-            if file_path and Path(file_path).exists():
-                Path(file_path).unlink(missing_ok=True)
-        except Exception:
-            pass
-
-        if not extracted or not master_audio_path.exists() or master_audio_path.stat().st_size == 0:
-            JOBS[job_id]["status"] = "error"
-            JOBS[job_id]["message"] = "Không thể bóc tách luồng âm thanh từ tệp tải lên."
-            return
-
-        # 2. Probe master audio duration with exact precision and safe decoding
-        duration = 0.0
-        try:
-            res = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(master_audio_path)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                timeout=30
-            )
-            out_str = res.stdout.decode("utf-8", errors="ignore").strip()
-            duration = float(out_str)
-        except Exception:
-            duration = 60.0
-
+        # 1. Probe true duration directly from uploaded file_path (fast & accurate for any length: 1h - 10h)
+        duration = probe_media_duration(file_path)
         total_chunks = max(1, math.ceil(duration / 60.0))
         total_time_str = format_hms(duration)
-        JOBS[job_id]["progress"] = 10
-        JOBS[job_id]["message"] = f"Thời lượng video: [{total_time_str}] ({total_chunks} phút). Đang bắt đầu nhận diện tuần tự..."
 
-        # 3. Check for existing checkpoint (Resume support)
+        # 40-minute part packaging: 40 chunks = 2400s
+        CHUNKS_PER_PART = 40
+        total_parts = max(1, math.ceil(total_chunks / CHUNKS_PER_PART))
+
+        JOBS[job_id]["progress"] = 8
+        JOBS[job_id]["message"] = f"Thời lượng video: [{total_time_str}] ({total_chunks} phút, chia thành {total_parts} Phần 40 phút). Bắt đầu nhận diện..."
+
+        # 2. Check for existing checkpoint (Resume support)
         chk = load_checkpoint(job_id)
         if not chk or chk.get("total_segments") != total_chunks:
             chk = {
@@ -1184,13 +1174,14 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
                 "language": language,
                 "total_duration": duration,
                 "total_segments": total_chunks,
+                "total_parts": total_parts,
                 "total_time": total_time_str,
                 "status": "processing",
                 "segments": {}
             }
             save_atomic_checkpoint(job_id, chk)
 
-        # 4. Dynamic on-the-fly streaming slice & transcription with exact timeline marker
+        # 3. Dynamic on-the-fly streaming slice directly from file_path (zero upfront transcoding, zero timeout)
         completed_count = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
 
         for idx in range(total_chunks):
@@ -1199,23 +1190,25 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             et_val = min((idx + 1) * 60.0, duration)
             current_st_str = format_hms(st_val)
             current_et_str = format_hms(et_val)
-            marker_label = f"[{current_et_str} / {total_time_str}]"
+            part_num = (idx // CHUNKS_PER_PART) + 1
+            marker_label = f"[Phần {part_num}/{total_parts}: {current_et_str} / {total_time_str}]"
 
             # Check if this 1-minute segment is already completed in checkpoint
             if idx_str in chk.get("segments", {}) and chk["segments"][idx_str].get("status") == "completed":
                 continue
 
-            prog = int(10 + (completed_count / total_chunks) * 85)
+            prog = int(8 + (completed_count / total_chunks) * 87)
             JOBS[job_id]["progress"] = prog
-            JOBS[job_id]["message"] = f"⏳ Đang xử lý: [{current_st_str} / {total_time_str}] ➔ Phút {idx+1}/{total_chunks} ({prog}%)..."
+            JOBS[job_id]["message"] = f"⏳ [Phần {part_num}/{total_parts}] Đang xử lý: [{current_st_str} / {total_time_str}] ➔ Phút {idx+1}/{total_chunks} ({prog}%)..."
 
-            # Dynamically slice only this 60s audio segment on-the-fly (takes 0.02s)
+            # Dynamically slice only this 60s audio segment directly from source file (takes 0.05s via fast-seek)
             chunk_slice_p = temp_dir / f"slice_{idx}.wav"
             subprocess.run([
                 "ffmpeg", "-y",
                 "-ss", str(st_val),
                 "-t", str(et_val - st_val),
-                "-i", str(master_audio_path),
+                "-i", str(file_path),
+                "-vn",
                 "-c:a", "pcm_s16le",
                 "-ar", "16000",
                 "-ac", "1",
@@ -1239,6 +1232,7 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             # Mark complete and save to Checkpoint atomically with exact timeline marker
             chk["segments"][idx_str] = {
                 "index": idx,
+                "part_index": part_num,
                 "start_time": st_val,
                 "end_time": et_val,
                 "timeline": f"{current_st_str} - {current_et_str}",
@@ -1250,20 +1244,55 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             save_atomic_checkpoint(job_id, chk)
 
             completed_count += 1
-            prog = int(10 + (completed_count / total_chunks) * 85)
+            prog = int(8 + (completed_count / total_chunks) * 87)
             JOBS[job_id]["progress"] = prog
 
             has_text = "✅" if transcript else "⏭️"
             JOBS[job_id]["message"] = f"{has_text} ĐÁNH DẤU: {marker_label} ➔ Phút {idx+1}/{total_chunks} ({prog}%)..."
 
-            # Anti-rate-limit cooldown: pause 1.5s between API calls to prevent Google from blocking
+            # Anti-rate-limit cooldown
             if idx < total_chunks - 1:
-                time.sleep(1.5)
+                time.sleep(1.2)
 
-        # 5. Build final complete TXT and SRT subtitles from checkpoint data
+        # 4. Build both: A) Full unified TXT/SRT & B) 40-minute Timeline Parts
         valid_texts = []
         srt_blocks = []
         srt_idx = 1
+        
+        parts_data = []
+        for p_idx in range(total_parts):
+            p_start_chunk = p_idx * CHUNKS_PER_PART
+            p_end_chunk = min((p_idx + 1) * CHUNKS_PER_PART, total_chunks)
+            p_st_sec = p_start_chunk * 60.0
+            p_et_sec = min(p_end_chunk * 60.0, duration)
+            p_timeline = f"{format_timestamp_srt(p_st_sec)} - {format_timestamp_srt(p_et_sec)}"
+            
+            p_texts = []
+            p_srt_blocks = []
+            p_srt_idx = 1
+            
+            for i in range(p_start_chunk, p_end_chunk):
+                seg_data = chk.get("segments", {}).get(str(i), {})
+                txt = (seg_data.get("transcript") or "").strip()
+                if txt:
+                    p_texts.append(txt)
+                    st = seg_data.get("start_time", i * 60.0)
+                    et = seg_data.get("end_time", min((i + 1) * 60.0, duration))
+                    p_srt_blocks.append(f"{p_srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n")
+                    p_srt_idx += 1
+            
+            p_full_txt = "\n\n".join(p_texts)
+            p_words = [w for w in p_full_txt.split() if w]
+            parts_data.append({
+                "part_index": p_idx + 1,
+                "timeline": p_timeline,
+                "start_sec": p_st_sec,
+                "end_sec": p_et_sec,
+                "text": p_full_txt,
+                "srt": "\n".join(p_srt_blocks),
+                "word_count": len(p_words),
+                "char_count": len(p_full_txt)
+            })
 
         for i in range(total_chunks):
             seg_data = chk.get("segments", {}).get(str(i), {})
@@ -1279,19 +1308,21 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
         full_text = "\n\n".join(valid_texts) if valid_texts else "Không nhận diện được giọng nói trong tệp này."
         srt_content = "\n".join(srt_blocks) if srt_blocks else ""
 
-        # 6. Final cleanup
+        # 5. Final cleanup: safely remove temp slices and uploaded file
         try:
             for p in temp_dir.glob("*"):
                 p.unlink(missing_ok=True)
             temp_dir.rmdir()
             delete_checkpoint(job_id)
+            if file_path and Path(file_path).exists():
+                Path(file_path).unlink(missing_ok=True)
         except Exception:
             pass
 
         words = [w for w in full_text.split() if w]
         JOBS[job_id]["progress"] = 100
         JOBS[job_id]["status"] = "completed"
-        JOBS[job_id]["message"] = f"Hoàn tất 100%! Đã nhận diện toàn bộ [{total_time_str} / {total_time_str}] ({total_chunks} phút) thành công."
+        JOBS[job_id]["message"] = f"Hoàn tất 100%! Đã nhận diện toàn bộ [{total_time_str}] ({total_chunks} phút, {total_parts} phần 40 phút) thành công."
         JOBS[job_id]["result"] = {
             "text": full_text,
             "srt": srt_content,
@@ -1300,6 +1331,8 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             "word_count": len(words),
             "char_count": len(full_text),
             "total_chunks": total_chunks,
+            "total_parts": total_parts,
+            "parts": parts_data
         }
     except Exception as e:
         JOBS[job_id]["status"] = "error"
@@ -1747,10 +1780,45 @@ def api_transcribe_status(job_id):
             if status == "completed":
                 total_duration = chk.get("total_duration", 0.0)
                 total_time_str = chk.get("total_time", format_hms(total_duration))
+                total = chk.get("total_segments", 1)
+                CHUNKS_PER_PART = 40
+                total_parts = max(1, math.ceil(total / CHUNKS_PER_PART))
+                
+                parts_data = []
+                for p_idx in range(total_parts):
+                    p_start_chunk = p_idx * CHUNKS_PER_PART
+                    p_end_chunk = min((p_idx + 1) * CHUNKS_PER_PART, total)
+                    p_st_sec = p_start_chunk * 60.0
+                    p_et_sec = min(p_end_chunk * 60.0, total_duration)
+                    p_timeline = f"{format_timestamp_srt(p_st_sec)} - {format_timestamp_srt(p_et_sec)}"
+                    p_texts = []
+                    p_srt_blocks = []
+                    p_srt_idx = 1
+                    for i in range(p_start_chunk, p_end_chunk):
+                        seg_data = chk.get("segments", {}).get(str(i), {})
+                        txt = (seg_data.get("transcript") or "").strip()
+                        if txt:
+                            p_texts.append(txt)
+                            st = seg_data.get("start_time", i * 60.0)
+                            et = seg_data.get("end_time", min((i + 1) * 60.0, total_duration))
+                            p_srt_blocks.append(f"{p_srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n")
+                            p_srt_idx += 1
+                    p_full_txt = "\n\n".join(p_texts)
+                    p_words = [w for w in p_full_txt.split() if w]
+                    parts_data.append({
+                        "part_index": p_idx + 1,
+                        "timeline": p_timeline,
+                        "start_sec": p_st_sec,
+                        "end_sec": p_et_sec,
+                        "text": p_full_txt,
+                        "srt": "\n".join(p_srt_blocks),
+                        "word_count": len(p_words),
+                        "char_count": len(p_full_txt)
+                    })
+
                 valid_texts = []
                 srt_blocks = []
                 srt_idx = 1
-                total = chk.get("total_segments", 1)
                 for i in range(total):
                     seg_data = chk.get("segments", {}).get(str(i), {})
                     txt = (seg_data.get("transcript") or "").strip()
@@ -1766,14 +1834,17 @@ def api_transcribe_status(job_id):
                 return jsonify({
                     "status": "completed",
                     "progress": 100,
-                    "message": "Hoàn tất 100%! Đã nhận diện âm thanh thành công.",
+                    "message": f"Hoàn tất 100%! Đã nhận diện âm thanh [{total_time_str}] ({total_parts} phần 40 phút) thành công.",
                     "result": {
                         "text": full_text,
                         "srt": "\n".join(srt_blocks),
                         "duration": round(total_duration, 1),
                         "total_time": total_time_str,
                         "word_count": len(words),
-                        "char_count": len(full_text)
+                        "char_count": len(full_text),
+                        "total_chunks": total,
+                        "total_parts": total_parts,
+                        "parts": parts_data
                     }
                 })
             else:
