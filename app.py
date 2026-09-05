@@ -1668,10 +1668,20 @@ def api_upload_chunk():
 
             JOBS[upload_id] = {
                 "status": "queued",
-                "progress": 0,
+                "progress": 5,
                 "message": "Đã ghép nối các mảnh tệp hoàn tất! Đang xếp hàng xử lý âm thanh AI...",
                 "result": None
             }
+
+            chk = {
+                "job_id": upload_id,
+                "status": "queued",
+                "progress": 5,
+                "message": "Đã tiếp nhận tệp hoàn tất. Đang xếp hàng nhận diện âm thanh...",
+                "total_segments": 1,
+                "segments": {}
+            }
+            save_atomic_checkpoint(upload_id, chk)
 
             t = threading.Thread(target=run_stt_with_adaptive_queue, args=(upload_id, assembled_path, language))
             t.daemon = True
@@ -1703,10 +1713,20 @@ def api_transcribe_job():
 
     JOBS[job_id] = {
         "status": "queued",
-        "progress": 0,
+        "progress": 5,
         "message": "Đang xếp hàng xử lý tệp âm thanh...",
         "result": None
     }
+
+    chk = {
+        "job_id": job_id,
+        "status": "queued",
+        "progress": 5,
+        "message": "Đã tiếp nhận tệp. Đang xếp hàng xử lý âm thanh AI...",
+        "total_segments": 1,
+        "segments": {}
+    }
+    save_atomic_checkpoint(job_id, chk)
 
     t = threading.Thread(target=run_stt_with_adaptive_queue, args=(job_id, saved_path, language))
     t.daemon = True
@@ -1718,19 +1738,74 @@ def api_transcribe_job():
 def api_transcribe_status(job_id):
     job = JOBS.get(job_id)
     if not job:
-        # Fallback to persistent checkpoint if in-memory state was reset
+        # Fallback 1: Persistent checkpoint on disk (survives memory reset or multi-worker routing)
         chk = load_checkpoint(job_id)
         if chk:
-            total = chk.get("total_segments", 1)
-            completed = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
-            prog = int(10 + (completed / total) * 85)
+            status = chk.get("status", "processing")
+            if status == "completed":
+                total_duration = chk.get("total_duration", 0.0)
+                total_time_str = chk.get("total_time", format_hms(total_duration))
+                valid_texts = []
+                srt_blocks = []
+                srt_idx = 1
+                total = chk.get("total_segments", 1)
+                for i in range(total):
+                    seg_data = chk.get("segments", {}).get(str(i), {})
+                    txt = (seg_data.get("transcript") or "").strip()
+                    if txt:
+                        valid_texts.append(txt)
+                        st = seg_data.get("start_time", i * 60.0)
+                        et = seg_data.get("end_time", min((i + 1) * 60.0, total_duration))
+                        srt_block = f"{srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n"
+                        srt_blocks.append(srt_block)
+                        srt_idx += 1
+                full_text = "\n\n".join(valid_texts) if valid_texts else ""
+                words = [w for w in full_text.split() if w]
+                return jsonify({
+                    "status": "completed",
+                    "progress": 100,
+                    "message": "Hoàn tất 100%! Đã nhận diện âm thanh thành công.",
+                    "result": {
+                        "text": full_text,
+                        "srt": "\n".join(srt_blocks),
+                        "duration": round(total_duration, 1),
+                        "total_time": total_time_str,
+                        "word_count": len(words),
+                        "char_count": len(full_text)
+                    }
+                })
+            else:
+                total = chk.get("total_segments", 1)
+                completed = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
+                prog = int(10 + (completed / total) * 85)
+                return jsonify({
+                    "status": "processing",
+                    "progress": prog,
+                    "message": chk.get("message") or f"Đang nhận diện giọng nói AI (tự động phục hồi): {completed}/{total} đoạn ({prog}%)...",
+                    "result": None
+                })
+
+        # Fallback 2: Check if assembled file or upload chunks exist in UPLOAD_DIR
+        assembled_files = list(UPLOAD_DIR.glob(f"upload_{job_id}*"))
+        if assembled_files:
             return jsonify({
-                "status": "processing",
-                "progress": prog,
-                "message": f"Đang nhận diện giọng nói AI (tự động phục hồi): {completed}/{total} đoạn ({prog}%)...",
+                "status": "queued",
+                "progress": 5,
+                "message": "Đã ghép nối tệp và đang xếp hàng nhận diện âm thanh AI...",
                 "result": None
             })
+
+        part_files = list(UPLOAD_DIR.glob(f"{job_id}_part_*.tmp"))
+        if part_files:
+            return jsonify({
+                "status": "queued",
+                "progress": 3,
+                "message": f"Đang hoàn tất tải các mảnh tệp lên máy chủ ({len(part_files)} mảnh)...",
+                "result": None
+            })
+
         return jsonify({"status": "error", "message": "Không tìm thấy tiến trình chuyển đổi."}), 404
+
     return jsonify(job)
 
 # ── 3-Pass Neural Contextual Translation Engine (Ultralight, Zero-Overload) ──

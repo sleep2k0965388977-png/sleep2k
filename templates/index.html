@@ -1642,19 +1642,21 @@
                     throw new Error("Không nhận được mã tiến trình từ máy chủ.");
                 }
 
-                // Poll transcription status with high-resilience retry tolerance
+                // Poll transcription status with high-resilience retry tolerance (90s grace period)
                 let consecutiveErrors = 0;
                 const pollInterval = setInterval(async () => {
                     try {
                         const sr = await fetch(`/api/transcribe_status/${jobId}`);
                         if (!sr.ok) {
                             consecutiveErrors++;
-                            if (consecutiveErrors > 15) {
+                            if (consecutiveErrors > 60) {
                                 clearInterval(pollInterval);
                                 alert("Mất kết nối với máy chủ. Vui lòng kiểm tra lại đường truyền mạng!");
                                 progressCard.classList.remove("show");
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                            } else {
+                                statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--accent-amber);"></i> Đang duy trì kết nối máy chủ AI (thử lại ${consecutiveErrors}/60)...`;
                             }
                             return;
                         }
