@@ -1706,20 +1706,7 @@
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> ' + sd.message;
 
                             setTimeout(() => {
-                                progressCard.classList.remove("show");
-                                currentSttResult = sd.result;
-                                currentSelectedPart = "all";
-                                sttTxtResult = currentSttResult.text || "";
-                                sttSrtResult = currentSttResult.srt || "";
-
-                                setupSttParts(currentSttResult);
-                                updateSttStatsDisplay();
-                                switchOutputFormat('txt');
-
-                                resultCard.style.display = "block";
-                                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                                btn.disabled = false;
-                                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                                renderSttSuccessResult(sd.result);
                             }, 500);
                         } else if (sd.status === "error") {
                             clearInterval(pollInterval);
@@ -1743,6 +1730,33 @@
                 console.error("Upload error:", err);
                 alert("Lỗi tải tệp: " + (err.message || "Mạng gián đoạn. Vui lòng thử lại!"));
                 progressCard.classList.remove("show");
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+            }
+        }
+
+        // ── Render STT Success Result (Unified Handler for Standard & Multi-Part Large Videos) ──
+        function renderSttSuccessResult(res) {
+            if (!res) return;
+            const progressCard = document.getElementById("sttProgressCard");
+            const resultCard = document.getElementById("sttResultCard");
+            const btn = document.getElementById("btnTranscribe");
+
+            if (progressCard) progressCard.classList.remove("show");
+            currentSttResult = res;
+            currentSelectedPart = "all";
+            sttTxtResult = currentSttResult.text || "";
+            sttSrtResult = currentSttResult.srt || "";
+
+            setupSttParts(currentSttResult);
+            updateSttStatsDisplay();
+            switchOutputFormat('txt');
+
+            if (resultCard) {
+                resultCard.style.display = "block";
+                resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
             }
