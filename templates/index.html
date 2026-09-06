@@ -1567,33 +1567,54 @@
                         // Wait for Part P to finish transcription on server before moving to next part
                         statusEl.innerHTML = `<i class="fa-solid fa-gears fa-spin" style="color:var(--accent-purple);"></i> Đang bóc tách và nhận diện âm thanh Phần ${p+1}/${totalParts}...`;
                         let partDone = false;
-                        for (let poll = 0; poll < 120; poll++) {
+                        for (let poll = 0; poll < 600; poll++) {
                             await new Promise(res => setTimeout(res, 2000));
-                            const sResp = await fetch(`/api/multipart/session_status/${sessionId}`);
-                            if (sResp.ok) {
-                                const sData = await sResp.json();
-                                if ((sData.completed_parts || []).includes(pStr) || sData.status === "completed") {
-                                    partDone = true;
-                                    break;
+                            try {
+                                const sResp = await fetch(`/api/multipart/session_status/${sessionId}`);
+                                if (sResp.ok) {
+                                    const sData = await sResp.json();
+                                    if (sData.status === "error") {
+                                        throw new Error(sData.message || "Lỗi xử lý phần video.");
+                                    }
+                                    if ((sData.completed_parts || []).includes(pStr) || sData.status === "completed") {
+                                        partDone = true;
+                                        break;
+                                    }
+                                    if (sData.message) {
+                                        statusEl.innerHTML = `<i class="fa-solid fa-gears fa-spin" style="color:var(--accent-purple);"></i> Phần ${p+1}/${totalParts}: ${sData.message}`;
+                                    }
                                 }
+                            } catch (pe) {
+                                if (pe.message && pe.message.includes("Lỗi")) throw pe;
                             }
                         }
+                        if (!partDone) throw new Error(`Quá thời gian chờ nhận diện Phần ${p+1}. Vui lòng thử lại!`);
                     }
 
                     // Poll final session result
-                    for (let poll = 0; poll < 60; poll++) {
-                        const sResp = await fetch(`/api/multipart/session_status/${sessionId}`);
-                        if (sResp.ok) {
-                            const sData = await sResp.json();
-                            if (sData.status === "completed" && sData.result) {
-                                sessionDone = true;
-                                renderSttSuccessResult(sData.result);
-                                return;
-                            } else if (sData.status === "error") {
-                                throw new Error(sData.message || "Lỗi tổng hợp video lớn.");
+                    let sessionDone = false;
+                    for (let poll = 0; poll < 300; poll++) {
+                        await new Promise(res => setTimeout(res, 2000));
+                        try {
+                            const sResp = await fetch(`/api/multipart/session_status/${sessionId}`);
+                            if (sResp.ok) {
+                                const sData = await sResp.json();
+                                if (sData.status === "completed" && sData.result) {
+                                    sessionDone = true;
+                                    renderSttSuccessResult(sData.result);
+                                    return;
+                                } else if (sData.status === "error") {
+                                    throw new Error(sData.message || "Lỗi tổng hợp video lớn.");
+                                }
+                                if (sData.message) {
+                                    statusEl.innerHTML = `<i class="fa-solid fa-boxes-packing fa-spin" style="color:var(--accent-blue);"></i> ${sData.message}`;
+                                }
                             }
+                        } catch (pe) {
+                            if (pe.message && pe.message.includes("Lỗi")) throw pe;
                         }
                     }
+                    if (!sessionDone) throw new Error("Quá thời gian tổng hợp kết quả cuối cùng. Vui lòng tải lại trang!");
                     return;
                 } else if (selectedSttFile.size <= 5 * 1024 * 1024) {
                     // Small file (≤ 5MB): Direct one-shot upload
