@@ -1515,17 +1515,39 @@ def process_multipart_part_job(job_key, session_id, part_index, part_file_path, 
             srt_idx = 1
             cumulative_offset = 0.0
 
+            parts_data = []
             for p_idx in range(total_parts):
                 p_data = session["parts"].get(str(p_idx), {})
                 p_dur = p_data.get("duration", 0.0)
+                p_st_sec = cumulative_offset
+                p_et_sec = cumulative_offset + p_dur
+                p_texts = []
+                p_srts = []
+                p_s_idx = 1
                 for seg in p_data.get("segments", []):
-                    all_texts.append(seg["text"])
-                    st = seg["start_time"] + cumulative_offset
-                    et = seg["end_time"] + cumulative_offset
-                    srt_block = f"{srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{seg['text']}\n"
-                    srt_blocks.append(srt_block)
-                    srt_idx += 1
+                    seg_text = (seg.get("text") or "").strip()
+                    if seg_text:
+                        all_texts.append(seg_text)
+                        p_texts.append(seg_text)
+                        st = seg["start_time"] + cumulative_offset
+                        et = seg["end_time"] + cumulative_offset
+                        srt_block = f"{srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{seg_text}\n"
+                        srt_blocks.append(srt_block)
+                        srt_idx += 1
+                        p_srts.append(f"{p_s_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{seg_text}\n")
+                        p_s_idx += 1
                 cumulative_offset += p_dur
+                p_full_txt = "\n\n".join(p_texts)
+                parts_data.append({
+                    "part_index": p_idx + 1,
+                    "timeline": f"{format_timestamp_srt(p_st_sec)} - {format_timestamp_srt(p_et_sec)}",
+                    "start_sec": p_st_sec,
+                    "end_sec": p_et_sec,
+                    "text": p_full_txt,
+                    "srt": "\n".join(p_srts),
+                    "word_count": len(p_full_txt.split()),
+                    "char_count": len(p_full_txt)
+                })
 
             final_text = "\n\n".join(all_texts) if all_texts else "Không nhận diện được giọng nói trong video."
             final_srt = "\n".join(srt_blocks) if srt_blocks else ""
@@ -1534,10 +1556,13 @@ def process_multipart_part_job(job_key, session_id, part_index, part_file_path, 
             session["final_result"] = {
                 "text": final_text,
                 "srt": final_srt,
+                "duration": round(cumulative_offset, 1),
                 "total_duration": round(cumulative_offset, 1),
+                "total_time": format_hms(cumulative_offset),
                 "total_parts": total_parts,
                 "word_count": len(final_text.split()),
-                "char_count": len(final_text)
+                "char_count": len(final_text),
+                "parts": parts_data
             }
             save_atomic_checkpoint(f"session_{session_id}", session)
 
