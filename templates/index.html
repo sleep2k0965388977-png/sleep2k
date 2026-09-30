@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -585,6 +585,31 @@
                 </div>
             </div>
 
+            <!-- File Upload for Chapter Detection -->
+            <div style="margin-bottom:12px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    
+                    <button type="button" id="btnUploadFile" onclick="document.getElementById('chapterFileInput').click();" style="background:linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3)); border:1px solid rgba(59,130,246,0.5); color:#93c5fd; padding:7px 16px; border-radius:10px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;">
+                        <i class="fa-solid fa-file-arrow-up"></i> T&#7843;i File Truy&#7879;n (.TXT)
+                    </button>
+                    <span id="uploadedFileName" style="display:none; font-size:12px; color:#34d399; font-weight:600;"><i class="fa-solid fa-circle-check"></i> <span id="uploadedFileNameText"></span></span>
+                    <input type="file" id="chapterFileInput" accept=".txt" style="display:none;" onchange="handleChapterFileUpload(this.files[0]);">
+                </div>
+
+                <!-- Chapter List Panel (shown after file upload) -->
+                
+                <div id="chapterListPanel"<div id="chapterListPanel" style="display:none; margin-bottom:12px; padding:14px; background:rgba(30,41,59,0.7); border:1px solid var(--card-border); border-radius:12px; max-height:300px; overflow-y:auto;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <span style="font-weight:700; color:#fff; font-size:13px;"><i class="fa-solid fa-list-ol" style="color:var(--accent-purple);"></i> Danh s&#225;ch ch&#432;&#417;ng (<span id="chapterTotalCount">0</span>)</span>
+                        <div style="display:flex; gap:6px;">
+                            <button onclick="startAutoGenerateAll()" id="btnAutoAll" style="background:linear-gradient(135deg,var(--accent-purple),var(--accent-pink)); border:none; color:#fff; padding:5px 14px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:700;"><i class="fa-solid fa-play"></i> T&#7841;o t&#7845;t c&#7843;</button>
+                            <button onclick="clearChapterList()" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; padding:5px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <div id="chapterItems" style="display:flex; flex-direction:column; gap:6px;"></div>
+                </div>
+            </div>
+
             <div class="textarea-container">
                 <textarea id="textInput" oninput="updateTextStats()" placeholder="Dán văn bản, chương truyện hoặc bất kỳ nội dung dài bao nhiêu trang tùy thích vào đây..."></textarea>
             </div>
@@ -677,6 +702,12 @@
 
                 </div>
         <!-- End Section TTS -->
+
+        
+        
+
+        <!-- STT Mode Section (Speech to Text) -->
+        
 
         <!-- STT Mode Section (Speech to Text) -->
         <div id="sectionSTT" style="display: none;">
@@ -2033,6 +2064,179 @@
             }
         }
 
+    
+        // === CHAPTER FILE UPLOAD & AUTO TTS ===
+        let chapterFileId = null;
+        let chapterList = [];
+        let chapterDoneStatus = {};
+        let autoGenerating = false;
+        let currentAutoIndex = -1;
+
+        function handleChapterFileUpload(file) {
+            if (!file) return;
+            if (!file.name.toLowerCase().endsWith('.txt')) {
+                alert('Vui l\u00f2ng ch\u1ECDn file .TXT');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            document.getElementById('btnUploadFile').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> \u0110ang ph\u00e2n t\u00edch...';
+            fetch('/api/upload_text_file', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('btnUploadFile').innerHTML = '<i class="fa-solid fa-file-arrow-up"></i> T\u1EA3i File Truy\u1EC7n (.TXT)';
+                if (data.status === 'success') {
+                    chapterFileId = data.file_id;
+                    chapterList = data.chapters;
+                    chapterDoneStatus = {};
+                    document.getElementById('uploadedFileName').style.display = 'inline';
+                    document.getElementById('uploadedFileNameText').textContent = data.filename + ' (' + data.total_chapters + ' ch\u01B0\u01A1ng)';
+                    document.getElementById('chapterTotalCount').textContent = data.total_chapters;
+                    renderChapterItems();
+                    document.getElementById('chapterListPanel').style.display = 'block';
+                } else {
+                    alert(data.message || 'L\u1ED7i ph\u00E2n t\u00EDch file');
+                }
+            })
+            .catch(err => {
+                document.getElementById('btnUploadFile').innerHTML = '<i class="fa-solid fa-file-arrow-up"></i> T\u1EA3i File Truy\u1EC7n (.TXT)';
+                alert('L\u1ED7i: ' + err.message);
+            });
+        }
+
+        function renderChapterItems() {
+            const container = document.getElementById('chapterItems');
+            container.innerHTML = chapterList.map(function(ch, i) {
+                const isDone = chapterDoneStatus[ch.index] === true;
+                const isActive = currentAutoIndex === i;
+                const statusIcon = isDone ? '<i class="fa-solid fa-circle-check" style="color:#34d399;font-size:16px;"></i>'
+                    : isActive ? '<i class="fa-solid fa-spinner fa-spin" style="color:var(--accent-purple);font-size:16px;"></i>'
+                    : '<i class="fa-regular fa-circle" style="color:var(--text-muted);font-size:16px;"></i>';
+                const bgColor = isDone ? 'rgba(16,185,129,0.08)' : isActive ? 'rgba(139,92,246,0.12)' : 'rgba(30,41,59,0.5)';
+                const bdColor = isDone ? 'rgba(16,185,129,0.3)' : isActive ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)';
+                return '<div onclick="selectChapter(' + i + ')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:' + bgColor + ';border:1px solid ' + bdColor + ';border-radius:10px;cursor:pointer;transition:all 0.2s;">'
+                    + statusIcon
+                    + '<div style="flex:1;min-width:0;"><div style="font-weight:600;color:#fff;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + ch.title + '</div></div>'
+                    + '<span style="font-size:10px;color:var(--text-muted);white-space:nowrap;">' + ch.char_count.toLocaleString() + '</span>'
+                    + '</div>';
+            }).join('');
+        }
+
+        function selectChapter(index) {
+            if (index < 0 || index >= chapterList.length) return;
+            const ch = chapterList[index];
+            const textarea = document.getElementById('textInput');
+            textarea.value = ch.content;
+            if (typeof updateTextStats === 'function') updateTextStats();
+            currentAutoIndex = index;
+            renderChapterItems();
+            textarea.scrollTop = 0;
+        }
+
+        function clearChapterList() {
+            chapterFileId = null;
+            chapterList = [];
+            chapterDoneStatus = {};
+            autoGenerating = false;
+            currentAutoIndex = -1;
+            document.getElementById('chapterListPanel').style.display = 'none';
+            document.getElementById('uploadedFileName').style.display = 'none';
+            document.getElementById('chapterFileInput').value = '';
+        }
+
+        function startAutoGenerateAll() {
+            if (chapterList.length === 0) return;
+            if (autoGenerating) {
+                autoGenerating = false;
+                document.getElementById('btnAutoAll').innerHTML = '<i class="fa-solid fa-play"></i> Tiếp tục tạo';
+                renderChapterItems();
+                return;
+            }
+            autoGenerating = true;
+            var startIdx = 0;
+            for (var i = 0; i < chapterList.length; i++) {
+                if (!chapterDoneStatus[chapterList[i].index]) { startIdx = i; break; }
+            }
+            if (startIdx >= chapterList.length) {
+                alert('Tất cả các chương đã hoàn thành!');
+                autoGenerating = false;
+                document.getElementById('btnAutoAll').innerHTML = '<i class="fa-solid fa-play"></i> Tạo tất cả';
+                return;
+            }
+            autoGenerateChapter(startIdx);
+        }
+
+        function autoGenerateChapter(index) {
+            if (!autoGenerating || index >= chapterList.length) {
+                autoGenerating = false;
+                document.getElementById('btnAutoAll').innerHTML = '<i class="fa-solid fa-play"></i> T\u1EA1o t\u1EA5t c\u1EA3';
+                renderChapterItems();
+                return;
+            }
+            var ch = chapterList[index];
+            if (chapterDoneStatus[ch.index]) { autoGenerateChapter(index + 1); return; }
+
+            document.getElementById('btnAutoAll').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (index+1) + '/' + chapterList.length;
+            selectChapter(index);
+
+            setTimeout(function() {
+                startGeneration();
+                waitForChapterDone(index);
+            }, 800);
+        }
+
+        function waitForChapterDone(chapterIdx) {
+            var checkTimer = setInterval(function() {
+                var playerCard = document.getElementById('playerCard');
+                if (playerCard && window.getComputedStyle(playerCard).display !== 'none') {
+                    clearInterval(checkTimer);
+                    chapterDoneStatus[chapterList[chapterIdx].index] = true;
+                    renderChapterItems();
+
+                    // Auto download MP3 file, wait for download to complete before next chapter
+                    var dlBtn = document.getElementById('downloadBtn');
+                    if (dlBtn && dlBtn.href && dlBtn.href !== '#') {
+                        var chTitle = chapterList[chapterIdx].title.replace(/[^a-zA-Z0-9\u00C0-\u024F\u1E00-\u1EFF ]/g, '').trim();
+                        
+                        // Fetch the file first to ensure it's fully loaded
+                        fetch(dlBtn.href)
+                        .then(function(resp) { return resp.blob(); })
+                        .then(function(blob) {
+                            var url = URL.createObjectURL(blob);
+                            var a = document.createElement('a');
+                            a.href = url;
+                            a.download = chTitle + '.mp3';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            console.log('Downloaded: ' + chTitle + '.mp3 (' + (blob.size/1024).toFixed(0) + 'KB)');
+                            
+                            // Wait 3 seconds after download completes, then next chapter
+                            if (autoGenerating) {
+                                setTimeout(function() { autoGenerateChapter(chapterIdx + 1); }, 3000);
+                            }
+                        })
+                        .catch(function() {
+                            // Fallback: direct download
+                            var a = document.createElement('a');
+                            a.href = dlBtn.href;
+                            a.download = chTitle + '.mp3';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            if (autoGenerating) {
+                                setTimeout(function() { autoGenerateChapter(chapterIdx + 1); }, 3000);
+                            }
+                        });
+                    } else if (autoGenerating) {
+                        setTimeout(function() { autoGenerateChapter(chapterIdx + 1); }, 3000);
+                    }
+                }
+            }, 2000);
+        }
+    
+        
     </script>
 </body>
 </html>

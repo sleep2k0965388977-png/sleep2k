@@ -1,4 +1,4 @@
-import os
+﻿import os
 import re
 import math
 import json
@@ -2131,6 +2131,502 @@ def api_translate_content():
         print(f"Translate API error: {e}")
         return jsonify({"status": "error", "message": f"Lỗi dịch thuật: {str(e)}"}), 500
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BATCH FILE UPLOAD - Auto Chapter Detection & Batch TTS Generation
+# ══════════════════════════════════════════════════════════════════════════════
+
+BATCH_JOBS = {}
+
+def detect_chapters(text):
+    """Auto-detect chapters/episodes in text file content."""
+    import re
+    
+    # Common chapter patterns (Vietnamese & English)
+    chapter_patterns = [
+        r'(?i)^[\s]*(?:chương|chuong|chương)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+        r'(?i)^[\s]*(?:tập|tap|tập)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+        r'(?i)^[\s]*(?:phần|phan|phần)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+        r'(?i)^[\s]*(?:hồi|hoi|hồi)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+        r'(?i)^[\s]*(?:chapter|chap)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+        r'(?i)^[\s]*(?:episode|ep)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+        r'(?i)^[\s]*(?:part)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+        r'(?i)^[\s]*(?:quyển|quyen|quyển)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+        r'(?i)^[\s]*(?:mục|muc|mục)\s*[:\-\s]*(\d+)[:\-\s]*(.*)',
+    ]
+    
+    lines = text.split('\n')
+    chapters = []
+    current_chapter = None
+    current_content = []
+    
+    for line in lines:
+        matched = False
+        for pattern in chapter_patterns:
+            m = re.match(pattern, line.strip())
+            if m:
+                # Save previous chapter
+                if current_chapter is not None:
+                    content = '\n'.join(current_content).strip()
+                    if content:
+                        current_chapter['content'] = content
+                        current_chapter['char_count'] = len(content)
+                        chapters.append(current_chapter)
+                
+                num = m.group(1)
+                title = m.group(2).strip() if m.group(2).strip() else ''
+                full_title = line.strip()
+                
+                current_chapter = {
+                    'index': len(chapters),
+                    'number': num,
+                    'title': full_title,
+                    'short_title': title,
+                    'content': '',
+                    'char_count': 0
+                }
+                current_content = [line.strip()]
+                matched = True
+                break
+        
+        if not matched:
+            current_content.append(line)
+    
+    # Save last chapter
+    if current_chapter is not None:
+        content = '\n'.join(current_content).strip()
+        if content:
+            current_chapter['content'] = content
+            current_chapter['char_count'] = len(content)
+            chapters.append(current_chapter)
+    
+    # If no chapters detected, treat entire text as one chapter
+    if not chapters:
+        text_stripped = text.strip()
+        if text_stripped:
+            chapters.append({
+                'index': 0,
+                'number': '1',
+                'title': 'Toàn bộ nội dung',
+                'short_title': 'Toàn bộ nội dung',
+                'content': text_stripped,
+                'char_count': len(text_stripped)
+            })
+    
+    return chapters
+
+
+@app.route("/api/upload_text_file", methods=["POST"])
+def upload_text_file():
+    """Upload a text file and auto-detect chapters."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({"status": "error", "message": "Không tìm thấy file."}), 400
+        
+        file = request.files['file']
+        if not file.filename:
+            return jsonify({"status": "error", "message": "File không hợp lệ."}), 400
+        
+        # Read file content with encoding detection
+        raw_bytes = file.read()
+        text = None
+        for enc in ['utf-8', 'utf-8-sig', 'utf-16', 'cp1252', 'latin-1']:
+            try:
+                text = raw_bytes.decode(enc)
+                break
+            except (UnicodeDecodeError, Exception):
+                continue
+        
+        if text is None:
+            return jsonify({"status": "error", "message": "Không thể đọc file. Hãy đảm bảo file là UTF-8."}), 400
+        
+        # Detect chapters
+        chapters = detect_chapters(text)
+        
+        # Store text for later use
+        file_id = str(uuid.uuid4())[:8]
+        BATCH_JOBS[file_id] = {
+            "filename": file.filename,
+            "chapters": chapters,
+            "total_chars": sum(c['char_count'] for c in chapters),
+        }
+        
+        # Return chapter list (without full content to save bandwidth)
+        chapter_summary = [{
+            'index': c['index'],
+            'number': c['number'],
+            'title': c['title'],
+            'char_count': c['char_count'],
+            'preview': c['content'][:150] + '...' if len(c['content']) > 150 else c['content'],
+            'content': c['content']
+        } for c in chapters]
+        
+        return jsonify({
+            "status": "success",
+            "file_id": file_id,
+            "filename": file.filename,
+            "total_chapters": len(chapters),
+            "total_chars": sum(c['char_count'] for c in chapters),
+            "chapters": chapter_summary
+        })
+    
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/batch_generate", methods=["POST"])
+def batch_generate():
+    """Start batch TTS generation for all chapters."""
+    try:
+        data = request.json or {}
+        file_id = data.get("file_id")
+        voice = data.get("voice", "BV421_vivn_streaming")
+        resource_id = data.get("resource_id", None)
+        rate = data.get("rate", "1.0")
+        selected_chapters = data.get("selected_chapters", None)  # list of indices, None = all
+        
+        if not file_id or file_id not in BATCH_JOBS:
+            return jsonify({"status": "error", "message": "File không tồn tại. Hãy tải lên lại."}), 400
+        
+        batch = BATCH_JOBS[file_id]
+        chapters = batch["chapters"]
+        
+        if selected_chapters is not None:
+            chapters = [c for c in chapters if c['index'] in selected_chapters]
+        
+        if not chapters:
+            return jsonify({"status": "error", "message": "Không có chương nào được chọn."}), 400
+        
+        vinfo = find_voice_info(voice)
+        if vinfo and not resource_id:
+            resource_id = vinfo.get("resource_id")
+        lan = vinfo.get("lan", "vi") if vinfo else "vi"
+        
+        batch_id = str(uuid.uuid4())[:8]
+        
+        BATCH_JOBS[batch_id] = {
+            "type": "batch_generation",
+            "status": "processing",
+            "total_chapters": len(chapters),
+            "completed_chapters": 0,
+            "current_chapter": 0,
+            "current_chapter_title": chapters[0]["title"] if chapters else "",
+            "progress": 0,
+            "message": f"Bắt đầu tạo giọng đọc cho {len(chapters)} chương...",
+            "results": [],
+            "errors": []
+        }
+        
+        def run_batch(bid, chaps, v, rid, r, language):
+            total = len(chaps)
+            for i, chapter in enumerate(chaps):
+                try:
+                    BATCH_JOBS[bid]["current_chapter"] = i
+                    BATCH_JOBS[bid]["current_chapter_title"] = chapter["title"]
+                    BATCH_JOBS[bid]["message"] = f"Đang tạo: {chapter['title']} ({i+1}/{total})..."
+                    
+                    # Create a sub-job for this chapter
+                    sub_job_id = f"batch_{bid}_{i}"
+                    JOBS[sub_job_id] = {
+                        "status": "processing",
+                        "progress": 0,
+                        "message": "Đang xử lý...",
+                        "result": None,
+                    }
+                    
+                    run_tts_job(sub_job_id, chapter["content"], v, rid, r, language)
+                    
+                    sub_result = JOBS.get(sub_job_id, {})
+                    if sub_result.get("status") in ["completed", "done"] and sub_result.get("result"):
+                        BATCH_JOBS[bid]["results"].append({
+                            "chapter_index": chapter["index"],
+                            "chapter_title": chapter["title"],
+                            "filename": sub_result["result"]["filename"],
+                            "download_url": sub_result["result"]["download_url"],
+                            "duration_ms": sub_result["result"].get("duration_ms", 0),
+                        })
+                    else:
+                        BATCH_JOBS[bid]["errors"].append({
+                            "chapter_index": chapter["index"],
+                            "chapter_title": chapter["title"],
+                            "error": sub_result.get("message", "Lỗi không xác định")
+                        })
+                    
+                    # Cleanup sub job
+                    JOBS.pop(sub_job_id, None)
+                    
+                except Exception as ex:
+                    BATCH_JOBS[bid]["errors"].append({
+                        "chapter_index": chapter["index"],
+                        "chapter_title": chapter["title"],
+                        "error": str(ex)
+                    })
+                
+                BATCH_JOBS[bid]["completed_chapters"] = i + 1
+                BATCH_JOBS[bid]["progress"] = int(((i + 1) / total) * 100)
+            
+            BATCH_JOBS[bid]["status"] = "done"
+            BATCH_JOBS[bid]["message"] = f"Hoàn tất! Đã tạo {len(BATCH_JOBS[bid]['results'])}/{total} chương thành công."
+        
+        t = threading.Thread(
+            target=run_batch,
+            args=(batch_id, chapters, voice, resource_id, rate, lan),
+            daemon=True
+        )
+        t.start()
+        
+        return jsonify({"status": "success", "batch_id": batch_id, "total_chapters": len(chapters)})
+    
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/batch_status/<batch_id>", methods=["GET"])
+def get_batch_status(batch_id):
+    """Get batch generation progress."""
+    batch = BATCH_JOBS.get(batch_id)
+    if not batch:
+        return jsonify({"status": "error", "message": "Batch không tồn tại."}), 404
+    return jsonify(batch)
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GOOGLE DRIVE INTEGRATION - Auto upload audio to user's Google Drive
+# ══════════════════════════════════════════════════════════════════════════════
+
+GOOGLE_DRIVE_CREDS = None
+GOOGLE_DRIVE_FOLDER_ID = None
+
+def get_drive_service():
+    """Get authenticated Google Drive service."""
+    global GOOGLE_DRIVE_CREDS
+    if not GOOGLE_DRIVE_CREDS:
+        return None
+    try:
+        from googleapiclient.discovery import build
+        from google.oauth2.credentials import Credentials
+        creds = Credentials.from_authorized_user_info(GOOGLE_DRIVE_CREDS)
+        if creds and creds.expired and creds.refresh_token:
+            from google.auth.transport.requests import Request
+            creds.refresh(Request())
+            GOOGLE_DRIVE_CREDS = json.loads(creds.to_json())
+        return build('drive', 'v3', credentials=creds)
+    except Exception as e:
+        print(f"Drive service error: {e}")
+        return None
+
+def upload_to_drive(file_path, filename, folder_id=None):
+    """Upload a file to Google Drive and return the shareable link."""
+    service = get_drive_service()
+    if not service:
+        return None
+    
+    try:
+        from googleapiclient.http import MediaFileUpload
+        
+        file_metadata = {'name': filename}
+        if folder_id:
+            file_metadata['parents'] = [folder_id]
+        
+        media = MediaFileUpload(str(file_path), mimetype='audio/mpeg', resumable=True)
+        file = service.files().create(body=file_metadata, media_body=media, fields='id,webViewLink').execute()
+        
+        # Make file accessible via link
+        service.permissions().create(
+            fileId=file.get('id'),
+            body={'type': 'anyone', 'role': 'reader'}
+        ).execute()
+        
+        return {
+            'file_id': file.get('id'),
+            'web_link': file.get('webViewLink'),
+            'download_url': f"https://drive.google.com/uc?export=download&id={file.get('id')}"
+        }
+    except Exception as e:
+        print(f"Drive upload error: {e}")
+        return None
+
+
+@app.route("/api/drive/auth_url", methods=["GET"])
+def drive_auth_url():
+    """Generate Google OAuth2 authorization URL."""
+    try:
+        client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+        redirect_uri = request.host_url.rstrip('/') + '/api/drive/callback'
+        
+        if not client_id:
+            return jsonify({
+                "status": "error",
+                "message": "Google Client ID ch\u01b0a \u0111\u01b0\u1ee3c c\u1ea5u h\u00ecnh. Vui l\u00f2ng set GOOGLE_CLIENT_ID."
+            }), 400
+        
+        scope = "https://www.googleapis.com/auth/drive.file"
+        auth_url = (
+            f"https://accounts.google.com/o/oauth2/v2/auth?"
+            f"client_id={client_id}&"
+            f"redirect_uri={urllib.parse.quote(redirect_uri)}&"
+            f"response_type=code&"
+            f"scope={urllib.parse.quote(scope)}&"
+            f"access_type=offline&"
+            f"prompt=consent"
+        )
+        return jsonify({"status": "success", "auth_url": auth_url})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/drive/callback")
+def drive_callback():
+    """Handle Google OAuth2 callback."""
+    global GOOGLE_DRIVE_CREDS
+    try:
+        code = request.args.get("code")
+        if not code:
+            return "Authorization failed", 400
+        
+        client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+        redirect_uri = request.host_url.rstrip('/') + '/api/drive/callback'
+        
+        # Exchange code for tokens
+        token_url = "https://oauth2.googleapis.com/token"
+        token_data = {
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code'
+        }
+        
+        resp = requests.post(token_url, data=token_data)
+        tokens = resp.json()
+        
+        if 'access_token' in tokens:
+            GOOGLE_DRIVE_CREDS = {
+                'token': tokens['access_token'],
+                'refresh_token': tokens.get('refresh_token'),
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'token_uri': 'https://oauth2.googleapis.com/token'
+            }
+            
+            # Save creds to file for persistence
+            creds_path = Path(__file__).parent / "drive_creds.json"
+            with open(creds_path, 'w') as f:
+                json.dump(GOOGLE_DRIVE_CREDS, f)
+            
+            return '<html><body style="background:#0b0f19;color:#34d399;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="text-align:center;"><h1>\u2705 K\u1ebft n\u1ed1i Google Drive th\u00e0nh c\u00f4ng!</h1><p>B\u1ea1n c\u00f3 th\u1ec3 \u0111\u00f3ng tab n\u00e0y v\u00e0 quay l\u1ea1i app.</p></div></body></html>'
+        else:
+            return f"Token error: {tokens}", 400
+            
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+
+@app.route("/api/drive/status", methods=["GET"])
+def drive_status():
+    """Check if Google Drive is connected."""
+    global GOOGLE_DRIVE_CREDS
+    
+    # Try to load saved creds
+    if not GOOGLE_DRIVE_CREDS:
+        creds_path = Path(__file__).parent / "drive_creds.json"
+        if creds_path.exists():
+            try:
+                with open(creds_path, 'r') as f:
+                    GOOGLE_DRIVE_CREDS = json.load(f)
+            except Exception:
+                pass
+    
+    connected = GOOGLE_DRIVE_CREDS is not None and 'token' in (GOOGLE_DRIVE_CREDS or {})
+    return jsonify({"connected": connected, "folder_id": GOOGLE_DRIVE_FOLDER_ID})
+
+
+@app.route("/api/drive/set_folder", methods=["POST"])
+def drive_set_folder():
+    """Set the Google Drive folder ID for uploads."""
+    global GOOGLE_DRIVE_FOLDER_ID
+    data = request.json or {}
+    GOOGLE_DRIVE_FOLDER_ID = data.get("folder_id", None)
+    return jsonify({"status": "success", "folder_id": GOOGLE_DRIVE_FOLDER_ID})
+
+
+
+@app.route("/api/drive/test", methods=["POST"])
+def drive_test_connection():
+    """Test if we can upload to the specified Drive folder."""
+    global GOOGLE_DRIVE_FOLDER_ID
+    try:
+        data = request.json or {}
+        folder_id = data.get("folder_id")
+        
+        if not folder_id:
+            return jsonify({"status": "error", "message": "Folder ID is empty."}), 400
+        
+        service = get_drive_service()
+        if not service:
+            return jsonify({"status": "error", "message": "Chưa đăng nhập Google. Vui lòng đăng nhập trước."}), 400
+        
+        # Try to list files in the folder to test access
+        try:
+            results = service.files().list(
+                q=f"'{folder_id}' in parents",
+                pageSize=1,
+                fields="files(id, name)"
+            ).execute()
+            
+            GOOGLE_DRIVE_FOLDER_ID = folder_id
+            return jsonify({
+                "status": "success",
+                "message": "Kết nối thành công! Có thể tải file lên folder này."
+            })
+        except Exception as api_err:
+            error_msg = str(api_err)
+            if "404" in error_msg:
+                return jsonify({"status": "error", "message": "Folder không tồn tại hoặc không có quyền truy cập. Hãy chia sẻ folder với quyền chỉnh sửa."}), 400
+            elif "403" in error_msg:
+                return jsonify({"status": "error", "message": "Không có quyền truy cập folder. Hãy cấp quyền chỉnh sửa."}), 400
+            else:
+                return jsonify({"status": "error", "message": f"Lỗi: {error_msg}"}), 400
+    
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/drive/upload", methods=["POST"])
+def drive_upload_endpoint():
+    """Upload a generated audio file to Google Drive."""
+    try:
+        data = request.json or {}
+        filename = data.get("filename")
+        
+        if not filename:
+            return jsonify({"status": "error", "message": "Missing filename"}), 400
+        
+        file_path = OUTPUT_DIR / filename
+        if not file_path.exists():
+            return jsonify({"status": "error", "message": "File not found"}), 404
+        
+        result = upload_to_drive(file_path, filename, GOOGLE_DRIVE_FOLDER_ID)
+        
+        if result:
+            # Delete local file after successful upload
+            try:
+                file_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            
+            return jsonify({
+                "status": "success",
+                "drive_link": result['web_link'],
+                "download_url": result['download_url'],
+                "file_id": result['file_id']
+            })
+        else:
+            return jsonify({"status": "error", "message": "Ch\u01b0a k\u1ebft n\u1ed1i Google Drive. Vui l\u00f2ng k\u1ebft n\u1ed1i tr\u01b0\u1edbc."}), 400
+    
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     import sys
