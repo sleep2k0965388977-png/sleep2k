@@ -19,103 +19,73 @@ import edge_tts
 import speech_recognition as sr
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 from capcut_tts_api import CapCutClient, CapCutError
-# ── 🔒 SECURITY MODULE ──
-from functools import wraps
+# ── 🔒 SECURITY: API Protection + Anti-Bot/DDOS ──
+# Không cần đăng nhập — app mở cho mọi người
+# Chỉ chặn: gọi API từ bên ngoài + bot/DDOS
 import hashlib
-import secrets
 
-# Security Configuration (set via Railway Environment Variables)
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")  # Set in Railway → Settings → Variables
-API_KEY = os.environ.get("SLEEP2K_API_KEY", "")  # Optional API key for programmatic access
-RATE_LIMIT_WINDOW = 60  # seconds
-RATE_LIMIT_MAX_GENERATE = int(os.environ.get("RATE_LIMIT_GENERATE", "10"))  # max generates per minute
-RATE_LIMIT_MAX_PREVIEW = int(os.environ.get("RATE_LIMIT_PREVIEW", "30"))  # max previews per minute
-RATE_LIMIT_MAX_GENERAL = int(os.environ.get("RATE_LIMIT_GENERAL", "60"))  # max general requests per minute
+# ── Rate Limiting (chống spam/DDOS) ──
+_rate_store = {}  # {ip: {endpoint: [timestamps]}}
+RATE_WINDOW = 60  # 60 seconds window
 
-# In-memory rate limiter
-_rate_limit_store = {}  # {ip: {endpoint: [timestamps]}}
-
-def _get_client_ip():
-    """Get real client IP behind proxy."""
+def _get_ip():
     return request.headers.get('X-Forwarded-For', request.remote_addr or '0.0.0.0').split(',')[0].strip()
 
-def _check_rate_limit(endpoint, max_requests):
-    """Simple in-memory rate limiter."""
-    ip = _get_client_ip()
+def _rate_check(endpoint, max_req):
+    """Return True if OK, False if rate limited."""
+    ip = _get_ip()
     now = time.time()
     key = f"{ip}:{endpoint}"
-    
-    if key not in _rate_limit_store:
-        _rate_limit_store[key] = []
-    
-    # Clean old entries
-    _rate_limit_store[key] = [t for t in _rate_limit_store[key] if now - t < RATE_LIMIT_WINDOW]
-    
-    if len(_rate_limit_store[key]) >= max_requests:
+    if key not in _rate_store:
+        _rate_store[key] = []
+    _rate_store[key] = [t for t in _rate_store[key] if now - t < RATE_WINDOW]
+    if len(_rate_store[key]) >= max_req:
         return False
-    
-    _rate_limit_store[key].append(now)
+    _rate_store[key].append(now)
     return True
 
-def require_auth(f):
-    """Decorator: require admin password or API key for protected routes."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        # Skip auth if no password is set (backward compatible)
-        if not ADMIN_PASSWORD and not API_KEY:
-            return f(*args, **kwargs)
-        
-        # Check API Key header
-        api_key = request.headers.get("X-API-Key", "")
-        if API_KEY and api_key == API_KEY:
-            return f(*args, **kwargs)
-        
-        # Check session cookie
-        session_token = request.cookies.get("sleep2k_session", "")
-        if session_token and ADMIN_PASSWORD:
-            expected = hashlib.sha256(f"{ADMIN_PASSWORD}:sleep2k_salt_2024".encode()).hexdigest()
-            if session_token == expected:
-                return f(*args, **kwargs)
-        
-        # Check Bearer token
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer ") and ADMIN_PASSWORD:
-            if auth_header[7:] == ADMIN_PASSWORD:
-                return f(*args, **kwargs)
-        
-        # If request is from browser (Accept: text/html), redirect to login
-        if "text/html" in request.headers.get("Accept", ""):
-            return render_template("login.html") if os.path.exists(os.path.join(app.template_folder or "templates", "login.html")) else jsonify({"error": "Unauthorized. Set password via /login"}), 401
-        
-        return jsonify({"error": "Unauthorized", "message": "API key or admin password required"}), 401
-    return decorated
+# ── Anti-Bot: Block suspicious requests ──
+BLOCKED_USER_AGENTS = ['python-requests', 'curl', 'wget', 'httpie', 'postman', 'insomnia']
+ALLOW_PROGRAMMATIC = os.environ.get("ALLOW_PROGRAMMATIC", "false").lower() == "true"
 
-def rate_limit(endpoint, max_req):
-    """Decorator: apply rate limiting."""
-    def decorator(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            if not _check_rate_limit(endpoint, max_req):
-                ip = _get_client_ip()
-                print(f"⚠️ Rate limit hit: {ip} on {endpoint}")
-                return jsonify({"error": "Rate limit exceeded", "retry_after": RATE_LIMIT_WINDOW}), 429
-            return f(*args, **kwargs)
-        return decorated
-    return decorator
+def _is_bot_request():
+    """Check if request looks like a bot/script (not from our web UI)."""
+    if ALLOW_PROGRAMMATIC:
+        return False
+    ua = request.headers.get('User-Agent', '').lower()
+    # Block known script user agents
+    for blocked in BLOCKED_USER_AGENTS:
+        if blocked in ua:
+            return True
+    # No user agent at all = suspicious
+    if not ua or len(ua) < 10:
+        return True
+    return False
 
-# Allowed file extensions for uploads
-ALLOWED_AUDIO_EXT = {'.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.wma', '.opus'}
-ALLOWED_TEXT_EXT = {'.txt', '.srt', '.vtt', '.sub', '.ass'}
-ALLOWED_UPLOAD_EXT = ALLOWED_AUDIO_EXT | ALLOWED_TEXT_EXT
+def _is_same_origin():
+    """Check if request comes from our own web UI (same origin)."""
+    referer = request.headers.get('Referer', '')
+    origin = request.headers.get('Origin', '')
+    host = request.host_url.rstrip('/')
+    
+    # Requests from our own pages have matching referer/origin
+    if referer and host in referer:
+        return True
+    if origin and host in origin:
+        return True
+    # Browser form submissions and direct page loads don't have Origin header
+    # but they have matching host
+    if not origin and not referer:
+        # Could be direct API call or browser navigation
+        # Allow if it's a GET request (page load) or has proper content type
+        if request.method == 'GET':
+            return True
+        # POST without referer/origin = likely external script
+        return False
+    return False
 
-def validate_upload(file, allowed_ext=None):
-    """Validate uploaded file extension and size."""
-    if not file or not file.filename:
-        return False, "No file provided"
-    ext = os.path.splitext(file.filename)[1].lower()
-    if allowed_ext and ext not in allowed_ext:
-        return False, f"File type {ext} not allowed. Allowed: {', '.join(allowed_ext)}"
-    return True, "OK"
+
+
 
 
 # Load HF_TOKEN from environment if set
@@ -471,6 +441,48 @@ def add_header(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key, Authorization"
     return response
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB upload limit (security)
+
+# ── API Protection Middleware ──
+@app.before_request
+def api_protection():
+    """Protect POST API routes from external/bot access."""
+    path = request.path
+    
+    # Skip protection for: static files, health, GET requests, login
+    if request.method == 'GET' or request.method == 'HEAD' or request.method == 'OPTIONS':
+        return None
+    if path in ['/', '/health', '/favicon.ico', '/login', '/logout']:
+        return None
+    if path.startswith('/output/'):
+        return None
+    
+    # Only protect /api/* POST routes
+    if not path.startswith('/api/'):
+        return None
+    
+    # Check 1: Bot detection
+    if _is_bot_request():
+        return jsonify({"error": "Access denied", "message": "Automated requests not allowed"}), 403
+    
+    # Check 2: Same-origin check (request must come from our web UI)
+    if not _is_same_origin():
+        return jsonify({"error": "Access denied", "message": "API can only be called from the web interface"}), 403
+    
+    # Check 3: Rate limiting per endpoint
+    rate_limits = {
+        '/api/generate_job': 10,      # 10 per minute
+        '/api/preview_voice': 30,     # 30 per minute
+        '/api/batch_generate': 5,     # 5 per minute
+        '/api/transcribe_job': 10,    # 10 per minute
+        '/api/translate_content': 10, # 10 per minute
+        '/api/upload_chunk': 20,      # 20 per minute
+    }
+    max_req = rate_limits.get(path, 30)  # default 30/min
+    if not _rate_check(path, max_req):
+        return jsonify({"error": "Rate limit exceeded", "retry_after": RATE_WINDOW}), 429
+    
+    return None
+
 
 # Temporary output directory (files auto-cleaned on each new generation)
 OUTPUT_DIR = Path(__file__).parent / "output_audio"
@@ -962,37 +974,7 @@ def add_cache_control_headers(response):
     return response
 
 
-# ── 🔒 Login & Auth Routes ──
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "GET":
-        # If already authenticated, redirect to home
-        session_token = request.cookies.get("sleep2k_session", "")
-        if session_token and ADMIN_PASSWORD:
-            expected = hashlib.sha256(f"{ADMIN_PASSWORD}:sleep2k_salt_2024".encode()).hexdigest()
-            if session_token == expected:
-                return redirect("/")
-        if not ADMIN_PASSWORD:
-            return redirect("/")
-        return render_template("login.html")
-    
-    # POST - verify password
-    password = request.form.get("password", "") or request.json.get("password", "") if request.is_json else request.form.get("password", "")
-    if password == ADMIN_PASSWORD:
-        token = hashlib.sha256(f"{ADMIN_PASSWORD}:sleep2k_salt_2024".encode()).hexdigest()
-        response = jsonify({"status": "success"}) if request.is_json else redirect("/")
-        response.set_cookie("sleep2k_session", token, httponly=True, secure=True, samesite="Lax", max_age=86400*7)
-        return response
-    return jsonify({"error": "Wrong password"}), 401
-
-@app.route("/logout")
-def logout():
-    response = redirect("/login")
-    response.delete_cookie("sleep2k_session")
-    return response
-
 @app.route("/")
-@require_auth
 def index():
     return render_template("index.html")
 
@@ -1006,7 +988,6 @@ def get_voices():
     return jsonify({"status": "success", "voices": voices})
 
 @app.route("/api/generate_job", methods=["POST"])
-@require_auth
 def generate_job():
     try:
         data = request.json or {}
@@ -1055,7 +1036,6 @@ def get_job_status(job_id):
     return jsonify(job)
 
 @app.route("/api/preview_voice", methods=["POST"])
-@require_auth
 def preview_voice():
     try:
         data = request.json or {}
@@ -1754,7 +1734,6 @@ def process_multipart_part_job(job_key, session_id, part_index, part_file_path, 
         JOBS[job_key]["message"] = f"Lỗi xử lý phần {part_index+1}: {str(e)}"
 
 @app.route("/api/multipart/init_session", methods=["POST"])
-@require_auth
 def api_multipart_init_session():
     try:
         data = request.get_json(force=True) or {}
@@ -1813,7 +1792,6 @@ def api_multipart_session_status(session_id):
     })
 
 @app.route("/api/multipart/upload_part_chunk", methods=["POST"])
-@require_auth
 def api_multipart_upload_part_chunk():
     try:
         session_id = request.form.get("session_id")
@@ -1865,7 +1843,6 @@ def api_multipart_upload_part_chunk():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/upload_chunk", methods=["POST"])
-@require_auth
 def api_upload_chunk():
     """Receive sequential 5MB file chunks, assemble safely, and trigger adaptive queue STT."""
     try:
@@ -1935,7 +1912,6 @@ def api_upload_chunk():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/transcribe_job", methods=["POST"])
-@require_auth
 def api_transcribe_job():
     if "file" not in request.files:
         return jsonify({"status": "error", "message": "Vui lòng chọn tệp âm thanh hoặc video!"}), 400
@@ -2285,7 +2261,6 @@ def translate_content_parallel(text, srt_text, target_lang="vi", source_lang="au
     return translated_txt, ""
 
 @app.route("/api/translate_content", methods=["POST"])
-@require_auth
 def api_translate_content():
     """Translate TXT and SRT results with 10x parallelism and zero Render timeout."""
     try:
@@ -2399,7 +2374,6 @@ def detect_chapters(text):
 
 
 @app.route("/api/upload_text_file", methods=["POST"])
-@require_auth
 def upload_text_file():
     """Upload a text file and auto-detect chapters."""
     try:
@@ -2458,7 +2432,6 @@ def upload_text_file():
 
 
 @app.route("/api/batch_generate", methods=["POST"])
-@require_auth
 def batch_generate():
     """Start batch TTS generation for all chapters."""
     try:
@@ -2709,7 +2682,6 @@ def drive_callback():
 
 
 @app.route("/api/drive/status", methods=["GET"])
-@require_auth
 def drive_status():
     """Check if Google Drive is connected."""
     global GOOGLE_DRIVE_CREDS
@@ -2729,7 +2701,6 @@ def drive_status():
 
 
 @app.route("/api/drive/set_folder", methods=["POST"])
-@require_auth
 def drive_set_folder():
     """Set the Google Drive folder ID for uploads."""
     global GOOGLE_DRIVE_FOLDER_ID
@@ -2740,7 +2711,6 @@ def drive_set_folder():
 
 
 @app.route("/api/drive/test", methods=["POST"])
-@require_auth
 def drive_test_connection():
     """Test if we can upload to the specified Drive folder."""
     global GOOGLE_DRIVE_FOLDER_ID
@@ -2781,7 +2751,6 @@ def drive_test_connection():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/drive/upload", methods=["POST"])
-@require_auth
 def drive_upload_endpoint():
     """Upload a generated audio file to Google Drive."""
     try:
