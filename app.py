@@ -17,7 +17,7 @@ import tempfile
 import soundfile as sf
 import edge_tts
 import speech_recognition as sr
-from flask import Flask, render_template, request, jsonify, send_from_directory, Response
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response, redirect
 from capcut_tts_api import CapCutClient, CapCutError
 # ── 🔒 SECURITY: API Protection + Anti-Bot/DDOS ──
 # Không cần đăng nhập — app mở cho mọi người
