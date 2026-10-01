@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLEEP2K TTS — Đăng Nhập</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-box {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 50px 40px;
+            width: 400px;
+            max-width: 90vw;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+        .login-box h1 {
+            color: #fff;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        .login-box p {
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .login-box .icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+            margin-bottom: 20px;
+        }
+        input[type="password"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 15px rgba(102,126,234,0.3);
+        }
+        input[type="password"]::placeholder { color: rgba(255,255,255,0.3); }
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102,126,234,0.4);
+        }
+        button:active { transform: translateY(0); }
+        .error {
+            color: #ff6b6b;
+            margin-top: 15px;
+            font-size: 14px;
+            display: none;
+        }
+        .error.show { display: block; animation: shake 0.5s; }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="icon">🔒</div>
+        <h1>SLEEP2K TTS</h1>
+        <p>Nhập mật khẩu để truy cập</p>
+        <form id="loginForm">
+            <input type="password" id="password" placeholder="Mật khẩu..." autofocus>
+            <button type="submit">Đăng Nhập</button>
+        </form>
+        <div class="error" id="error">Sai mật khẩu! Vui lòng thử lại.</div>
+    </div>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pw = document.getElementById('password').value;
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password: pw})
+            });
+            if (res.ok) {
+                window.location.href = '/';
+            } else {
+                document.getElementById('error').classList.add('show');
+                document.getElementById('password').value = '';
+                document.getElementById('password').focus();
+                setTimeout(() => document.getElementById('error').classList.remove('show'), 3000);
+            }
+        });
+    </script>
+</body>
+</html>
