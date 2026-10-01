@@ -66,21 +66,27 @@ def _is_same_origin():
     """Check if request comes from our own web UI (same origin)."""
     referer = request.headers.get('Referer', '')
     origin = request.headers.get('Origin', '')
-    host = request.host_url.rstrip('/')
+    # Get hostname without protocol (Railway uses http internally but https externally)
+    server_host = request.host.split(':')[0]  # e.g. "sleep2k-tts-production.up.railway.app"
     
-    # Requests from our own pages have matching referer/origin
-    if referer and host in referer:
+    # Check if referer/origin contains our hostname
+    if referer and server_host in referer:
         return True
-    if origin and host in origin:
+    if origin and server_host in origin:
         return True
-    # Browser form submissions and direct page loads don't have Origin header
-    # but they have matching host
+    # Browser fetch from same page sends Origin header
+    # Direct page navigation (GET) has no Origin
     if not origin and not referer:
-        # Could be direct API call or browser navigation
-        # Allow if it's a GET request (page load) or has proper content type
         if request.method == 'GET':
             return True
-        # POST without referer/origin = likely external script
+        # POST from same page via form submit may not have Origin
+        # Check X-Requested-With header (set by JS fetch/XMLHttpRequest)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return True
+        # Allow POST with proper content-type from same page
+        ct = request.headers.get('Content-Type', '')
+        if 'multipart/form-data' in ct or 'application/json' in ct:
+            return True
         return False
     return False
 
@@ -410,7 +416,7 @@ def add_header(response):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
     # CORS — only allow same origin
-    allowed_origin = os.environ.get("ALLOWED_ORIGIN", request.host_url.rstrip("/"))
+    allowed_origin = os.environ.get("ALLOWED_ORIGIN", "https://" + request.host.split(":")[0])
     response.headers["Access-Control-Allow-Origin"] = allowed_origin
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-API-Key, Authorization"
