@@ -23,37 +23,66 @@ from capcut_tts_api import CapCutClient, CapCutError
 # Load HF_TOKEN from environment if set
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
-# ── VieNeu-TTS Official Neural Model (20 distinct preset voices) ──
+# ── VieNeu-TTS Official Neural Model (25 preset voices — synced with VieNeu SDK v3.8.3) ──
 _vieneu_tts_instance = None
 _vieneu_lock = threading.Lock()
 
 VIENEU_PRESET_MAP = {
+    "vieneu_adam_bua": "Adam bựa",
     "vieneu_truc_ly": "Trúc Ly",
-    "vieneu_ngoc_linh": "Ngọc Linh",
-    "vieneu_doan_trang": "Đoan Trang",
+    "vieneu_thien_minh": "Thiện Minh",
     "vieneu_mai_anh": "Mai Anh",
-    "vieneu_quynh_anh": "Quỳnh Anh",
-    "vieneu_ngoc_huyen": "Ngọc Huyền",
+    "vieneu_hai_dang": "Hải Đăng",
     "vieneu_thuy_dung": "Thùy Dung",
-    "vieneu_thuc_doan": "Thục Đoan",
-    "vieneu_my_duyen": "Mỹ Duyên",
-    "vieneu_kim_thanh": "Kim Thanh",
+    "vieneu_thien_tam_duc": "Thiền Tâm Đức",
+    "vieneu_ngoc_huyen": "Ngọc Huyền",
+    "vieneu_quang_son": "Quang Sơn",
     "vieneu_ngoc_tran": "Ngọc Trân",
     "vieneu_minh_duc": "Minh Đức",
     "vieneu_pham_tuyen": "Phạm Tuyên",
-    "vieneu_thanh_binh": "Thanh Bình",
     "vieneu_thai_son": "Thái Sơn",
     "vieneu_xuan_vinh": "Xuân Vĩnh",
+    "vieneu_thanh_binh": "Thanh Bình",
+    "vieneu_ngoc_linh": "Ngọc Linh",
+    "vieneu_doan_trang": "Đoan Trang",
+    "vieneu_thuc_doan": "Thục Đoan",
     "vieneu_minh_triet": "Minh Triết",
+    "vieneu_my_duyen": "Mỹ Duyên",
+    "vieneu_quynh_anh": "Quỳnh Anh",
     "vieneu_duc_tri": "Đức Trí",
+    "vieneu_kim_thanh": "Kim Thanh",
     "vieneu_adam": "Adam",
-    "vieneu_quang_son": "Quang Sơn",
+    "vieneu_quoc_tuan": "Quốc Tuấn",
 }
 
 # ── Distinct Acoustic Profiles for VieNeu Voice Station (Unique Pitch, Cadence, Timbre) ──
 VIENEU_VOICE_PROFILES = {
-    # ── Giọng Nam (Nam Bắc, Nam Nam, Nam Trung với cao độ & tiết tấu khác biệt hoàn toàn) ──
+    "vieneu_adam_bua": {"voice": "vi-VN-NamMinhNeural", "pitch": "+26Hz", "rate_offset": 10, "sample": "Trời ơi cái giọng nó tự nhiên mà nó mượt mà dã man, nghe không khác gì người thật luôn."},
+    "vieneu_truc_ly": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+0Hz", "rate_offset": 0, "sample": "Xin chào, tôi là Trúc Ly, giọng đọc tự nhiên trong sáng miền Bắc."},
+    "vieneu_thien_minh": {"voice": "vi-VN-NamMinhNeural", "pitch": "-8Hz", "rate_offset": -4, "sample": "Chào các bạn, tôi là Thiện Minh, hôm nay chúng ta cùng lắng nghe một câu chuyện thật cảm động."},
+    "vieneu_mai_anh": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+10Hz", "rate_offset": 12, "sample": "Kính chào quý vị, bản tin dự báo thời tiết và nhịp sống hôm nay xin được tiếp tục."},
+    "vieneu_hai_dang": {"voice": "vi-VN-NamMinhNeural", "pitch": "+0Hz", "rate_offset": 0, "sample": "Xin chào tất cả các bạn, tôi là Hải Đăng, giọng đọc tự nhiên miền Bắc."},
+    "vieneu_thuy_dung": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+8Hz", "rate_offset": 10, "sample": "Xin kính chào quý khán giả đang theo dõi bản tin phát thanh trực tiếp hôm nay."},
+    "vieneu_thien_tam_duc": {"voice": "vi-VN-NamMinhNeural", "pitch": "-16Hz", "rate_offset": -8, "sample": "Trong ký ức của tôi, những câu chuyện ngày xưa luôn đong đầy cảm xúc ấm áp và sâu lắng."},
+    "vieneu_ngoc_huyen": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+38Hz", "rate_offset": 6, "sample": "Xin chào, em là Ngọc Huyền, giọng đọc ngọt ngào trong trẻo và thanh thoát."},
+    "vieneu_quang_son": {"voice": "vi-VN-NamMinhNeural", "pitch": "-10Hz", "rate_offset": 2, "sample": "Chào bà con miền Trung khúc ruột thân thương, chúc mọi người luôn bình an."},
+    "vieneu_ngoc_tran": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+24Hz", "rate_offset": 2, "sample": "Dạ em chào anh chị, giọng em là giọng con gái Huế miền Trung thương nhớ."},
+    "vieneu_minh_duc": {"voice": "vi-VN-NamMinhNeural", "pitch": "+12Hz", "rate_offset": 8, "sample": "Kính chào quý vị và các bạn, đây là chương trình tin tức chính luận truyền hình."},
     "vieneu_pham_tuyen": {"voice": "vi-VN-NamMinhNeural", "pitch": "+0Hz", "rate_offset": 0, "sample": "Xin chào tất cả các bạn, tôi là Phạm Tuyên, giọng đọc tự nhiên miền Bắc."},
+    "vieneu_thai_son": {"voice": "vi-VN-NamMinhNeural", "pitch": "-28Hz", "rate_offset": -5, "sample": "Chào bà con cô bác, Thái Sơn xin gửi đến bà con một câu chuyện miền sông nước."},
+    "vieneu_xuan_vinh": {"voice": "vi-VN-NamMinhNeural", "pitch": "+16Hz", "rate_offset": 6, "sample": "Chào bạn nha, đây là Xuân Vĩnh với chất giọng trẻ trung, gần gũi."},
+    "vieneu_thanh_binh": {"voice": "vi-VN-NamMinhNeural", "pitch": "-16Hz", "rate_offset": -8, "sample": "Trong ký ức của tôi, những câu chuyện ngày xưa luôn đong đầy cảm xúc ấm áp."},
+    "vieneu_ngoc_linh": {"voice": "vi-VN-HoaiMyNeural", "pitch": "-12Hz", "rate_offset": -8, "sample": "Ngày xửa ngày xưa, ở một ngôi làng nhỏ bên triền đồi có một câu chuyện thật diệu kỳ..."},
+    "vieneu_doan_trang": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+16Hz", "rate_offset": 4, "sample": "Chào bạn, tôi là Đoan Trang, rất vui được đồng hành và chia sẻ cùng bạn."},
+    "vieneu_thuc_doan": {"voice": "vi-VN-HoaiMyNeural", "pitch": "-14Hz", "rate_offset": -6, "sample": "Hôm nay em xin gửi tới quý thính giả một câu chuyện tình yêu thật nhẹ nhàng."},
+    "vieneu_minh_triet": {"voice": "vi-VN-NamMinhNeural", "pitch": "+6Hz", "rate_offset": 10, "sample": "Chào quý khán giả, bản tin tiêu điểm thời sự và kinh tế hôm nay xin được bắt đầu."},
+    "vieneu_my_duyen": {"voice": "vi-VN-HoaiMyNeural", "pitch": "-18Hz", "rate_offset": -10, "sample": "Gió thoảng qua rặng dừa xanh, sông nước miền Tây êm đềm trôi theo dòng kỷ niệm."},
+    "vieneu_quynh_anh": {"voice": "vi-VN-HoaiMyNeural", "pitch": "-22Hz", "rate_offset": -10, "sample": "Đêm đã về khuya, không gian yên tĩnh và lắng đọng từng trang sách ấm áp."},
+    "vieneu_duc_tri": {"voice": "vi-VN-NamMinhNeural", "pitch": "-36Hz", "rate_offset": -12, "sample": "Đêm đã về khuya, không gian tĩnh lặng, chỉ còn tiếng bước chân vọng lại từ xa xôi."},
+    "vieneu_kim_thanh": {"voice": "vi-VN-HoaiMyNeural", "pitch": "-8Hz", "rate_offset": -8, "sample": "Kính mời quý thính giả cùng lắng nghe trọn vẹn chương truyện truyền cảm sau đây."},
+    "vieneu_adam": {"voice": "vi-VN-NamMinhNeural", "pitch": "+22Hz", "rate_offset": 8, "sample": "Xin chào các bạn, tôi là Adam, chúc bạn có những giây phút trải nghiệm năng động."},
+    "vieneu_quoc_tuan": {"voice": "vi-VN-NamMinhNeural", "pitch": "+4Hz", "rate_offset": 2, "sample": "Xin chào, tôi là Quốc Tuấn, giọng đọc tự nhiên và trầm ấm miền Bắc."},
+},
     "vieneu_thanh_binh": {"voice": "vi-VN-NamMinhNeural", "pitch": "-16Hz", "rate_offset": -8, "sample": "Trong ký ức của tôi, những câu chuyện ngày xưa luôn đong đầy cảm xúc ấm áp."},
     "vieneu_thai_son":   {"voice": "vi-VN-NamMinhNeural", "pitch": "-28Hz", "rate_offset": -5, "sample": "Chào bà con cô bác, Thái Sơn xin gửi đến bà con một câu chuyện miền sông nước."},
     "vieneu_xuan_vinh":  {"voice": "vi-VN-NamMinhNeural", "pitch": "+16Hz", "rate_offset": +6, "sample": "Chào bạn nha, đây là Xuân Vĩnh với chất giọng Nam Bộ trẻ trung, gần gũi."},
@@ -74,7 +103,12 @@ VIENEU_VOICE_PROFILES = {
     "vieneu_thuc_doan":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "-14Hz", "rate_offset": -6, "sample": "Hôm nay em xin gửi tới quý thính giả một câu chuyện tình yêu thật nhẹ nhàng."},
     "vieneu_my_duyen":   {"voice": "vi-VN-HoaiMyNeural", "pitch": "-18Hz", "rate_offset": -10, "sample": "Gió thoảng qua rặng dừa xanh, sông nước miền Tây êm đềm trôi theo dòng kỷ niệm."},
     "vieneu_kim_thanh":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "-8Hz", "rate_offset": -8, "sample": "Kính mời quý thính giả cùng lắng nghe trọn vẹn chương truyện truyền cảm sau đây."},
-    "vieneu_ngoc_tran":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "+24Hz", "rate_offset": +2, "sample": "Dạ em chào anh chị, giọng em là giọng con gái Huế miền Trung thương nhớ."}
+    "vieneu_ngoc_tran":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "+24Hz", "rate_offset": +2, "sample": "Dạ em chào anh chị, giọng em là giọng con gái Huế miền Trung thương nhớ."},
+    "vieneu_hai_dang":    {"voice": "vi-VN-NamMinhNeural", "pitch": "-20Hz", "rate_offset": -6, "sample": "Xin chào, tôi là Hải Đăng, cùng tôi khám phá những trang sách và câu chuyện hấp dẫn nhé."},
+    "vieneu_thien_minh": {"voice": "vi-VN-NamMinhNeural", "pitch": "-8Hz", "rate_offset": -4, "sample": "Chào các bạn, tôi là Thiện Minh, hôm nay chúng ta cùng lắng nghe một câu chuyện thật cảm động."},
+    "vieneu_hoang_nam":  {"voice": "vi-VN-NamMinhNeural", "pitch": "+18Hz", "rate_offset": +4, "sample": "Xin chào tất cả, tôi là Hoàng Nam, giọng đọc tự nhiên và gần gũi miền Bắc."},
+    "vieneu_bich_ngoc":  {"voice": "vi-VN-HoaiMyNeural", "pitch": "-6Hz", "rate_offset": -4, "sample": "Xin chào, tôi là Bích Ngọc, hãy cùng tôi bước vào thế giới câu chuyện cổ tích diệu kỳ."},
+    "vieneu_thanh_thao": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+20Hz", "rate_offset": +6, "sample": "Dạ chào mọi người, em là Thanh Thảo, giọng con gái miền Nam ngọt ngào và ấm áp."}
 }
 
 LANGUAGE_FALLBACK_VOICE = {

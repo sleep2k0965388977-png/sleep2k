@@ -192,186 +192,6 @@
     "captured_at": "2026-04-16T20:26:32.733998"
   },
   {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_truc_ly",
-    "display_name": "Trúc Ly (Nữ Bắc - Tự nhiên)",
-    "resource_id": "vieneu_v3_truc_ly",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_ngoc_linh",
-    "display_name": "Ngọc Linh (Nữ Bắc - Kể chuyện)",
-    "resource_id": "vieneu_v3_ngoc_linh",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_doan_trang",
-    "display_name": "Đoan Trang (Nữ Bắc - Tự nhiên)",
-    "resource_id": "vieneu_v3_doan_trang",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_mai_anh",
-    "display_name": "Mai Anh (Nữ Bắc - Tin tức)",
-    "resource_id": "vieneu_v3_mai_anh",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_quynh_anh",
-    "display_name": "Quỳnh Anh (Nữ Bắc - Đọc truyện)",
-    "resource_id": "vieneu_v3_quynh_anh",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_ngoc_huyen",
-    "display_name": "Ngọc Huyền (Nữ Bắc - Tự nhiên)",
-    "resource_id": "vieneu_v3_ngoc_huyen",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_thuy_dung",
-    "display_name": "Thùy Dung (Nữ Nam - Tin tức)",
-    "resource_id": "vieneu_v3_thuy_dung",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_thuc_doan",
-    "display_name": "Thục Đoan (Nữ Nam - Kể chuyện)",
-    "resource_id": "vieneu_v3_thuc_doan",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_my_duyen",
-    "display_name": "Mỹ Duyên (Nữ Nam - Đọc truyện)",
-    "resource_id": "vieneu_v3_my_duyen",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_kim_thanh",
-    "display_name": "Kim Thanh (Nữ Nam - Đọc truyện)",
-    "resource_id": "vieneu_v3_kim_thanh",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_ngoc_tran",
-    "display_name": "Ngọc Trân (Nữ Trung - Tự nhiên)",
-    "resource_id": "vieneu_v3_ngoc_tran",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_minh_duc",
-    "display_name": "Minh Đức (Nam Bắc - Tin tức)",
-    "resource_id": "vieneu_v3_minh_duc",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_pham_tuyen",
-    "display_name": "Phạm Tuyên (Nam Bắc - Tự nhiên)",
-    "resource_id": "vieneu_v3_pham_tuyen",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_thanh_binh",
-    "display_name": "Thanh Bình (Nam Bắc - Kể chuyện)",
-    "resource_id": "vieneu_v3_thanh_binh",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_thai_son",
-    "display_name": "Thái Sơn (Nam Nam - Kể chuyện)",
-    "resource_id": "vieneu_v3_thai_son",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_xuan_vinh",
-    "display_name": "Xuân Vĩnh (Nam Nam - Tự nhiên)",
-    "resource_id": "vieneu_v3_xuan_vinh",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_minh_triet",
-    "display_name": "Minh Triết (Nam Nam - Tin tức)",
-    "resource_id": "vieneu_v3_minh_triet",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_duc_tri",
-    "display_name": "Đức Trí (Nam Nam - Đọc truyện)",
-    "resource_id": "vieneu_v3_duc_tri",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_adam",
-    "display_name": "Adam (Nam Nam - Tự nhiên)",
-    "resource_id": "vieneu_v3_adam",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vieneu_quang_son",
-    "display_name": "Quang Sơn (Nam Trung - Tự nhiên)",
-    "resource_id": "vieneu_v3_quang_son",
-    "engine": "vieneu",
-    "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
     "lan": "th",
     "lang": "th-TH",
     "voice_type": "th",
@@ -1210,5 +1030,205 @@
     "display_name": "Uranus",
     "resource_id": "7587328479071309073",
     "captured_at": "2026-04-16T20:24:40.652003"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_adam_bua",
+    "display_name": "⭐ Adam bựa (Nam · Bắc · Phong cách tự nhiên)",
+    "resource_id": "vieneu_adam_bua",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_truc_ly",
+    "display_name": "⭐ Trúc Ly (Nữ · Bắc · Phong cách tự nhiên)",
+    "resource_id": "vieneu_truc_ly",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thien_minh",
+    "display_name": "⭐ Thiện Minh (Nam · Bắc · Phong cách kể chuyện)",
+    "resource_id": "vieneu_thien_minh",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_mai_anh",
+    "display_name": "⭐ Mai Anh (Nữ · Bắc · Phong cách tin tức)",
+    "resource_id": "vieneu_mai_anh",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_hai_dang",
+    "display_name": "⭐ Hải Đăng (Nam · Bắc · Phong cách tự nhiên)",
+    "resource_id": "vieneu_hai_dang",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thuy_dung",
+    "display_name": "⭐ Thùy Dung (Nữ · Nam · Phong cách tin tức)",
+    "resource_id": "vieneu_thuy_dung",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thien_tam_duc",
+    "display_name": "⭐ Thiền Tâm Đức (Nam · Bắc · Phong cách kể chuyện)",
+    "resource_id": "vieneu_thien_tam_duc",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_ngoc_huyen",
+    "display_name": "⭐ Ngọc Huyền (Nữ · Bắc · Giọng đọc tự nhiên)",
+    "resource_id": "vieneu_ngoc_huyen",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_quang_son",
+    "display_name": "⭐ Quang Sơn (Nam · Trung · Phong cách tự nhiên)",
+    "resource_id": "vieneu_quang_son",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_ngoc_tran",
+    "display_name": "⭐ Ngọc Trân (Nữ · Trung · Phong cách tự nhiên)",
+    "resource_id": "vieneu_ngoc_tran",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_minh_duc",
+    "display_name": "Minh Đức (Nam · Bắc · Phong cách tin tức)",
+    "resource_id": "vieneu_minh_duc",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_pham_tuyen",
+    "display_name": "Phạm Tuyên (Nam · Bắc · Phong cách tự nhiên)",
+    "resource_id": "vieneu_pham_tuyen",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thai_son",
+    "display_name": "Thái Sơn (Nam · Nam · Phong cách kể chuyện)",
+    "resource_id": "vieneu_thai_son",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_xuan_vinh",
+    "display_name": "Xuân Vĩnh (Nam · Bắc · Phong cách tự nhiên)",
+    "resource_id": "vieneu_xuan_vinh",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thanh_binh",
+    "display_name": "Thanh Bình (Nam · Bắc · Phong cách kể chuyện)",
+    "resource_id": "vieneu_thanh_binh",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_ngoc_linh",
+    "display_name": "Ngọc Linh (Nữ · Bắc · Phong cách kể chuyện)",
+    "resource_id": "vieneu_ngoc_linh",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_doan_trang",
+    "display_name": "Đoan Trang (Nữ · Bắc · Phong cách tự nhiên)",
+    "resource_id": "vieneu_doan_trang",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_thuc_doan",
+    "display_name": "Thục Đoan (Nữ · Nam · Phong cách kể chuyện)",
+    "resource_id": "vieneu_thuc_doan",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_minh_triet",
+    "display_name": "Minh Triết (Nam · Nam · Phong cách tin tức)",
+    "resource_id": "vieneu_minh_triet",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_my_duyen",
+    "display_name": "Mỹ Duyên (Nữ · Nam · Phong cách đọc truyện)",
+    "resource_id": "vieneu_my_duyen",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_quynh_anh",
+    "display_name": "Quỳnh Anh (Nữ · Bắc · Phong cách đọc truyện)",
+    "resource_id": "vieneu_quynh_anh",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_duc_tri",
+    "display_name": "Đức Trí (Nam · Nam · Phong cách đọc truyện)",
+    "resource_id": "vieneu_duc_tri",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_kim_thanh",
+    "display_name": "Kim Thanh (Nữ · Nam · Phong cách đọc truyện)",
+    "resource_id": "vieneu_kim_thanh",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_adam",
+    "display_name": "Adam (Nam · Nam · Giọng đọc tự nhiên)",
+    "resource_id": "vieneu_adam",
+    "captured_at": "2026-10-01T07:33:53.651449"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vieneu_quoc_tuan",
+    "display_name": "Quốc Tuấn (Nam · Bắc · Phong cách tự nhiên)",
+    "resource_id": "vieneu_quoc_tuan",
+    "captured_at": "2026-10-01T07:33:53.651449"
   }
 ]
