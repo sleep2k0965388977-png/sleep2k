@@ -462,6 +462,7 @@ def api_protection():
         '/api/upload_custom_voice': 20,
         '/api/custom_voices': 60,
         '/api/delete_custom_voice': 30,
+        '/api/cleanup_session_voices': 60,
         '/api/clone_worker_status': 30,
         '/api/set_clone_worker_url': 30,
     }
@@ -484,9 +485,24 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 CUSTOM_VOICES_DIR = UPLOAD_DIR / "custom_voices"
 CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
-CUSTOM_VOICES_FILE = Path(__file__).parent / "custom_voices.json"
 WORKER_CONFIG_FILE = Path(__file__).parent / "worker_config.json"
 CLONE_API_KEY = os.environ.get("CLONE_API_KEY", "sleep2k_clone_2024")
+
+# In-Memory Temporary Custom Voices (Ephemeral: NOT saved permanently to disk)
+TEMP_CUSTOM_VOICES = {}  # {voice_type: voice_entry}
+
+def auto_clean_stale_custom_voices():
+    """Automatically delete temporary voice recordings older than 1 hour to prevent disk bloat."""
+    now = time.time()
+    for vid, v in list(TEMP_CUSTOM_VOICES.items()):
+        if now - v.get("created_at", now) > 3600:
+            delete_custom_voice_entry(vid)
+    try:
+        for p in CUSTOM_VOICES_DIR.glob("clone_*.*"):
+            if now - p.stat().st_mtime > 3600:
+                p.unlink(missing_ok=True)
+    except Exception:
+        pass
 
 def get_clone_worker_url():
     """Retrieve the AI Clone Worker URL from environment or persistent config file."""
@@ -512,51 +528,33 @@ def set_clone_worker_url(url):
         print(f"Error saving worker URL: {e}")
         return False
 
-def load_custom_voices():
-    """Load user's custom cloned voices from JSON file."""
-    if CUSTOM_VOICES_FILE.exists():
-        try:
-            with open(CUSTOM_VOICES_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error loading custom voices: {e}")
-    return []
+def load_custom_voices(session_id=None):
+    """Load temporary custom voices for the active browser session only."""
+    auto_clean_stale_custom_voices()
+    if not session_id:
+        return []
+    return [v for v in TEMP_CUSTOM_VOICES.values() if v.get("session_id") == session_id]
 
 def save_custom_voice_entry(voice_entry):
-    """Save a new custom voice to JSON file."""
-    voices = load_custom_voices()
-    updated = False
-    for i, v in enumerate(voices):
-        if v.get("voice_type") == voice_entry.get("voice_type"):
-            voices[i] = voice_entry
-            updated = True
-            break
-    if not updated:
-        voices.insert(0, voice_entry)
-    with open(CUSTOM_VOICES_FILE, "w", encoding="utf-8") as f:
-        json.dump(voices, f, ensure_ascii=False, indent=2)
+    """Save a temporary custom voice to in-memory session store."""
+    voice_type = voice_entry.get("voice_type")
+    TEMP_CUSTOM_VOICES[voice_type] = voice_entry
     return voice_entry
 
 def delete_custom_voice_entry(voice_type):
-    """Delete a custom voice by voice_type and remove its audio file."""
-    voices = load_custom_voices()
-    removed = None
-    remaining = []
-    for v in voices:
-        if v.get("voice_type") == voice_type:
-            removed = v
-        else:
-            remaining.append(v)
-    if removed:
-        with open(CUSTOM_VOICES_FILE, "w", encoding="utf-8") as f:
-            json.dump(remaining, f, ensure_ascii=False, indent=2)
-        ref_filename = removed.get("ref_audio")
-        if ref_filename:
+    """Delete a temporary custom voice and instantly remove its vocal audio file."""
+    entry = TEMP_CUSTOM_VOICES.pop(voice_type, None)
+    ref_filename = entry.get("ref_audio") if entry else f"{voice_type}.wav"
+    if ref_filename:
+        try:
             ref_path = CUSTOM_VOICES_DIR / ref_filename
             if ref_path.exists():
                 ref_path.unlink(missing_ok=True)
-        return True
-    return False
+            for extra in CUSTOM_VOICES_DIR.glob(f"{voice_type}.*"):
+                extra.unlink(missing_ok=True)
+        except Exception:
+            pass
+    return True
 
 def is_clone_voice(voice):
     return str(voice or "").startswith("clone_")
@@ -686,12 +684,13 @@ def run_stt_with_adaptive_queue(job_id, saved_path, language):
     finally:
         sem.release()
 
-def load_voices():
+def load_voices(session_id=None):
     voices = []
-    # 1. Custom Cloned Voices first!
-    custom_v = load_custom_voices()
-    if custom_v:
-        voices.extend(custom_v)
+    # 1. Temporary Custom Cloned Voices for this browser session only!
+    if session_id:
+        custom_v = load_custom_voices(session_id=session_id)
+        if custom_v:
+            voices.extend(custom_v)
     # 2. Preset voices
     if VOICE_JSON_PATH.exists():
         with open(VOICE_JSON_PATH, "r", encoding="utf-8") as f:
@@ -699,11 +698,13 @@ def load_voices():
     return voices
 
 def find_voice_info(voice_type):
-    # Check custom voices first
-    for v in load_custom_voices():
-        if v.get("voice_type") == voice_type or v.get("display_name") == voice_type:
+    # Check temporary custom voices first
+    if voice_type in TEMP_CUSTOM_VOICES:
+        return TEMP_CUSTOM_VOICES[voice_type]
+    for v in TEMP_CUSTOM_VOICES.values():
+        if v.get("display_name") == voice_type:
             return v
-    # Check all voices
+    # Check all preset voices
     voices = load_voices()
     for v in voices:
         if v.get("voice_type") == voice_type or v.get("display_name") == voice_type:
@@ -1114,7 +1115,8 @@ def favicon():
 
 @app.route("/api/voices", methods=["GET"])
 def get_voices():
-    voices = load_voices()
+    session_id = request.args.get("session_id", "").strip()
+    voices = load_voices(session_id=session_id)
     return jsonify({"status": "success", "voices": voices})
 
 @app.route("/api/generate_job", methods=["POST"])
@@ -1359,15 +1361,28 @@ def upload_custom_voice():
             "created_at": int(time.time())
         }
         
+        session_id = request.form.get("session_id", "").strip()
+        voice_entry["session_id"] = session_id
         save_custom_voice_entry(voice_entry)
         
         return jsonify({
             "status": "success",
-            "message": f"Đã thêm giọng '{name}' thành công!",
+            "message": f"Đã thêm giọng '{name}' thành công (lưu tạm thời trong phiên làm việc)!",
             "voice": voice_entry
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/cleanup_session_voices", methods=["GET", "POST"])
+def cleanup_session_voices():
+    """Clean up all temporary voice recordings when user closes browser tab / Google Chrome."""
+    session_id = request.args.get("session_id") or (request.json or {}).get("session_id") or request.form.get("session_id")
+    if not session_id:
+        return jsonify({"status": "ignored"}), 200
+    to_delete = [vid for vid, v in list(TEMP_CUSTOM_VOICES.items()) if v.get("session_id") == session_id]
+    for vid in to_delete:
+        delete_custom_voice_entry(vid)
+    return jsonify({"status": "success", "deleted_count": len(to_delete)}), 200
 
 @app.route("/api/delete_custom_voice/<voice_id>", methods=["POST", "DELETE"])
 def delete_custom_voice(voice_id):

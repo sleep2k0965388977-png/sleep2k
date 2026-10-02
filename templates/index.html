@@ -804,10 +804,10 @@
             <div class="guide-step-card" style="border-color: rgba(236,72,153,0.3); background: rgba(236,72,153,0.03);">
                 <div class="guide-step-title">
                     <span style="color:#ec4899;"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
-                    4. Nhân Bản Giọng Của Bạn (Mới)
+                    4. Nhân Bản Giọng Của Bạn (Lưu Tạm Thời)
                 </div>
                 <div class="guide-step-desc">
-                    Bấm thẻ <span class="guide-tag" style="background:rgba(236,72,153,0.15); color:#f472b6; border-color:rgba(236,72,153,0.3);">+ Clone Giọng Bản Thân</span> &rarr; Thu âm 5–15s hoặc tải file vocal. Hệ thống sẽ tạo thẻ giọng riêng mang tên bạn để đọc mọi văn bản!
+                    Bấm thẻ <span class="guide-tag" style="background:rgba(236,72,153,0.15); color:#f472b6; border-color:rgba(236,72,153,0.3);">+ Clone Giọng Bản Thân</span> &rarr; Thu âm 5–15s hoặc tải file vocal. Giọng được <strong>lưu tạm thời trong phiên làm việc</strong>, khi bạn đóng trình duyệt Google Chrome sẽ tự động xóa sạch để bảo vệ riêng tư và tránh đầy bộ nhớ máy chủ!
                 </div>
             </div>
 
@@ -1332,6 +1332,7 @@
                 <div>
                     <h3 style="margin:0; font-size:17px; font-weight:700; color:#fff;">Tải Lên / Nhân Bản Giọng Của Bạn</h3>
                     <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">AI học ngữ điệu từ 5–15s vocal ghi âm của chính bạn</div>
+                    <div style="font-size:11px; color:#34d399; margin-top:4px;"><i class="fa-solid fa-shield-halved"></i> Lưu tạm thời trong phiên — tự động xóa sạch khi đóng trình duyệt để chống đầy bộ nhớ</div>
                 </div>
             </div>
 
@@ -1560,9 +1561,26 @@
 
         let currentLangFilter = "all";
 
+        // Temporary Session ID (Stored in sessionStorage - automatically deleted when browser/Google Chrome is closed)
+        let currentSessionId = sessionStorage.getItem('tts_temp_session');
+        if (!currentSessionId) {
+            currentSessionId = 'sess_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+            sessionStorage.setItem('tts_temp_session', currentSessionId);
+        }
+
+        // Automatic cleanup beacon when closing browser tab / Google Chrome
+        function sendSessionCleanup() {
+            if (currentSessionId && navigator.sendBeacon) {
+                navigator.sendBeacon('/api/cleanup_session_voices?session_id=' + encodeURIComponent(currentSessionId));
+            }
+        }
+        window.addEventListener('beforeunload', sendSessionCleanup);
+        window.addEventListener('pagehide', sendSessionCleanup);
+
         async function fetchVoices() {
             try {
-                const resp = await fetch("/api/voices");
+                const url = currentSessionId ? ('/api/voices?session_id=' + encodeURIComponent(currentSessionId)) : '/api/voices';
+                const resp = await fetch(url);
                 const data = await resp.json();
                 if (data.status === "success") { 
                     allVoices = data.voices; 
@@ -2899,6 +2917,9 @@
             try {
                 const formData = new FormData();
                 formData.append('name', name);
+                if (currentSessionId) {
+                    formData.append('session_id', currentSessionId);
+                }
                 const filename = (cloneAudioBlob.name) ? cloneAudioBlob.name : 'recorded_vocal.wav';
                 formData.append('audio', cloneAudioBlob, filename);
 
