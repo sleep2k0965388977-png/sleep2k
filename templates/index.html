@@ -530,10 +530,249 @@
             color: var(--text-muted);
         }
 
-    </style>
+    
+        /* ── 3-Column Studio Layout with Left Guide & Right Donation QR ── */
+        .main-layout-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 22px;
+            width: 100%;
+            max-width: 1680px;
+            margin: 0 auto;
+            padding: 20px 16px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            flex: 1;
+            max-width: 900px;
+            min-width: 0;
+            margin: 0 !important;
+        }
+
+        .side-panel {
+            width: 320px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            background: rgba(18, 24, 38, 0.88);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 20px 18px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+            box-sizing: border-box;
+        }
+
+        .side-panel::-webkit-scrollbar {
+            width: 5px;
+        }
+        .side-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .side-panel::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.3);
+            border-radius: 5px;
+        }
+        .side-panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(139, 92, 246, 0.5);
+        }
+
+        .side-panel-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .side-panel-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .guide-step-card {
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+        .guide-step-card:hover {
+            background: rgba(139, 92, 246, 0.06);
+            border-color: rgba(139, 92, 246, 0.25);
+            transform: translateX(2px);
+        }
+
+        .guide-step-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        .guide-step-desc {
+            font-size: 11.5px;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        .guide-tag {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 10.5px;
+            font-weight: 600;
+            background: rgba(139, 92, 246, 0.15);
+            color: #c084fc;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .qr-display-box {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(239, 68, 68, 0.05));
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-radius: 16px;
+            padding: 14px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
+            margin-bottom: 14px;
+        }
+
+        .qr-display-img {
+            width: 100%;
+            max-width: 230px;
+            height: auto;
+            border-radius: 12px;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        @media (max-width: 1360px) {
+            .side-panel {
+                width: 280px;
+                padding: 16px 14px;
+            }
+        }
+
+        @media (max-width: 1140px) {
+            .main-layout-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+            .container {
+                width: 100%;
+                max-width: 900px;
+            }
+            .side-panel {
+                position: static;
+                width: 100%;
+                max-width: 900px;
+                max-height: none;
+            }
+        }
+
+</style>
 </head>
 <body>
-    <div class="container">
+    <div class="main-layout-wrapper">
+        <!-- Cột Trái: Hướng Dẫn Sử Dụng Toàn Bộ Chức Năng App -->
+        <aside class="side-panel side-panel-left" id="guidePanel">
+            <div class="side-panel-header">
+                <div class="side-panel-icon" style="background: linear-gradient(135deg, #3b82f6, #6366f1); box-shadow: 0 0 15px rgba(59,130,246,0.35);">
+                    <i class="fa-solid fa-book-open"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0; font-size:15px; font-weight:700; color:#fff;">Hướng Dẫn Sử Dụng</h3>
+                    <div style="font-size:11.5px; color:#94a3b8;">Toàn bộ tính năng từ A – Z</div>
+                </div>
+            </div>
+
+            <!-- Bước 1: Nhập & Tải văn bản -->
+            <div class="guide-step-card">
+                <div class="guide-step-title">
+                    <span style="color:#60a5fa;"><i class="fa-solid fa-file-pen"></i></span>
+                    1. Nhập hoặc Tải File Truyện
+                </div>
+                <div class="guide-step-desc">
+                    Dán văn bản trực tiếp <strong>không giới hạn ký tự</strong>. Hoặc bấm <span class="guide-tag">Tải File Truyện (.TXT)</span> để hệ thống tự động tách chương, đọc trọn bộ tiểu thuyết dài.
+                </div>
+            </div>
+
+            <!-- Bước 2: Gắn biểu cảm AI -->
+            <div class="guide-step-card">
+                <div class="guide-step-title">
+                    <span style="color:#f59e0b;"><i class="fa-solid fa-masks-theater"></i></span>
+                    2. Gắn Biểu Cảm Cảm Xúc AI
+                </div>
+                <div class="guide-step-desc">
+                    Chèn nhanh các tag <span class="guide-tag">[cười]</span>, <span class="guide-tag">[thở dài]</span>, <span class="guide-tag">[hắng giọng]</span>, <span class="guide-tag">[nghỉ nhịp]</span>. Hoặc bấm nút <span class="guide-tag">⚡ Tự Động Quét</span> để AI tự phân tích ngữ cảnh và thêm cảm xúc.
+                </div>
+            </div>
+
+            <!-- Bước 3: Chọn giọng đọc -->
+            <div class="guide-step-card">
+                <div class="guide-step-title">
+                    <span style="color:#a855f7;"><i class="fa-solid fa-microphone-lines"></i></span>
+                    3. 154+ Giọng Đọc Đa Ngôn Ngữ
+                </div>
+                <div class="guide-step-desc">
+                    Chọn các tab ngôn ngữ: <strong>Tiếng Việt</strong> (Hoài My, Nam Minh, Thảo Trinh, Bé, Việt Méo...), Anh, Trung, Nhật... Có sẵn <strong>VieNeu 48kHz</strong> đặc sắc vùng miền. Bấm <span class="guide-tag"><i class="fa-solid fa-volume-high"></i> Nghe thử</span> trước khi tạo.
+                </div>
+            </div>
+
+            <!-- Bước 4: Clone giọng bản thân -->
+            <div class="guide-step-card" style="border-color: rgba(236,72,153,0.3); background: rgba(236,72,153,0.03);">
+                <div class="guide-step-title">
+                    <span style="color:#ec4899;"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+                    4. Nhân Bản Giọng Của Bạn (Mới)
+                </div>
+                <div class="guide-step-desc">
+                    Bấm thẻ <span class="guide-tag" style="background:rgba(236,72,153,0.15); color:#f472b6; border-color:rgba(236,72,153,0.3);">+ Clone Giọng Bản Thân</span> &rarr; Thu âm 5–15s hoặc tải file vocal. Hệ thống sẽ tạo thẻ giọng riêng mang tên bạn để đọc mọi văn bản!
+                </div>
+            </div>
+
+            <!-- Bước 5: Tạo audio & Xuất file -->
+            <div class="guide-step-card">
+                <div class="guide-step-title">
+                    <span style="color:#10b981;"><i class="fa-solid fa-circle-play"></i></span>
+                    5. Tạo Âm Thanh & Xuất MP3
+                </div>
+                <div class="guide-step-desc">
+                    Chỉnh tốc độ đọc (0.75x – 1.5x) &rarr; Bấm <strong>Tạo Giọng Đọc MP3</strong>. Công nghệ chia đoạn song song ghép nối mượt mà trong 1–3s. Nghe trực tiếp hoặc tải file MP3 về máy.
+                </div>
+            </div>
+
+            <!-- Bước 6: Chuyển âm thanh thành chữ STT -->
+            <div class="guide-step-card">
+                <div class="guide-step-title">
+                    <span style="color:#06b6d4;"><i class="fa-solid fa-file-audio"></i></span>
+                    6. Chuyển Âm Thanh Thành Chữ (STT)
+                </div>
+                <div class="guide-step-desc">
+                    Bấm tab <strong>STT</strong> ở đầu trang để chuyển file ghi âm, video thành văn bản hoặc xuất tệp phụ đề <strong>.SRT</strong> khớp từng giây.
+                </div>
+            </div>
+        </aside>
+
+        <div class="container">
         <header>
             <div class="logo-area">
                 <img src="data:image/jpeg;base64,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" alt="SLEEP2K Logo" class="logo-icon-img">
@@ -945,6 +1184,46 @@
                 </div>
             </div>
         </footer>
+        </div>
+
+        <!-- Cột Phải: Mã QR Kêu Gọi Ủng Hộ Cà Phê -->
+        <aside class="side-panel side-panel-right" id="donatePanel">
+            <div class="side-panel-header">
+                <div class="side-panel-icon" style="background: linear-gradient(135deg, #f59e0b, #ef4444); box-shadow: 0 0 15px rgba(245,158,11,0.35);">
+                    <i class="fa-solid fa-mug-hot"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0; font-size:15px; font-weight:700; color:#fff;">Mời Admin Cốc Coffee ☕</h3>
+                    <div style="font-size:11.5px; color:#94a3b8;">Đồng hành duy trì Server</div>
+                </div>
+            </div>
+
+            <!-- Khung hiển thị Mã QR -->
+            <div class="qr-display-box">
+                <img src="/static/donate_qr.jpg" alt="Mã Chuyển Khoản QR" class="qr-display-img" onerror="this.onerror=null;this.src='/static/donate_qr.png';">
+                <div style="font-size:11px; color:#fcd34d; font-weight:600; margin-top:8px;">
+                    <i class="fa-solid fa-qrcode"></i> Quét mã MoMo / Ngân Hàng
+                </div>
+            </div>
+
+            <!-- Lời nhắn -->
+            <div style="font-size:12px; color:#cbd5e1; line-height:1.6; margin-bottom:14px; text-align:justify; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:12px;">
+                Nếu bạn thấy app này hữu ích và giúp ích cho công việc sáng tạo nội dung của bạn, bạn có thể mời admin một cốc coffee để góp phần duy trì chi phí server Railway và phát triển thêm nhiều tính năng mới nhé. Cảm ơn bạn rất nhiều! ❤️
+            </div>
+
+            <!-- Kênh mạng xã hội -->
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <a href="https://www.youtube.com/channel/UCJZbbNNQi_3b7woAWsxfcOA" target="_blank" rel="noopener noreferrer" class="social-btn btn-youtube" style="padding:9px 12px; font-size:12px; border-radius:8px; justify-content:center; text-decoration:none; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-brands fa-youtube" style="font-size:14px;"></i> Đăng Ký Kênh YouTube
+                </a>
+                <a href="https://www.facebook.com/profile.php?id=61573341676326" target="_blank" rel="noopener noreferrer" class="social-btn btn-facebook" style="padding:9px 12px; font-size:12px; border-radius:8px; justify-content:center; text-decoration:none; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-brands fa-facebook" style="font-size:14px;"></i> Nhắn Tin Qua Facebook
+                </a>
+                <a href="mailto:sleepchill2002@gmail.com" class="social-btn btn-mail" style="padding:9px 12px; font-size:12px; border-radius:8px; justify-content:center; text-decoration:none; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-envelope" style="font-size:14px;"></i> Hỗ Trợ: sleepchill2002@gmail.com
+                </a>
+            </div>
+        </aside>
     </div>
 
     <!-- Voice Clone Modal -->
