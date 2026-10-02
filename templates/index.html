@@ -689,6 +689,66 @@
             }
         }
 
+
+        /* ── Batch Multiple Files Upload & Auto Sequential Queue ── */
+        .batch-file-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+        .batch-file-item.active {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(99, 102, 241, 0.15));
+            border-color: rgba(168, 85, 247, 0.6);
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.25);
+        }
+        .batch-file-item.completed {
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        .batch-file-item.error {
+            border-color: rgba(239, 68, 68, 0.4);
+            background: rgba(239, 68, 68, 0.05);
+        }
+        .batch-badge {
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .batch-badge.pending {
+            background: rgba(100, 116, 139, 0.2);
+            color: #94a3b8;
+        }
+        .batch-badge.generating {
+            background: rgba(56, 189, 248, 0.2);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+        }
+        .batch-badge.downloading {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fcd34d;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }
+        .batch-badge.completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+        .batch-badge.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+        }
+
 </style>
 </head>
 <body>
@@ -709,10 +769,12 @@
             <div class="guide-step-card">
                 <div class="guide-step-title">
                     <span style="color:#60a5fa;"><i class="fa-solid fa-file-pen"></i></span>
-                    1. Nhập hoặc Tải File Truyện
+                    1. Nhập hoặc Tải File Hàng Loạt
                 </div>
                 <div class="guide-step-desc">
-                    Dán văn bản trực tiếp <strong>không giới hạn ký tự</strong>. Hoặc bấm <span class="guide-tag">Tải File Truyện (.TXT)</span> để hệ thống tự động tách chương, đọc trọn bộ tiểu thuyết dài.
+                    • Dán văn bản trực tiếp <strong>không giới hạn ký tự</strong>.<br/>
+                    • Bấm <span class="guide-tag">Tải File Truyện (.TXT)</span>: Tự động tách chương đọc 1 cuốn tiểu thuyết dài.<br/>
+                    • Bấm <span class="guide-tag" style="color:#f472b6; border-color:rgba(236,72,153,0.4); background:rgba(236,72,153,0.15);">Tải Danh Sách File (.TXT)</span>: Chọn cùng lúc nhiều file, hệ thống sẽ tự động tạo lần lượt từng file từ trên xuống dưới, tạo xong file nào tự động tải xuống file đó rồi mới tiếp tục file kế tiếp!
                 </div>
             </div>
 
@@ -859,11 +921,44 @@
             <div style="margin-bottom:12px;">
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
                     
-                    <button type="button" id="btnUploadFile" onclick="document.getElementById('chapterFileInput').click();" style="background:linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3)); border:1px solid rgba(59,130,246,0.5); color:#93c5fd; padding:7px 16px; border-radius:10px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;">
+                    <button type="button" id="btnUploadFile" onclick="document.getElementById('chapterFileInput').click();" style="background:linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3)); border:1px solid rgba(59,130,246,0.5); color:#93c5fd; padding:7px 16px; border-radius:10px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;" title="Tách chương đọc nguyên một cuốn truyện dài">
                         <i class="fa-solid fa-file-arrow-up"></i> T&#7843;i File Truy&#7879;n (.TXT)
+                    </button>
+                    <button type="button" id="btnUploadBatchFiles" onclick="document.getElementById('batchFilesInput').click();" style="background:linear-gradient(135deg, rgba(168,85,247,0.3), rgba(236,72,153,0.3)); border:1px solid rgba(168,85,247,0.5); color:#f472b6; padding:7px 16px; border-radius:10px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s; box-shadow:0 2px 10px rgba(168,85,247,0.25);" title="Tải danh sách nhiều file .TXT lên để tạo lần lượt từng file từ trên xuống dưới, tạo xong file nào tự động tải xuống file đó">
+                        <i class="fa-solid fa-folder-plus"></i> T&#7843;i Danh S&#225;ch File (.TXT)
                     </button>
                     <span id="uploadedFileName" style="display:none; font-size:12px; color:#34d399; font-weight:600;"><i class="fa-solid fa-circle-check"></i> <span id="uploadedFileNameText"></span></span>
                     <input type="file" id="chapterFileInput" accept=".txt" style="display:none;" onchange="handleChapterFileUpload(this.files[0]);">
+                    <input type="file" id="batchFilesInput" accept=".txt" multiple style="display:none;" onchange="handleBatchFilesUpload(this.files);">
+                </div>
+
+                <!-- Batch Multiple Files Queue Panel (Tạo tuần tự từ trên xuống, xong file nào tải xuống file đó) -->
+                <div id="batchFilesPanel" style="display:none; margin-bottom:14px; padding:16px; background:rgba(30,41,59,0.85); border:1px solid rgba(168,85,247,0.35); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,0.4);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-layer-group" style="color:#c084fc; font-size:16px;"></i>
+                            <span style="font-weight:700; color:#fff; font-size:13.5px;">Danh S&#225;ch File H&#224;ng Lo&#7841;t (<span id="batchTotalCount" style="color:#c084fc;">0</span> file)</span>
+                            <span id="batchTotalChars" style="font-size:11.5px; color:#94a3b8; margin-left:6px;"></span>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button type="button" id="btnBatchStartAll" onclick="toggleBatchGeneration()" style="background:linear-gradient(135deg,#a855f7,#ec4899); border:none; color:#fff; padding:6px 16px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(168,85,247,0.35);">
+                                <i class="fa-solid fa-play" id="batchStartIcon"></i> <span id="batchStartText">T&#7841;o L&#7847;n L&#434;&#7907;t T&#7845;t C&#7843;</span>
+                            </button>
+                            <button type="button" onclick="clearBatchFilesList()" style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; padding:6px 12px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;">
+                                <i class="fa-solid fa-trash-can"></i> X&#243;a h&#7871;t
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Status Banner during Batch -->
+                    <div id="batchLiveBanner" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:10px; background:rgba(168,85,247,0.15); border:1px solid rgba(168,85,247,0.3); font-size:12px; color:#e9d5ff; display:flex; align-items:center; justify-content:space-between;">
+                        <span id="batchLiveMessage"><i class="fa-solid fa-circle-notch fa-spin"></i> &#272;ang t&#7841;o file...</span>
+                        <span id="batchLivePercent" style="font-weight:700; color:#38bdf8;">0%</span>
+                    </div>
+
+                    <!-- Items container -->
+                    <div id="batchItemsContainer" style="display:flex; flex-direction:column; gap:8px; max-height:360px; overflow-y:auto; padding-right:4px;">
+                    </div>
                 </div>
 
                 <!-- Chapter List Panel (shown after file upload) -->
@@ -2895,6 +2990,362 @@
             }
         }
     
+
+        // ── Batch Multiple Text Files Sequential Generator ──
+        let batchFilesQueue = [];
+        let isBatchRunning = false;
+        let currentBatchRunningIndex = -1;
+
+        async function handleBatchFilesUpload(fileList) {
+            if (!fileList || fileList.length === 0) return;
+
+            const filesArray = Array.from(fileList);
+            const txtFiles = filesArray.filter(f => f.name.toLowerCase().endsWith('.txt'));
+
+            if (txtFiles.length === 0) {
+                alert('Vui lòng chọn các file văn bản có đuôi .TXT');
+                return;
+            }
+
+            // Natural sort by filename (e.g. tap1, tap2, tap10)
+            txtFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+            let totalChars = 0;
+            const newItems = [];
+
+            for (let i = 0; i < txtFiles.length; i++) {
+                const file = txtFiles[i];
+                try {
+                    const text = await readFileAsText(file);
+                    const cleanText = text.trim();
+                    totalChars += cleanText.length;
+
+                    newItems.push({
+                        id: 'batch_' + Date.now() + '_' + i,
+                        file: file,
+                        name: file.name,
+                        title: file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9\u00C0-\u024F\u1E00-\u1EFF _-]/g, '').trim() || ('audio_' + (i+1)),
+                        size: file.size,
+                        text: cleanText,
+                        charCount: cleanText.length,
+                        status: 'pending', // pending, generating, downloading, completed, error
+                        progress: 0,
+                        statusMsg: 'Chờ đến lượt',
+                        mp3Url: null,
+                        errorMsg: null
+                    });
+                } catch (e) {
+                    console.error('Lỗi đọc file ' + file.name + ':', e);
+                }
+            }
+
+            batchFilesQueue = newItems;
+            renderBatchList();
+
+            const panel = document.getElementById('batchFilesPanel');
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Reset input
+            document.getElementById('batchFilesInput').value = '';
+        }
+
+        function readFileAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result || '');
+                reader.onerror = e => reject(e);
+                reader.readAsText(file, 'utf-8');
+            });
+        }
+
+        function renderBatchList() {
+            const container = document.getElementById('batchItemsContainer');
+            container.innerHTML = '';
+
+            const totalFiles = batchFilesQueue.length;
+            document.getElementById('batchTotalCount').innerText = totalFiles;
+
+            let totalChars = 0;
+            let completedCount = 0;
+
+            batchFilesQueue.forEach((item, idx) => {
+                totalChars += item.charCount;
+                if (item.status === 'completed') completedCount++;
+
+                const row = document.createElement('div');
+                row.className = 'batch-file-item ' + (item.status === 'generating' ? 'active' : item.status);
+                row.id = 'batchRow_' + idx;
+
+                let badgeHtml = '';
+                if (item.status === 'pending') {
+                    badgeHtml = '<span class="batch-badge pending"><i class="fa-solid fa-clock"></i> Chờ đến lượt</span>';
+                } else if (item.status === 'generating') {
+                    badgeHtml = '<span class="batch-badge generating"><i class="fa-solid fa-circle-notch fa-spin"></i> Đang tạo: ' + (item.progress || 5) + '%</span>';
+                } else if (item.status === 'downloading') {
+                    badgeHtml = '<span class="batch-badge downloading"><i class="fa-solid fa-cloud-arrow-down fa-bounce"></i> Đang tải xuống MP3...</span>';
+                } else if (item.status === 'completed') {
+                    badgeHtml = '<span class="batch-badge completed"><i class="fa-solid fa-circle-check"></i> Đã xong & Tải về</span>';
+                } else if (item.status === 'error') {
+                    badgeHtml = '<span class="batch-badge error" title="' + (item.errorMsg||'') + '"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi</span>';
+                }
+
+                row.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+                        <span style="font-size:11px; font-weight:700; color:#a78bfa; width:22px; text-align:center;">#${idx + 1}</span>
+                        <i class="fa-solid fa-file-lines" style="color:#60a5fa; font-size:16px; flex-shrink:0;"></i>
+                        <div style="min-width:0; flex:1;">
+                            <div style="font-size:12.5px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${item.name}">${item.name}</div>
+                            <div style="font-size:11px; color:#94a3b8; display:flex; gap:10px; margin-top:2px;">
+                                <span><i class="fa-solid fa-font"></i> ${item.charCount.toLocaleString('vi-VN')} ký tự</span>
+                                <span><i class="fa-solid fa-database"></i> ${(item.size / 1024).toFixed(1)} KB</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                        ${badgeHtml}
+                        ${item.status === 'completed' && item.mp3Url ? `
+                            <button type="button" class="btn-preview" onclick="triggerDownloadBlob('${item.mp3Url}', '${item.title}.mp3')" title="Tải lại file này" style="padding:4px 8px; font-size:11px;">
+                                <i class="fa-solid fa-download"></i>
+                            </button>
+                        ` : ''}
+                        ${!isBatchRunning && item.status !== 'generating' ? `
+                            <button type="button" onclick="removeBatchItem(${idx})" title="Xóa file này khỏi danh sách" style="background:none; border:none; color:#ef4444; opacity:0.6; cursor:pointer; padding:4px;">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+
+            document.getElementById('batchTotalChars').innerText = '• ' + totalChars.toLocaleString('vi-VN') + ' ký tự (' + completedCount + '/' + totalFiles + ' đã xong)';
+        }
+
+        function removeBatchItem(index) {
+            if (isBatchRunning) return;
+            batchFilesQueue.splice(index, 1);
+            if (batchFilesQueue.length === 0) {
+                clearBatchFilesList();
+            } else {
+                renderBatchList();
+            }
+        }
+
+        function clearBatchFilesList() {
+            if (isBatchRunning) {
+                if (!confirm('Đang tạo hàng loạt, bạn có chắc chắn muốn dừng và xóa toàn bộ danh sách?')) return;
+                isBatchRunning = false;
+            }
+            batchFilesQueue = [];
+            currentBatchRunningIndex = -1;
+            document.getElementById('batchFilesPanel').style.display = 'none';
+            document.getElementById('batchLiveBanner').style.display = 'none';
+            updateBatchUI();
+        }
+
+        function toggleBatchGeneration() {
+            if (isBatchRunning) {
+                // Pause / Stop
+                isBatchRunning = false;
+                updateBatchUI();
+            } else {
+                startBatchSequentialGeneration();
+            }
+        }
+
+        function updateBatchUI() {
+            const btn = document.getElementById('btnBatchStartAll');
+            const icon = document.getElementById('batchStartIcon');
+            const text = document.getElementById('batchStartText');
+
+            if (isBatchRunning) {
+                btn.style.background = 'linear-gradient(135deg, #e11d48, #f43f5e)';
+                icon.className = 'fa-solid fa-pause';
+                text.innerText = 'Tạm Dừng';
+                document.getElementById('batchLiveBanner').style.display = 'flex';
+            } else {
+                btn.style.background = 'linear-gradient(135deg, #a855f7, #ec4899)';
+                icon.className = 'fa-solid fa-play';
+                const hasPending = batchFilesQueue.some(item => item.status !== 'completed');
+                text.innerText = hasPending ? 'Tạo Lần Lượt Tất Cả' : 'Tạo Lại Tất Cả';
+                document.getElementById('batchLiveBanner').style.display = 'none';
+            }
+        }
+
+        async function startBatchSequentialGeneration() {
+            if (batchFilesQueue.length === 0) {
+                alert('Vui lòng tải lên danh sách file văn bản (.txt) trước.');
+                return;
+            }
+
+            isBatchRunning = true;
+            updateBatchUI();
+
+            const total = batchFilesQueue.length;
+
+            for (let i = 0; i < total; i++) {
+                if (!isBatchRunning) break; // User stopped
+
+                const item = batchFilesQueue[i];
+                if (item.status === 'completed') continue; // Already generated
+
+                currentBatchRunningIndex = i;
+                item.status = 'generating';
+                item.progress = 5;
+                renderBatchList();
+
+                // Update live banner
+                document.getElementById('batchLiveMessage').innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Đang tạo file [${i + 1}/${total}]: <strong>${item.name}</strong>`;
+                document.getElementById('batchLivePercent').innerText = '5%';
+
+                // Scroll item into view
+                const rowEl = document.getElementById('batchRow_' + i);
+                if (rowEl) rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+                try {
+                    const textContent = item.text;
+                    if (!textContent || !textContent.trim()) {
+                        item.status = 'error';
+                        item.errorMsg = 'Nội dung file rỗng';
+                        renderBatchList();
+                        continue;
+                    }
+
+                    // 1. Send generation request
+                    const rate = document.getElementById('rateSelect') ? document.getElementById('rateSelect').value : '1.0';
+                    const genResp = await fetch('/api/generate_job', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: textContent,
+                            voice: selectedVoice,
+                            resource_id: selectedResourceId,
+                            rate: rate
+                        })
+                    });
+
+                    const genData = await genResp.json();
+                    if (genData.status !== 'success' || !genData.job_id) {
+                        throw new Error(genData.message || 'Không thể tạo task');
+                    }
+
+                    const jobId = genData.job_id;
+
+                    // 2. Poll progress until complete
+                    const jobResult = await pollJobProgress(jobId, (pct, msg) => {
+                        item.progress = pct;
+                        document.getElementById('batchLivePercent').innerText = pct + '%';
+                        renderBatchList();
+                    });
+
+                    if (!jobResult || !jobResult.download_url) {
+                        throw new Error('Không nhận được đường dẫn tệp âm thanh');
+                    }
+
+                    // 3. Mark as downloading
+                    item.status = 'downloading';
+                    item.progress = 100;
+                    item.mp3Url = jobResult.download_url;
+                    renderBatchList();
+                    document.getElementById('batchLiveMessage').innerHTML = `<i class="fa-solid fa-cloud-arrow-down fa-bounce"></i> Đang tải xuống file [${i + 1}/${total}]: <strong>${item.title}.mp3</strong>`;
+
+                    // 4. TRIGGER AUTOMATIC DOWNLOAD TO USER'S COMPUTER
+                    const outFilename = item.title + '.mp3';
+                    await triggerDownloadBlob(jobResult.download_url, outFilename);
+
+                    // 5. Mark as completed
+                    item.status = 'completed';
+                    renderBatchList();
+
+                    // 6. Mandatory Cooldown: wait 3 seconds to ensure download finishes before next file!
+                    if (isBatchRunning && i < total - 1) {
+                        document.getElementById('batchLiveMessage').innerHTML = `<i class="fa-solid fa-circle-check" style="color:#34d399;"></i> Đã tải xuống xong file #${i + 1}. Nghỉ 3s chuẩn bị file tiếp theo...`;
+                        await new Promise(r => setTimeout(r, 3000));
+                    }
+
+                } catch (err) {
+                    console.error('Lỗi khi tạo file #' + (i + 1) + ' (' + item.name + '):', err);
+                    item.status = 'error';
+                    item.errorMsg = err.message || 'Lỗi tạo âm thanh';
+                    renderBatchList();
+                    // Wait 2s on error before continuing to next file
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            }
+
+            isBatchRunning = false;
+            currentBatchRunningIndex = -1;
+            updateBatchUI();
+
+            const allDone = batchFilesQueue.every(it => it.status === 'completed');
+            if (allDone) {
+                alert('🎉 TUYỆT VỜI! Đã tạo và tự động tải xuống thành công toàn bộ ' + total + ' file văn bản!');
+            }
+        }
+
+        function pollJobProgress(jobId, onProgress) {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 150; // up to 5 minutes
+                const interval = setInterval(async () => {
+                    attempts++;
+                    if (!isBatchRunning) {
+                        clearInterval(interval);
+                        return reject(new Error('Người dùng đã tạm dừng'));
+                    }
+                    if (attempts > maxAttempts) {
+                        clearInterval(interval);
+                        return reject(new Error('Quá thời gian xử lý (Timeout)'));
+                    }
+                    try {
+                        const r = await fetch('/api/job_status/' + jobId);
+                        if (!r.ok) return;
+                        const data = await r.json();
+
+                        if (onProgress && data.progress !== undefined) {
+                            onProgress(data.progress, data.message || '');
+                        }
+
+                        if (data.status === 'completed') {
+                            clearInterval(interval);
+                            resolve(data.result || {});
+                        } else if (data.status === 'error') {
+                            clearInterval(interval);
+                            reject(new Error(data.message || 'Lỗi server'));
+                        }
+                    } catch (e) {
+                        // ignore and retry
+                    }
+                }, 2000);
+            });
+        }
+
+        async function triggerDownloadBlob(url, filename) {
+            try {
+                const resp = await fetch(url);
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+            } catch (err) {
+                // Direct link fallback
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.target = '_blank';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+
 </script>
 </body>
 </html>
