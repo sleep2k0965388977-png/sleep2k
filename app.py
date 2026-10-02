@@ -428,6 +428,8 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB upload limit (securi
 def api_protection():
     """Protect POST API routes from external/bot access."""
     path = request.path
+    if path.startswith('/api/delete_custom_voice/'):
+        path = '/api/delete_custom_voice'
     
     # Skip protection for: static files, health, GET requests, login
     if request.method == 'GET' or request.method == 'HEAD' or request.method == 'OPTIONS':
@@ -457,6 +459,11 @@ def api_protection():
         '/api/transcribe_job': 10,    # 10 per minute
         '/api/translate_content': 10, # 10 per minute
         '/api/upload_chunk': 20,      # 20 per minute
+        '/api/upload_custom_voice': 20,
+        '/api/custom_voices': 60,
+        '/api/delete_custom_voice': 30,
+        '/api/clone_worker_status': 30,
+        '/api/set_clone_worker_url': 30,
     }
     max_req = rate_limits.get(path, 30)  # default 30/min
     if not _rate_check(path, max_req):
@@ -474,6 +481,117 @@ PREVIEW_DIR.mkdir(exist_ok=True)
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+CUSTOM_VOICES_DIR = UPLOAD_DIR / "custom_voices"
+CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
+CUSTOM_VOICES_FILE = Path(__file__).parent / "custom_voices.json"
+WORKER_CONFIG_FILE = Path(__file__).parent / "worker_config.json"
+CLONE_API_KEY = os.environ.get("CLONE_API_KEY", "sleep2k_clone_2024")
+
+def get_clone_worker_url():
+    """Retrieve the AI Clone Worker URL from environment or persistent config file."""
+    env_url = os.environ.get("CLONE_WORKER_URL", "").strip()
+    if env_url:
+        return env_url
+    if WORKER_CONFIG_FILE.exists():
+        try:
+            with open(WORKER_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("worker_url", "").strip()
+        except Exception:
+            pass
+    return ""
+
+def set_clone_worker_url(url):
+    """Save the AI Clone Worker URL to persistent config file."""
+    try:
+        with open(WORKER_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump({"worker_url": url.strip()}, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving worker URL: {e}")
+        return False
+
+def load_custom_voices():
+    """Load user's custom cloned voices from JSON file."""
+    if CUSTOM_VOICES_FILE.exists():
+        try:
+            with open(CUSTOM_VOICES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading custom voices: {e}")
+    return []
+
+def save_custom_voice_entry(voice_entry):
+    """Save a new custom voice to JSON file."""
+    voices = load_custom_voices()
+    updated = False
+    for i, v in enumerate(voices):
+        if v.get("voice_type") == voice_entry.get("voice_type"):
+            voices[i] = voice_entry
+            updated = True
+            break
+    if not updated:
+        voices.insert(0, voice_entry)
+    with open(CUSTOM_VOICES_FILE, "w", encoding="utf-8") as f:
+        json.dump(voices, f, ensure_ascii=False, indent=2)
+    return voice_entry
+
+def delete_custom_voice_entry(voice_type):
+    """Delete a custom voice by voice_type and remove its audio file."""
+    voices = load_custom_voices()
+    removed = None
+    remaining = []
+    for v in voices:
+        if v.get("voice_type") == voice_type:
+            removed = v
+        else:
+            remaining.append(v)
+    if removed:
+        with open(CUSTOM_VOICES_FILE, "w", encoding="utf-8") as f:
+            json.dump(remaining, f, ensure_ascii=False, indent=2)
+        ref_filename = removed.get("ref_audio")
+        if ref_filename:
+            ref_path = CUSTOM_VOICES_DIR / ref_filename
+            if ref_path.exists():
+                ref_path.unlink(missing_ok=True)
+        return True
+    return False
+
+def is_clone_voice(voice):
+    return str(voice or "").startswith("clone_")
+
+def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
+    """
+    Synthesize audio using AI Voice Clone Engine via Colab or Local GPU Worker.
+    Sends text_chunk + ref_audio to worker's /api/clone endpoint.
+    """
+    vinfo = find_voice_info(voice)
+    if not vinfo or not vinfo.get("ref_audio"):
+        raise ValueError(f"Không tìm thấy tệp vocal mẫu cho {voice}")
+    
+    ref_file = CUSTOM_VOICES_DIR / vinfo["ref_audio"]
+    if not ref_file.exists():
+        raise FileNotFoundError(f"Tệp vocal mẫu {vinfo['ref_audio']} không tồn tại.")
+    
+    worker_url = get_clone_worker_url()
+    if not worker_url:
+        raise ValueError("Chưa thiết lập URL Worker AI Clone (Colab hoặc Local GPU).")
+    
+    clean_url = worker_url.rstrip("/")
+    with open(ref_file, "rb") as af:
+        resp = requests.post(
+            f"{clean_url}/api/clone",
+            headers={"X-API-Key": CLONE_API_KEY},
+            files={"audio": (vinfo["ref_audio"], af, "audio/wav")},
+            data={"text": text_chunk, "rate": rate},
+            timeout=60
+        )
+    if resp.status_code == 200 and len(resp.content) > 500:
+        return resp.content
+    else:
+        err_msg = resp.text[:150] if resp.text else f"status {resp.status_code}"
+        raise RuntimeError(f"Worker AI Clone: {err_msg}")
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
 CHECKPOINTS_DIR.mkdir(exist_ok=True)
@@ -569,12 +687,23 @@ def run_stt_with_adaptive_queue(job_id, saved_path, language):
         sem.release()
 
 def load_voices():
+    voices = []
+    # 1. Custom Cloned Voices first!
+    custom_v = load_custom_voices()
+    if custom_v:
+        voices.extend(custom_v)
+    # 2. Preset voices
     if VOICE_JSON_PATH.exists():
         with open(VOICE_JSON_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+            voices.extend(json.load(f))
+    return voices
 
 def find_voice_info(voice_type):
+    # Check custom voices first
+    for v in load_custom_voices():
+        if v.get("voice_type") == voice_type or v.get("display_name") == voice_type:
+            return v
+    # Check all voices
     voices = load_voices()
     for v in voices:
         if v.get("voice_type") == voice_type or v.get("display_name") == voice_type:
@@ -765,6 +894,7 @@ def generate_silent_mp3_bytes(duration_ms=250):
 def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     """
     Robust multi-layer chunk audio synthesis:
+    0. AI Voice Clone engine (Google Colab / Local GPU Worker)
     1. Primary engine (VieNeu / Edge-TTS / CapCut) with self-healing retries
     2. Seamless Neural fallback (HoaiMy/NamMinh)
     3. Graceful acoustic pause fallback (Zero job aborts guaranteed)
@@ -772,6 +902,25 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     if not text_chunk or not text_chunk.strip():
         silence = generate_silent_mp3_bytes(200)
         return idx, silence, 200
+
+    # ── 0. AI Voice Clone Engine (Google Colab / Local GPU Worker) ──
+    if is_clone_voice(voice):
+        try:
+            audio_bytes = synthesize_clone_audio(text_chunk, voice, rate=rate)
+            if audio_bytes and len(audio_bytes) > 0:
+                est_duration = int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, est_duration
+        except Exception as ex:
+            print(f"Clone Voice synthesis error chunk {idx+1}: {ex}")
+            try:
+                # Intelligent fallback: read with warm expressive neural voice
+                audio_bytes = edge_tts_synthesize_audio(text_chunk, "vi-VN-HoaiMyNeural", rate=rate, max_retries=2)
+                if audio_bytes and len(audio_bytes) > 0:
+                    return idx, audio_bytes, int(len(text_chunk) / 150 * 1000)
+            except Exception:
+                pass
+        silence = generate_silent_mp3_bytes(300)
+        return idx, silence, 300
 
     # ── 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
     if is_vieneu_voice(voice):
@@ -1021,6 +1170,15 @@ def preview_voice():
     try:
         data = request.json or {}
         voice = data.get("voice", "BV421_vivn_streaming")
+
+        # Instant preview for custom cloned voices (play original sample vocal)
+        if is_clone_voice(voice):
+            vinfo = find_voice_info(voice)
+            if vinfo and vinfo.get("ref_audio"):
+                return jsonify({
+                    "status": "success",
+                    "download_url": f"/uploads/custom_voices/{vinfo['ref_audio']}"
+                })
         lan = (data.get("lan") or "vi").lower()
 
         vinfo = find_voice_info(voice)
@@ -1151,6 +1309,105 @@ def serve_audio(filename):
 @app.route("/output/previews/<filename>")
 def serve_preview_audio(filename):
     return send_from_directory(PREVIEW_DIR, filename)
+
+@app.route("/uploads/custom_voices/<filename>")
+def serve_custom_voice(filename):
+    return send_from_directory(CUSTOM_VOICES_DIR, filename)
+
+@app.route("/api/custom_voices", methods=["GET"])
+def get_custom_voices():
+    voices = load_custom_voices()
+    worker_url = get_clone_worker_url()
+    return jsonify({
+        "status": "success",
+        "voices": voices,
+        "worker_url": worker_url,
+        "worker_connected": bool(worker_url)
+    })
+
+@app.route("/api/upload_custom_voice", methods=["POST"])
+def upload_custom_voice():
+    try:
+        name = request.form.get("name", "").strip()
+        if not name:
+            return jsonify({"status": "error", "message": "Vui lòng nhập tên cho giọng đọc."}), 400
+        
+        if "audio" not in request.files:
+            return jsonify({"status": "error", "message": "Vui lòng tải lên tệp âm thanh hoặc ghi âm giọng mẫu."}), 400
+        
+        audio_file = request.files["audio"]
+        if not audio_file or not audio_file.filename:
+            return jsonify({"status": "error", "message": "Tệp âm thanh mẫu không hợp lệ."}), 400
+        
+        voice_id = f"clone_{uuid.uuid4().hex[:8]}"
+        orig_ext = Path(audio_file.filename).suffix.lower()
+        if orig_ext not in [".mp3", ".wav", ".m4a", ".ogg", ".webm", ".aac"]:
+            orig_ext = ".wav"
+        
+        save_filename = f"{voice_id}{orig_ext}"
+        save_path = CUSTOM_VOICES_DIR / save_filename
+        audio_file.save(str(save_path))
+        
+        voice_entry = {
+            "voice_type": voice_id,
+            "display_name": name,
+            "lan": "vi",
+            "category": "custom",
+            "is_clone": True,
+            "ref_audio": save_filename,
+            "preview_url": f"/uploads/custom_voices/{save_filename}",
+            "created_at": int(time.time())
+        }
+        
+        save_custom_voice_entry(voice_entry)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Đã thêm giọng '{name}' thành công!",
+            "voice": voice_entry
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/delete_custom_voice/<voice_id>", methods=["POST", "DELETE"])
+def delete_custom_voice(voice_id):
+    try:
+        ok = delete_custom_voice_entry(voice_id)
+        if ok:
+            return jsonify({"status": "success", "message": "Đã xóa giọng thành công."})
+        return jsonify({"status": "error", "message": "Không tìm thấy giọng để xóa."}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/api/clone_worker_status", methods=["GET"])
+def clone_worker_status():
+    url = get_clone_worker_url()
+    if not url:
+        return jsonify({"status": "not_configured", "message": "Chưa kết nối URL Worker AI Clone."})
+    try:
+        r = requests.get(f"{url.rstrip('/')}/health", timeout=5)
+        if r.status_code == 200:
+            data = r.json()
+            return jsonify({
+                "status": "online",
+                "worker_url": url,
+                "gpu": data.get("gpu", "T4 GPU"),
+                "voices": data.get("voices", 0)
+            })
+    except Exception as e:
+        pass
+    return jsonify({
+        "status": "offline",
+        "worker_url": url,
+        "message": "Worker đang tắt hoặc URL Ngrok chưa kết nối."
+    })
+
+@app.route("/api/set_clone_worker_url", methods=["POST"])
+def set_clone_worker():
+    data = request.json or {}
+    url = data.get("worker_url", "").strip()
+    set_clone_worker_url(url)
+    return jsonify({"status": "success", "worker_url": url})
 
 # ── Speech to Text (Audio/Video Transcription) Engine ──
 

@@ -266,6 +266,37 @@
             transition: all 0.2s ease; display: flex; flex-direction: column;
             justify-content: space-between; gap: 8px;
         }
+        .add-voice-card {
+            border: 2px dashed rgba(168, 85, 247, 0.6) !important;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(99, 102, 241, 0.05)) !important;
+            cursor: pointer;
+            min-height: 86px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            transition: all 0.25s ease;
+        }
+        .add-voice-card:hover {
+            border-color: #c084fc !important;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.18), rgba(99, 102, 241, 0.12)) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 18px rgba(168, 85, 247, 0.25);
+        }
+        .btn-delete-voice {
+            background: none; border: none; color: #ef4444; opacity: 0.6;
+            cursor: pointer; padding: 2px 6px; font-size: 11px; border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .btn-delete-voice:hover { opacity: 1; background: rgba(239, 68, 68, 0.15); }
+        .recording-pulse {
+            animation: recPulse 1.2s infinite;
+        }
+        @keyframes recPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.8; }
+        }
         .voice-item:hover { background: rgba(139,92,246,0.12); border-color: rgba(139,92,246,0.35); transform: translateY(-2px); }
         .voice-item.active {
             background: linear-gradient(135deg, rgba(139,92,246,0.25), rgba(59,130,246,0.25));
@@ -632,6 +663,9 @@
                     <button class="lang-tab active" onclick="filterByLang('all', this)">
                         🌐 Tất Cả <span class="lang-count" id="cntAll">149</span>
                     </button>
+                    <button class="lang-tab" id="tabCustom" onclick="filterByLang('custom', this)" style="border: 1px solid rgba(168,85,247,0.5); background: rgba(168,85,247,0.12); color: #d8b4fe;">
+                        ⭐ Giọng Của Tôi <span class="lang-count" id="cntCustom">0</span>
+                    </button>
                     <button class="lang-tab" onclick="filterByLang('vi', this)">
                         🇻🇳 Tiếng Việt <span class="lang-count" id="cntVi">46</span>
                     </button>
@@ -913,6 +947,94 @@
         </footer>
     </div>
 
+    <!-- Voice Clone Modal -->
+    <div class="modal-overlay" id="cloneModal" onclick="if(event.target===this) closeCloneModal()">
+        <div class="modal-card" style="max-width: 520px; text-align: left; padding: 26px;">
+            <button class="modal-close-btn" onclick="closeCloneModal()"><i class="fa-solid fa-xmark"></i></button>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom: 16px;">
+                <div style="width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,#a855f7,#6366f1); display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(168,85,247,0.4); flex-shrink:0;">
+                    <i class="fa-solid fa-microphone-lines" style="font-size:20px; color:#fff;"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0; font-size:17px; font-weight:700; color:#fff;">Tải Lên / Nhân Bản Giọng Của Bạn</h3>
+                    <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">AI học ngữ điệu từ 5–15s vocal ghi âm của chính bạn</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+                <label style="display:block; font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:6px;">
+                    1. Đặt tên cho giọng đọc <span style="color:#ef4444;">*</span>
+                </label>
+                <input type="text" id="cloneVoiceName" placeholder="VD: Giọng của Tôi, Giọng Anh Tuấn, Giọng Kể Chuyện..." style="width:100%; box-sizing:border-box; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:10px; padding:10px 14px; color:#fff; font-size:13px; outline:none;">
+            </div>
+
+            <div style="margin-bottom: 14px;">
+                <label style="display:block; font-size:12px; font-weight:600; color:#cbd5e1; margin-bottom:6px;">
+                    2. Cung cấp đoạn giọng mẫu (Vocal 5–15 giây) <span style="color:#ef4444;">*</span>
+                </label>
+                
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <button type="button" id="tabUploadBtn" class="lang-tab active" onclick="switchCloneTab('upload')" style="flex:1; justify-content:center;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Tải Tệp Âm Thanh
+                    </button>
+                    <button type="button" id="tabRecordBtn" class="lang-tab" onclick="switchCloneTab('record')" style="flex:1; justify-content:center;">
+                        <i class="fa-solid fa-microphone"></i> Thu Âm Trực Tiếp
+                    </button>
+                </div>
+
+                <!-- Upload Area -->
+                <div id="cloneUploadArea" style="border:2px dashed rgba(168,85,247,0.4); border-radius:12px; padding:22px; text-align:center; background:rgba(168,85,247,0.04); cursor:pointer; transition:all 0.2s;" onclick="document.getElementById('cloneAudioFileInput').click()">
+                    <i class="fa-solid fa-file-audio" style="font-size:32px; color:#c084fc; margin-bottom:8px;"></i>
+                    <div style="font-size:13px; font-weight:600; color:#e2e8f0;" id="uploadFilePrompt">Bấm vào đây để chọn tệp âm thanh (MP3, WAV, M4A)</div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Thời lượng khuyến nghị: 5 – 20 giây rõ lời, ít tạp âm</div>
+                    <input type="file" id="cloneAudioFileInput" accept="audio/*" style="display:none;" onchange="handleCloneFileSelected(event)">
+                </div>
+
+                <!-- Record Area -->
+                <div id="cloneRecordArea" style="display:none; border:2px dashed rgba(236,72,153,0.4); border-radius:12px; padding:20px; text-align:center; background:rgba(236,72,153,0.04);">
+                    <div style="font-size:26px; font-weight:700; color:#f43f5e; font-family:monospace; margin-bottom:10px;" id="recordTimer">00:00</div>
+                    <button type="button" id="btnToggleRecord" onclick="toggleRecording()" style="background:linear-gradient(135deg,#e11d48,#f43f5e); color:#fff; border:none; padding:10px 22px; border-radius:30px; font-weight:600; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 15px rgba(225,29,72,0.4);">
+                        <i class="fa-solid fa-circle" id="recordIcon"></i> <span id="recordText">Bắt Đầu Ghi Âm</span>
+                    </button>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:8px;" id="recordStatusTip">Bấm nút và đọc một câu bất kỳ (5-10 giây) để AI lấy mẫu giọng</div>
+                </div>
+
+                <!-- Audio Preview Player -->
+                <div id="cloneAudioPreviewContainer" style="display:none; margin-top:12px; background:rgba(0,0,0,0.3); border-radius:10px; padding:10px;">
+                    <div style="font-size:11px; color:#cbd5e1; margin-bottom:4px; font-weight:600;">🎧 Nghe lại đoạn vocal mẫu đã chọn:</div>
+                    <audio id="cloneAudioPlayer" controls style="width:100%; height:36px;"></audio>
+                </div>
+            </div>
+
+            <!-- Worker Settings Accordion -->
+            <details style="margin-bottom: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px;">
+                <summary style="font-size: 12px; font-weight: 600; color: #a78bfa; cursor: pointer; display:flex; align-items:center; justify-content:space-between;">
+                    <span><i class="fa-solid fa-server"></i> Cấu hình Worker AI Clone (Colab / Local GPU)</span>
+                    <span id="workerStatusBadge" style="font-size:10px; padding:2px 8px; border-radius:10px; background:rgba(100,116,139,0.2); color:#94a3b8;">Đang kiểm tra...</span>
+                </summary>
+                <div style="margin-top: 10px; font-size: 11.5px; color: #cbd5e1;">
+                    <div style="margin-bottom: 6px;">URL kết nối Worker (Ngrok / Cloudflared):</div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="cloneWorkerUrlInput" placeholder="VD: https://xxxx.ngrok-free.app" style="flex:1; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:12px; outline:none;">
+                        <button type="button" onclick="saveWorkerUrlFromUI()" style="background:rgba(139,92,246,0.3); border:1px solid #8b5cf6; color:#fff; padding:0 12px; border-radius:6px; font-size:11px; cursor:pointer;">Lưu</button>
+                    </div>
+                    <div style="font-size: 10.5px; color: #94a3b8; margin-top: 6px; line-height: 1.4;">
+                        💡 Model 8.5GB chạy trên Google Colab GPU T4 miễn phí. Khi bạn ở nhà, chỉ cần chạy cell Colab hoặc Local Worker rồi dán URL vào đây.
+                    </div>
+                </div>
+            </details>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn-cancel" onclick="closeCloneModal()" style="background:rgba(255,255,255,0.08); border:none; color:#cbd5e1; padding:10px 18px; border-radius:10px; font-size:13px; cursor:pointer;">
+                    Hủy
+                </button>
+                <button type="button" id="btnSaveCloneVoice" onclick="submitCustomVoice()" style="background:linear-gradient(135deg,#a855f7,#6366f1); border:none; color:#fff; padding:10px 22px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 4px 15px rgba(168,85,247,0.4);">
+                    <i class="fa-solid fa-sparkles"></i> Lưu & Tạo Thẻ Giọng
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Donation Coffee Modal -->
     <div class="modal-overlay" id="donateModal" onclick="if(event.target===this) closeDonateModal()">
         <div class="modal-card">
@@ -1077,13 +1199,16 @@
         }
 
         function updateLangCounts() {
-            let vieneu = 0, vi = 0, en = 0, zh = 0, ja = 0, other = 0;
+            let custom = 0, vieneu = 0, vi = 0, en = 0, zh = 0, ja = 0, other = 0;
             allVoices.forEach(v => {
                 const lan = (v.lan || "").toLowerCase();
                 const vtype = (v.voice_type || "").toLowerCase();
                 const dname = (v.display_name || "").toLowerCase();
 
-                if (vtype.startsWith("vieneu_")) {
+                if (v.is_clone || vtype.startsWith("clone_")) {
+                    custom++;
+                    vi++;
+                } else if (vtype.startsWith("vieneu_")) {
                     vieneu++;
                     vi++;
                 } else if (lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt")) {
@@ -1100,6 +1225,7 @@
             });
 
             document.getElementById("cntAll").innerText = allVoices.length;
+            if (document.getElementById("cntCustom")) document.getElementById("cntCustom").innerText = custom;
             if (document.getElementById("cntVieneu")) document.getElementById("cntVieneu").innerText = vieneu;
             document.getElementById("cntVi").innerText = vi;
             document.getElementById("cntEn").innerText = en;
@@ -1124,6 +1250,7 @@
 
                 let matchesLang = false;
                 if (currentLangFilter === "all") matchesLang = true;
+                else if (currentLangFilter === "custom") matchesLang = (v.is_clone || vtype.startsWith("clone_"));
                 else if (currentLangFilter === "vieneu") matchesLang = vtype.startsWith("vieneu_");
                 else if (currentLangFilter === "vi") matchesLang = lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt");
                 else if (currentLangFilter === "en") matchesLang = lan.includes("en");
@@ -1149,20 +1276,44 @@
         function renderVoices(voices) {
             const listEl = document.getElementById("voiceList");
             listEl.innerHTML = "";
+
+            // Show "+ Thêm Giọng Của Tôi" card at index 0 when viewing all or custom voices
+            if (currentLangFilter === "all" || currentLangFilter === "custom") {
+                const addCard = document.createElement("div");
+                addCard.className = "voice-item add-voice-card";
+                addCard.onclick = openCloneModal;
+                addCard.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="font-size:18px;color:#c084fc;"></i>
+                        <div style="font-weight:700;color:#f3e8ff;font-size:13.5px;">+ Tải Lên / Clone Giọng Bản Thân</div>
+                    </div>
+                    <div style="font-size:11px;color:#a78bfa;margin-top:3px;">Chỉ cần 5–15s ghi âm vocal của bạn</div>
+                `;
+                listEl.appendChild(addCard);
+            }
+
             if (!voices || voices.length === 0) {
-                listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Không tìm thấy giọng đọc</div>';
+                if (currentLangFilter !== "all" && currentLangFilter !== "custom") {
+                    listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;">Không tìm thấy giọng đọc</div>';
+                }
                 return;
             }
             voices.forEach(v => {
                 const item = document.createElement("div");
+                const isClone = (v.is_clone || (v.voice_type || "").startsWith("clone_"));
                 const isVieneu = (v.voice_type || "").startsWith("vieneu_");
                 const isEdge = (v.voice_type || "").includes("Neural");
                 
                 item.className = `voice-item ${v.voice_type === selectedVoice ? 'active' : ''}`;
-                item.onclick = (e) => { if (e.target.closest('.btn-preview')) return; selectVoice(v.voice_type, v.resource_id, item); };
+                item.onclick = (e) => { 
+                    if (e.target.closest('.btn-preview') || e.target.closest('.btn-delete-voice')) return; 
+                    selectVoice(v.voice_type, v.resource_id, item); 
+                };
                 
                 let badgeHtml = '';
-                if (isVieneu) {
+                if (isClone) {
+                    badgeHtml = '<span style="color:#ec4899;font-weight:700;"><i class="fa-solid fa-sparkles"></i> Giọng Bản Thân (Clone)</span>';
+                } else if (isVieneu) {
                     badgeHtml = '<span style="color:#a78bfa;font-weight:700;">✨ VieNeu 48kHz</span>';
                 } else if (isEdge) {
                     badgeHtml = '<span style="color:#60a5fa;font-weight:600;">⚡ Edge Neural</span>';
@@ -1173,10 +1324,13 @@
 
                 item.innerHTML = `
                     <div class="voice-header">
-                        <div class="voice-name">${v.display_name || v.voice_type}</div>
-                        <button class="btn-preview" onclick="previewVoice('${v.voice_type}','${v.lan||'vi'}',this,event)">
-                            <i class="fa-solid fa-volume-high"></i> Nghe thử
-                        </button>
+                        <div class="voice-name" title="${v.display_name || v.voice_type}">${v.display_name || v.voice_type}</div>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                            <button class="btn-preview" onclick="previewVoice('${v.voice_type}','${v.lan||'vi'}',this,event)">
+                                <i class="fa-solid fa-volume-high"></i> Nghe thử
+                            </button>
+                            ${isClone ? `<button class="btn-delete-voice" onclick="deleteCustomVoice('${v.voice_type}',event)" title="Xóa giọng này"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+                        </div>
                     </div>
                     <div class="voice-tag">${badgeHtml}</div>`;
                 listEl.appendChild(item);
@@ -2237,6 +2391,231 @@
         }
     
         
-    </script>
+    
+        // ── AI Voice Cloning & Custom Voice Management ──
+        let cloneAudioBlob = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordTimerInterval = null;
+        let recordSeconds = 0;
+
+        function openCloneModal() {
+            document.getElementById('cloneModal').classList.add('show');
+            document.getElementById('cloneVoiceName').value = '';
+            document.getElementById('cloneAudioFileInput').value = '';
+            document.getElementById('uploadFilePrompt').innerText = 'Bấm vào đây để chọn tệp âm thanh (MP3, WAV, M4A)';
+            document.getElementById('cloneAudioPreviewContainer').style.display = 'none';
+            cloneAudioBlob = null;
+            checkWorkerStatusUI();
+        }
+
+        function closeCloneModal() {
+            document.getElementById('cloneModal').classList.remove('show');
+            stopRecording(false);
+            const player = document.getElementById('cloneAudioPlayer');
+            player.pause();
+            player.src = '';
+        }
+
+        function switchCloneTab(tab) {
+            if (tab === 'upload') {
+                document.getElementById('tabUploadBtn').classList.add('active');
+                document.getElementById('tabRecordBtn').classList.remove('active');
+                document.getElementById('cloneUploadArea').style.display = 'block';
+                document.getElementById('cloneRecordArea').style.display = 'none';
+            } else {
+                document.getElementById('tabRecordBtn').classList.add('active');
+                document.getElementById('tabUploadBtn').classList.remove('active');
+                document.getElementById('cloneRecordArea').style.display = 'block';
+                document.getElementById('cloneUploadArea').style.display = 'none';
+            }
+        }
+
+        function handleCloneFileSelected(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            cloneAudioBlob = file;
+            document.getElementById('uploadFilePrompt').innerText = '✅ Đã chọn: ' + file.name + ' (' + (file.size/1024).toFixed(0) + 'KB)';
+            const url = URL.createObjectURL(file);
+            const player = document.getElementById('cloneAudioPlayer');
+            player.src = url;
+            document.getElementById('cloneAudioPreviewContainer').style.display = 'block';
+        }
+
+        async function toggleRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                stopRecording(true);
+            } else {
+                startRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                recordSeconds = 0;
+
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    cloneAudioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const url = URL.createObjectURL(cloneAudioBlob);
+                    const player = document.getElementById('cloneAudioPlayer');
+                    player.src = url;
+                    document.getElementById('cloneAudioPreviewContainer').style.display = 'block';
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+
+                document.getElementById('btnToggleRecord').classList.add('recording-pulse');
+                document.getElementById('recordIcon').className = 'fa-solid fa-stop';
+                document.getElementById('recordText').innerText = 'Dừng Ghi Âm';
+                document.getElementById('recordStatusTip').innerText = '🔴 Đang ghi âm... Hãy đọc to rõ ràng từ 5-10 giây';
+
+                recordTimerInterval = setInterval(() => {
+                    recordSeconds++;
+                    const mins = String(Math.floor(recordSeconds / 60)).padStart(2, '0');
+                    const secs = String(recordSeconds % 60).padStart(2, '0');
+                    document.getElementById('recordTimer').innerText = `${mins}:${secs}`;
+                    if (recordSeconds >= 20) {
+                        stopRecording(true);
+                    }
+                }, 1000);
+
+            } catch (err) {
+                alert('Không thể truy cập Microphone: ' + err.message);
+            }
+        }
+
+        function stopRecording(save) {
+            if (recordTimerInterval) {
+                clearInterval(recordTimerInterval);
+                recordTimerInterval = null;
+            }
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+            document.getElementById('btnToggleRecord').classList.remove('recording-pulse');
+            document.getElementById('recordIcon').className = 'fa-solid fa-circle';
+            document.getElementById('recordText').innerText = 'Ghi Âm Lại';
+            document.getElementById('recordStatusTip').innerText = 'Đã hoàn tất ghi âm! Bạn có thể nghe thử ở dưới.';
+        }
+
+        async function submitCustomVoice() {
+            const name = document.getElementById('cloneVoiceName').value.trim();
+            if (!name) {
+                alert('Vui lòng nhập tên cho giọng đọc.');
+                document.getElementById('cloneVoiceName').focus();
+                return;
+            }
+            if (!cloneAudioBlob) {
+                alert('Vui lòng chọn tệp âm thanh hoặc ghi âm giọng mẫu (vocal).');
+                return;
+            }
+
+            const btn = document.getElementById('btnSaveCloneVoice');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải lên...';
+
+            try {
+                const formData = new FormData();
+                formData.append('name', name);
+                const filename = (cloneAudioBlob.name) ? cloneAudioBlob.name : 'recorded_vocal.wav';
+                formData.append('audio', cloneAudioBlob, filename);
+
+                const resp = await fetch('/api/upload_custom_voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                const resData = await resp.json();
+
+                if (resData.status === 'success') {
+                    closeCloneModal();
+                    await fetchVoices();
+                    filterByLang('custom', document.getElementById('tabCustom'));
+                    if (resData.voice && resData.voice.voice_type) {
+                        selectedVoice = resData.voice.voice_type;
+                        selectedResourceId = null;
+                        const matchItem = Array.from(document.querySelectorAll('.voice-item')).find(el => el.innerHTML.includes(name));
+                        if (matchItem) selectVoice(selectedVoice, null, matchItem);
+                    }
+                    alert('🎉 Đã thêm thành công giọng "' + name + '"! Giờ bạn có thể nhập văn bản và tạo giọng đọc như bình thường.');
+                } else {
+                    alert('Lỗi: ' + (resData.message || 'Không thể tải lên'));
+                }
+            } catch (err) {
+                alert('Lỗi kết nối: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-sparkles"></i> Lưu & Tạo Thẻ Giọng';
+            }
+        }
+
+        async function deleteCustomVoice(voiceType, event) {
+            if (event) event.stopPropagation();
+            if (!confirm('Bạn có chắc chắn muốn xóa giọng đọc này không?')) return;
+            try {
+                const resp = await fetch('/api/delete_custom_voice/' + voiceType, { method: 'POST' });
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    if (selectedVoice === voiceType) selectedVoice = 'BV421_vivn_streaming';
+                    await fetchVoices();
+                } else {
+                    alert('Lỗi: ' + (data.message || 'Không thể xóa'));
+                }
+            } catch (err) {
+                alert('Lỗi kết nối: ' + err.message);
+            }
+        }
+
+        async function checkWorkerStatusUI() {
+            try {
+                const resp = await fetch('/api/clone_worker_status');
+                const data = await resp.json();
+                const badge = document.getElementById('workerStatusBadge');
+                const input = document.getElementById('cloneWorkerUrlInput');
+                if (data.worker_url) input.value = data.worker_url;
+                if (data.status === 'online') {
+                    badge.style.background = 'rgba(16,185,129,0.2)';
+                    badge.style.color = '#10b981';
+                    badge.innerText = '🟢 Worker Online (' + (data.gpu || 'GPU') + ')';
+                } else if (data.status === 'offline') {
+                    badge.style.background = 'rgba(239,68,68,0.2)';
+                    badge.style.color = '#ef4444';
+                    badge.innerText = '🔴 Worker Offline';
+                } else {
+                    badge.style.background = 'rgba(100,116,139,0.2)';
+                    badge.style.color = '#94a3b8';
+                    badge.innerText = '⚪ Chưa cấu hình';
+                }
+            } catch (e) {
+                console.log('Worker status error:', e);
+            }
+        }
+
+        async function saveWorkerUrlFromUI() {
+            const url = document.getElementById('cloneWorkerUrlInput').value.trim();
+            try {
+                const resp = await fetch('/api/set_clone_worker_url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ worker_url: url })
+                });
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    alert('Đã lưu URL Worker AI!');
+                    checkWorkerStatusUI();
+                }
+            } catch (e) {
+                alert('Lỗi lưu worker: ' + e.message);
+            }
+        }
+    
+</script>
 </body>
 </html>
