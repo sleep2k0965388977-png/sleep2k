@@ -610,7 +610,7 @@ def wav_to_mp3_bytes(wav_array, sample_rate=24000):
     try:
         sf.write(str(temp_wav), wav_array, sample_rate, format='WAV')
         subprocess.run([
-            "ffmpeg", "-y", "-i", str(temp_wav),
+            FFMPEG_BIN, "-y", "-i", str(temp_wav),
             "-codec:a", "libmp3lame", "-b:a", "192k",
             str(temp_mp3)
         ], capture_output=True, check=True)
@@ -914,7 +914,7 @@ def stitch_audio_chunks(chunk_bytes_list, output_file_path):
                     f_list.write(f"file '{chunk_file.resolve().as_posix()}'\n")
 
             cmd = [
-                "ffmpeg", "-y",
+                FFMPEG_BIN, "-y",
                 "-f", "concat",
                 "-safe", "0",
                 "-i", str(concat_list_file),
@@ -953,7 +953,7 @@ def generate_silent_mp3_bytes(duration_ms=250):
         tmp_file.close()
         dur_s = max(0.1, duration_ms / 1000.0)
         subprocess.run([
-            "ffmpeg", "-y",
+            FFMPEG_BIN, "-y",
             "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono",
             "-t", str(dur_s),
             "-c:a", "libmp3lame",
@@ -1425,13 +1425,13 @@ def upload_custom_voice():
         clean_mp3_path = CUSTOM_VOICES_DIR / f"{voice_id}.mp3"
         try:
             subprocess.run([
-                "ffmpeg", "-y", "-i", str(temp_raw_path),
+                FFMPEG_BIN, "-y", "-i", str(temp_raw_path),
                 "-ar", "24000", "-ac", "1",
                 str(clean_wav_path)
             ], capture_output=True, check=True)
             # Create MP3 for fast browser preview
             subprocess.run([
-                "ffmpeg", "-y", "-i", str(clean_wav_path),
+                FFMPEG_BIN, "-y", "-i", str(clean_wav_path),
                 "-codec:a", "libmp3lame", "-b:a", "128k",
                 str(clean_mp3_path)
             ], capture_output=True, check=True)
@@ -1575,7 +1575,7 @@ def transcribe_audio_chunk(idx, chunk_path, language="vi-VN", max_retries=3):
 
             sub_wav = temp_dir / f"sub_{sub_i}.wav"
             subprocess.run([
-                "ffmpeg", "-y",
+                FFMPEG_BIN, "-y",
                 "-ss", str(st),
                 "-t", str(sub_dur),
                 "-i", str(chunk_path),
@@ -1715,7 +1715,7 @@ def process_speech_to_text_job(job_id, file_path, language="vi-VN"):
             # Dynamically slice only this 60s audio segment directly from source file (takes 0.05s via fast-seek)
             chunk_slice_p = temp_dir / f"slice_{idx}.wav"
             subprocess.run([
-                "ffmpeg", "-y",
+                FFMPEG_BIN, "-y",
                 "-ss", str(st_val),
                 "-t", str(et_val - st_val),
                 "-i", str(file_path),
@@ -1920,7 +1920,7 @@ def process_multipart_part_job(job_key, session_id, part_index, part_file_path, 
         segment_pattern = str(temp_dir / "chunk_%05d.wav")
 
         subprocess.run([
-            "ffmpeg", "-y", "-i", str(part_file_path),
+            FFMPEG_BIN, "-y", "-i", str(part_file_path),
             "-f", "segment", "-segment_time", "60",
             "-segment_list", str(csv_list_path), "-segment_list_type", "csv",
             "-c:a", "pcm_s16le", "-ar", "16000", "-ac", "1",
