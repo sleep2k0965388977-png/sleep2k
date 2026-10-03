@@ -96,11 +96,28 @@ if set_resp.status_code == 200 and set_resp.json().get("status") == "success":
 else:
     print(f"Lỗi liên kết: {set_resp.status_code} - {set_resp.text}")
 
+last_ping = time.time()
 try:
     while True:
         time.sleep(2)
+        if time.time() - last_ping > 25:
+            last_ping = time.time()
+            try:
+                requests.post(
+                    f"{RAILWAY_URL}/api/set_clone_worker_url",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
+                        "Referer": f"{RAILWAY_URL}/",
+                        "Origin": RAILWAY_URL
+                    },
+                    json={"worker_url": tunnel_url},
+                    timeout=5
+                )
+            except Exception:
+                pass
 except KeyboardInterrupt:
     print("\nĐang tắt hệ thống...")
     tunnel_proc.terminate()
     worker_proc.terminate()
     print("Đã tắt an toàn.")
+
