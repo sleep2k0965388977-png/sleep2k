@@ -621,9 +621,8 @@ def wav_to_mp3_bytes(wav_array, sample_rate=24000):
 
 def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     """
-    Synthesize audio using AI Voice Clone Engine:
-    1. If Colab/Local GPU worker is configured, use it for Turbo quality.
-    2. Otherwise, use embedded native VieNeu v3 Nano ONNX engine for direct on-server cloning.
+    Synthesize audio using AI Voice Clone Engine via Local / Colab Worker.
+    Sends text_chunk + ref_audio to worker's /api/clone endpoint.
     """
     vinfo = find_voice_info(voice)
     ref_filename = (vinfo.get("ref_audio") if vinfo else None) or f"{voice}.wav"
@@ -633,38 +632,24 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     if not ref_file.exists():
         raise FileNotFoundError(f"Tệp vocal mẫu {ref_filename} không tồn tại.")
 
-    # 1. Forward to remote GPU worker if URL configured
     worker_url = get_clone_worker_url()
-    if worker_url:
-        try:
-            clean_url = worker_url.rstrip("/")
-            with open(ref_file, "rb") as af:
-                resp = requests.post(
-                    f"{clean_url}/api/clone",
-                    headers={"X-API-Key": CLONE_API_KEY},
-                    files={"audio": (ref_file.name, af, "audio/wav")},
-                    data={"text": text_chunk, "rate": rate},
-                    timeout=60
-                )
-            if resp.status_code == 200 and len(resp.content) > 500:
-                return resp.content
-        except Exception as e_worker:
-            print(f"Worker clone request warning: {e_worker}, using native VieNeu v3 Nano ONNX...")
+    if not worker_url:
+        raise ValueError("Chưa kết nối AI Clone Worker. Vui lòng mở file CHAY_AI_CLONE_GIONG.bat trên máy tính để kích hoạt nhân bản giọng nói.")
 
-    # 2. Native embedded VieNeu v3 Nano ONNX (CPU, torch-free)
-    tts = get_nano_tts()
-    if not tts:
-        raise RuntimeError("Không thể khởi động bộ máy VieNeu v3 Nano.")
-    
-    with _NANO_LOCK:
-        if voice not in tts._preset_voices:
-            tts.add_voice(voice, str(ref_file))
-        speed_val = float(rate or 1.0)
-        wav_data = tts.infer(text_chunk, voice=voice, steps=8, speed=speed_val)
-
-    if wav_data is not None and len(wav_data) > 0:
-        return wav_to_mp3_bytes(wav_data, tts.sample_rate)
-    raise RuntimeError("VieNeu v3 Nano trả về dữ liệu âm thanh rỗng.")
+    clean_url = worker_url.rstrip("/")
+    with open(ref_file, "rb") as af:
+        resp = requests.post(
+            f"{clean_url}/api/clone",
+            headers={"X-API-Key": CLONE_API_KEY},
+            files={"audio": (ref_file.name, af, "audio/wav")},
+            data={"text": text_chunk, "rate": rate},
+            timeout=60
+        )
+    if resp.status_code == 200 and len(resp.content) > 500:
+        return resp.content
+    else:
+        err_msg = resp.text[:150] if resp.text else f"status {resp.status_code}"
+        raise RuntimeError(f"AI Clone Worker phản hồi lỗi: {err_msg}")
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
 CHECKPOINTS_DIR.mkdir(exist_ok=True)
@@ -1453,19 +1438,7 @@ def upload_custom_voice():
         voice_entry["session_id"] = session_id
         save_custom_voice_entry(voice_entry)
 
-        # Pre-warm voice embedding registration in background thread
-        def _pre_warm():
-            try:
-                tts = get_nano_tts()
-                if tts:
-                    with _NANO_LOCK:
-                        tts.add_voice(voice_id, str(clean_wav_path))
-                    print(f"✅ Pre-warmed clone voice '{name}' ({voice_id})")
-            except Exception as ew:
-                print(f"Pre-warm clone voice warning: {ew}")
-
-        threading.Thread(target=_pre_warm, daemon=True).start()
-
+        # Voice registered for worker forwarding
         return jsonify({
             "status": "success",
             "message": f"Đã thêm giọng '{name}' thành công (lưu tạm thời trong phiên làm việc)!",
