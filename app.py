@@ -19,6 +19,31 @@ import edge_tts
 import speech_recognition as sr
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, redirect
 from capcut_tts_api import CapCutClient, CapCutError
+
+def get_ffmpeg_exe():
+    import shutil
+    cmd = shutil.which("ffmpeg")
+    if cmd:
+        return cmd
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe and Path(exe).exists():
+            return exe
+    except Exception:
+        pass
+    try:
+        import static_ffmpeg
+        static_ffmpeg.add_paths()
+        cmd = shutil.which("ffmpeg")
+        if cmd:
+            return cmd
+    except Exception:
+        pass
+    return "ffmpeg"
+
+FFMPEG_BIN = get_ffmpeg_exe()
+
 # ── 🔒 SECURITY: API Protection + Anti-Bot/DDOS ──
 # Không cần đăng nhập — app mở cho mọi người
 # Chỉ chặn: gọi API từ bên ngoài + bot/DDOS

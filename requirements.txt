@@ -10,3 +10,6 @@ waitress>=3.0.0
 google-api-python-client
 google-auth-oauthlib
 google-auth-httplib2
+
+imageio-ffmpeg>=0.5.1
+static-ffmpeg>=2.7
