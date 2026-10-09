@@ -623,16 +623,22 @@ def wav_to_mp3_bytes(wav_array, sample_rate=24000):
 
 def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     """
-    Synthesize audio using AI Voice Clone Engine via Local / Colab Worker.
-    Sends text_chunk + ref_audio to worker's /api/clone endpoint.
+    Synthesize audio using AI Voice Clone Engine.
+    Tries Worker first (if connected), else runs directly on VPS (Native VieNeu v3 Nano).
     """
     vinfo = find_voice_info(voice)
     ref_filename = (vinfo.get("ref_audio") if vinfo else None) or f"{voice}.wav"
     ref_file = CUSTOM_VOICES_DIR / ref_filename
     if not ref_file.exists():
         ref_file = CUSTOM_VOICES_DIR / f"{voice}.wav"
+    
+    # If the specific voice file was removed/expired on the server, fallback to default reference
     if not ref_file.exists():
-        raise FileNotFoundError(f"Tệp vocal mẫu {ref_filename} không tồn tại.")
+        fallback_ref = Path(__file__).parent / "test_speech.wav"
+        if fallback_ref.exists():
+            ref_file = fallback_ref
+        else:
+            raise FileNotFoundError(f"Tệp vocal mẫu {ref_filename} không tồn tại.")
 
     worker_url = get_clone_worker_url()
     if worker_url:
@@ -651,14 +657,20 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
         except Exception as ex_w:
             print(f"Worker offline/error ({ex_w}), falling back to Native On-Server AI Engine...")
 
-    # Chạy trực tiếp 100% ONLINE trên máy chủ (Khi máy tính cá nhân đã tắt!)
-    print(f"🚀 [SERVER NATIVE CLONE] Đang nhân bản giọng trực tiếp trên máy chủ cho: '{text_chunk[:30]}...'")
+    # Chạy trực tiếp 100% ONLINE trên máy chủ VPS (Khi máy tính cá nhân đã tắt!)
+    print(f"👉 [SERVER NATIVE CLONE] Đang nhân bản giọng trực tiếp trên máy chủ VPS cho: '{text_chunk[:30]}...'")
     tts = get_nano_tts()
-    if tts is None:
-        raise RuntimeError("Mô hình AI VieNeu chưa sẵn sàng trên máy chủ.")
-
-    wav_data = tts.infer(text_chunk, ref_audio=str(ref_file), steps=8, speed=float(rate or 1.0))
-    return wav_to_mp3_bytes(wav_data, sample_rate=tts.sample_rate)
+    if tts is not None:
+        try:
+            wav_data = tts.infer(text_chunk, ref_audio=str(ref_file), steps=8, speed=float(rate or 1.0))
+            return wav_to_mp3_bytes(wav_data, sample_rate=tts.sample_rate)
+        except Exception as ex_tts:
+            print(f"Server native clone error ({ex_tts}), falling back to Edge TTS...")
+    
+    # Neural fallback if VieNeu is busy or failing
+    is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
+    fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
+    return edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=3)
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
 CHECKPOINTS_DIR.mkdir(exist_ok=True)
@@ -973,20 +985,22 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
         silence = generate_silent_mp3_bytes(200)
         return idx, silence, 200
 
-    # ── 0. AI Voice Clone Engine (Google Colab / Local GPU Worker) ──
+        # 🌟 0. AI Voice Clone Engine (Google Colab / Local GPU Worker / Native On-Server) 🌟
     if is_clone_voice(voice):
         try:
             audio_bytes = synthesize_clone_audio(text_chunk, voice, rate=rate)
             if audio_bytes and len(audio_bytes) > 0:
                 est_duration = int(len(text_chunk) / 150 * 1000)
                 return idx, audio_bytes, est_duration
-                except FileNotFoundError as fnf:
-            raise RuntimeError(f"Mẫu giọng đọc này ({voice}) đã hết hạn trên máy chủ (do server vừa được làm mới). Vui lòng bấm vào '+ Thêm Giọng Của Tôi' để tải lên hoặc ghi âm lại giọng mẫu của bạn!")
         except Exception as ex:
-            print(f"Clone Voice synthesis error chunk {idx+1}: {ex}")
-            raise RuntimeError(f"Chưa kết nối AI Clone Worker: Hãy mở file CHAY_AI_CLONE_GIONG.bat trên máy tính để nhân bản đúng giọng thật của bạn! ({ex})")")
+            print(f"Clone Voice synthesis chunk {idx+1} error: {ex}, applying neural fallback...")
+            is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
+            fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
+            fb_bytes = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=2)
+            if fb_bytes and len(fb_bytes) > 0:
+                return idx, fb_bytes, int(len(text_chunk) / 150 * 1000)
 
-    # ── 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
+    # 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
     if is_vieneu_voice(voice):
         try:
             audio_bytes = vieneu_synthesize_audio(text_chunk, voice, rate=rate)
