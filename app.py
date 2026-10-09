@@ -92,7 +92,7 @@ def _is_same_origin():
     referer = request.headers.get('Referer', '')
     origin = request.headers.get('Origin', '')
     # Get hostname without protocol (Railway uses http internally but https externally)
-    server_host = request.host.split(':')[0]  # e.g. "sleep2k-tts-production.up.railway.app"
+    server_host = request.host.split(':')[0]  # e.g. "sleep2k.up.railway.app"
     
     # Check if referer/origin contains our hostname
     if referer and server_host in referer:
@@ -1172,7 +1172,7 @@ def index():
         mode="tts",
         page_title="SLEEP2K TTS - Chuyển Văn Bản Thành Giọng Nói AI Miễn Phí (Không Giới Hạn) & Tải Video TikTok Douyin",
         page_desc="SLEEP2K TTS là công cụ AI chuyển văn bản thành giọng nói (Text-to-Speech) tiếng Việt tự nhiên miễn phí, không giới hạn ký tự. Hỗ trợ tạo audio truyện dài, clone giọng AI, đọc song song siêu tốc và tải video TikTok Douyin không logo.",
-        page_canonical="https://sleep2k-tts-production.up.railway.app/"
+        page_canonical="https://sleep2k.up.railway.app/"
     )
 
 @app.route("/chuyen-van-ban-thanh-giong-noi")
@@ -1181,7 +1181,7 @@ def index_tts():
         mode="tts",
         page_title="Chuyển Văn Bản Thành Giọng Nói AI Miễn Phí (Không Giới Hạn) - SLEEP2K TTS",
         page_desc="Công cụ chuyển văn bản thành giọng nói tiếng Việt miễn phí, không giới hạn ký tự. Hỗ trợ đọc truyện audio, clone giọng nói AI mượt mà và chia đoạn song song siêu tốc.",
-        page_canonical="https://sleep2k-tts-production.up.railway.app/chuyen-van-ban-thanh-giong-noi"
+        page_canonical="https://sleep2k.up.railway.app/chuyen-van-ban-thanh-giong-noi"
     )
 
 @app.route("/lay-text-tu-video")
@@ -1190,7 +1190,7 @@ def index_stt():
         mode="stt",
         page_title="Lấy Text Từ Video & Chuyển Âm Thanh Thành Văn Bản Tự Động - SLEEP2K",
         page_desc="Công cụ tự động lấy text từ video, chuyển đổi file ghi âm âm thanh MP3/WAV/MP4 thành văn bản tiếng Việt chính xác cao và dịch thuật AI đa ngôn ngữ.",
-        page_canonical="https://sleep2k-tts-production.up.railway.app/lay-text-tu-video"
+        page_canonical="https://sleep2k.up.railway.app/lay-text-tu-video"
     )
 
 @app.route("/tai-video-tiktok-douyin")
@@ -1199,7 +1199,7 @@ def index_downloader():
         mode="downloader",
         page_title="Tải Toàn Bộ Video Kênh TikTok & Douyin Không Logo Miễn Phí - SLEEP2K",
         page_desc="Công cụ tải toàn bộ video kênh TikTok và Douyin Trung Quốc chất lượng cao không dính logo watermark. Hỗ trợ tải lẻ từng video hoặc tải cả kênh siêu tốc.",
-        page_canonical="https://sleep2k-tts-production.up.railway.app/tai-video-tiktok-douyin"
+        page_canonical="https://sleep2k.up.railway.app/tai-video-tiktok-douyin"
     )
 
 
@@ -1211,7 +1211,7 @@ def favicon():
 def robots_txt():
     content = """User-agent: *
 Allow: /
-Sitemap: https://sleep2k-tts-production.up.railway.app/sitemap.xml
+Sitemap: https://sleep2k.up.railway.app/sitemap.xml
 """
     return Response(content, mimetype="text/plain")
 
@@ -1220,25 +1220,25 @@ def sitemap_xml():
     xml = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://sleep2k-tts-production.up.railway.app/</loc>
+    <loc>https://sleep2k.up.railway.app/</loc>
     <lastmod>2026-10-09</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://sleep2k-tts-production.up.railway.app/chuyen-van-ban-thanh-giong-noi</loc>
+    <loc>https://sleep2k.up.railway.app/chuyen-van-ban-thanh-giong-noi</loc>
     <lastmod>2026-10-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://sleep2k-tts-production.up.railway.app/lay-text-tu-video</loc>
+    <loc>https://sleep2k.up.railway.app/lay-text-tu-video</loc>
     <lastmod>2026-10-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://sleep2k-tts-production.up.railway.app/tai-video-tiktok-douyin</loc>
+    <loc>https://sleep2k.up.railway.app/tai-video-tiktok-douyin</loc>
     <lastmod>2026-10-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
