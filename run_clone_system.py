@@ -5,7 +5,7 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 import subprocess, time, re, os, requests
 from pathlib import Path
 
-RAILWAY_URL = "https://sleep2k-tts-production.up.railway.app"
+RAILWAY_URL = "https://sleep2k.up.railway.app"
 CLOUDFLARED = r"C:\Program Files (x86)\cloudflared\cloudflared.exe"
 WORKER_SCRIPT = Path(__file__).parent / "local_clone_worker.py"
 
@@ -20,6 +20,8 @@ worker_proc = subprocess.Popen(
     stdout=subprocess.PIPE,
     stderr=subprocess.STDOUT,
     text=True,
+    encoding='utf-8',
+    errors='replace',
     bufsize=1
 )
 
@@ -49,6 +51,8 @@ tunnel_proc = subprocess.Popen(
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True,
+    encoding='utf-8',
+    errors='replace',
     bufsize=1
 )
 

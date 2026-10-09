@@ -980,9 +980,11 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
             if audio_bytes and len(audio_bytes) > 0:
                 est_duration = int(len(text_chunk) / 150 * 1000)
                 return idx, audio_bytes, est_duration
+                except FileNotFoundError as fnf:
+            raise RuntimeError(f"Mẫu giọng đọc này ({voice}) đã hết hạn trên máy chủ (do server vừa được làm mới). Vui lòng bấm vào '+ Thêm Giọng Của Tôi' để tải lên hoặc ghi âm lại giọng mẫu của bạn!")
         except Exception as ex:
             print(f"Clone Voice synthesis error chunk {idx+1}: {ex}")
-            raise RuntimeError(f"Chưa kết nối AI Clone Worker: Hãy mở file CHAY_AI_CLONE_GIONG.bat trên máy tính để nhân bản đúng giọng thật của bạn! ({ex})")
+            raise RuntimeError(f"Chưa kết nối AI Clone Worker: Hãy mở file CHAY_AI_CLONE_GIONG.bat trên máy tính để nhân bản đúng giọng thật của bạn! ({ex})")")
 
     # ── 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
     if is_vieneu_voice(voice):
