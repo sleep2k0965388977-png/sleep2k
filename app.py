@@ -635,23 +635,30 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
         raise FileNotFoundError(f"Tệp vocal mẫu {ref_filename} không tồn tại.")
 
     worker_url = get_clone_worker_url()
-    if not worker_url:
-        raise ValueError("Chưa kết nối AI Clone Worker. Vui lòng mở file CHAY_AI_CLONE_GIONG.bat trên máy tính để kích hoạt nhân bản giọng nói.")
+    if worker_url:
+        try:
+            clean_url = worker_url.rstrip("/")
+            with open(ref_file, "rb") as af:
+                resp = requests.post(
+                    f"{clean_url}/api/clone",
+                    headers={"X-API-Key": CLONE_API_KEY},
+                    files={"audio": (ref_file.name, af, "audio/wav")},
+                    data={"text": text_chunk, "rate": rate},
+                    timeout=45
+                )
+            if resp.status_code == 200 and len(resp.content) > 500:
+                return resp.content
+        except Exception as ex_w:
+            print(f"Worker offline/error ({ex_w}), falling back to Native On-Server AI Engine...")
 
-    clean_url = worker_url.rstrip("/")
-    with open(ref_file, "rb") as af:
-        resp = requests.post(
-            f"{clean_url}/api/clone",
-            headers={"X-API-Key": CLONE_API_KEY},
-            files={"audio": (ref_file.name, af, "audio/wav")},
-            data={"text": text_chunk, "rate": rate},
-            timeout=60
-        )
-    if resp.status_code == 200 and len(resp.content) > 500:
-        return resp.content
-    else:
-        err_msg = resp.text[:150] if resp.text else f"status {resp.status_code}"
-        raise RuntimeError(f"AI Clone Worker phản hồi lỗi: {err_msg}")
+    # Chạy trực tiếp 100% ONLINE trên máy chủ (Khi máy tính cá nhân đã tắt!)
+    print(f"🚀 [SERVER NATIVE CLONE] Đang nhân bản giọng trực tiếp trên máy chủ cho: '{text_chunk[:30]}...'")
+    tts = get_nano_tts()
+    if tts is None:
+        raise RuntimeError("Mô hình AI VieNeu chưa sẵn sàng trên máy chủ.")
+
+    wav_data = tts.infer(text_chunk, ref_audio=str(ref_file), steps=8, speed=float(rate or 1.0))
+    return wav_to_mp3_bytes(wav_data, sample_rate=tts.sample_rate)
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
 CHECKPOINTS_DIR.mkdir(exist_ok=True)
