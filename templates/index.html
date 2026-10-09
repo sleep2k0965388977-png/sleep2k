@@ -1788,6 +1788,101 @@
     <audio id="previewAudio" style="display:none;"></audio>
 
     <script>
+
+        // ── Modern Floating Top-Right Toast Notifications (Replaces intrusive window.alert) ──
+        function showToast(msg, type = 'auto', duration = 35000) {
+            let container = document.getElementById('toastNotificationContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toastNotificationContainer';
+                container.style.cssText = 'position:fixed; top:20px; right:20px; z-index:9999999; display:flex; flex-direction:column; gap:10px; max-width:420px; width:calc(100% - 40px); pointer-events:none;';
+                document.body.appendChild(container);
+            }
+
+            const cleanMsg = String(msg || '');
+            let iconHtml = '<i class="fa-solid fa-circle-info" style="color:#38bdf8; font-size:18px; margin-top:2px;"></i>';
+            let borderColor = 'rgba(56, 189, 248, 0.5)';
+            let glowColor = 'rgba(56, 189, 248, 0.25)';
+            let barColor = 'linear-gradient(90deg, #38bdf8, #818cf8)';
+
+            if (type === 'error' || cleanMsg.toLowerCase().includes('lỗi') || cleanMsg.toLowerCase().includes('vui lòng') || cleanMsg.toLowerCase().includes('không thể') || cleanMsg.toLowerCase().includes('vượt quá')) {
+                iconHtml = '<i class="fa-solid fa-circle-exclamation" style="color:#ef4444; font-size:18px; margin-top:2px;"></i>';
+                borderColor = 'rgba(239, 68, 68, 0.6)';
+                glowColor = 'rgba(239, 68, 68, 0.25)';
+                barColor = 'linear-gradient(90deg, #ef4444, #f87171)';
+            } else if (type === 'success' || cleanMsg.includes('thành công') || cleanMsg.includes('🎉') || cleanMsg.includes('✅')) {
+                iconHtml = '<i class="fa-solid fa-circle-check" style="color:#34d399; font-size:18px; margin-top:2px;"></i>';
+                borderColor = 'rgba(52, 211, 153, 0.6)';
+                glowColor = 'rgba(52, 211, 153, 0.25)';
+                barColor = 'linear-gradient(90deg, #10b981, #34d399)';
+            } else if (type === 'warning' || cleanMsg.toLowerCase().includes('cảnh báo') || cleanMsg.includes('⚠️')) {
+                iconHtml = '<i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b; font-size:18px; margin-top:2px;"></i>';
+                borderColor = 'rgba(245, 158, 11, 0.6)';
+                glowColor = 'rgba(245, 158, 11, 0.25)';
+                barColor = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
+            }
+
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                pointer-events: auto;
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 14px 16px;
+                border-radius: 12px;
+                background: rgba(17, 24, 39, 0.94);
+                color: #f1f5f9;
+                font-size: 13px;
+                line-height: 1.5;
+                box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 16px ${glowColor};
+                border: 1.5px solid ${borderColor};
+                backdrop-filter: blur(14px);
+                transform: translateX(120%);
+                opacity: 0;
+                transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+                position: relative;
+                overflow: hidden;
+            `;
+
+            // Formatted message content (converts newlines to <br>)
+            const formattedContent = cleanMsg.replace(/\n/g, '<br>');
+
+            toast.innerHTML = `
+                <div style="flex-shrink:0;">${iconHtml}</div>
+                <div style="flex:1; word-break:break-word; font-weight:500;">${formattedContent}</div>
+                <button type="button" onclick="this.closest('div').style.transform='translateX(120%)'; this.closest('div').style.opacity='0'; setTimeout(()=>this.closest('div').remove(), 350);" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:16px; padding:0 0 0 8px; line-height:1; transition:color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#94a3b8'" title="Đóng">&times;</button>
+                <div class="toast-progress-bar" style="position:absolute; bottom:0; left:0; height:3px; background:${barColor}; width:100%; transition:width ${duration}ms linear;"></div>
+            `;
+
+            container.appendChild(toast);
+
+            // Animate in smoothly
+            requestAnimationFrame(() => {
+                toast.style.transform = 'translateX(0)';
+                toast.style.opacity = '1';
+                const progressBar = toast.querySelector('.toast-progress-bar');
+                if (progressBar) {
+                    setTimeout(() => {
+                        progressBar.style.width = '0%';
+                    }, 50);
+                }
+            });
+
+            // Auto dismiss after specified duration (30-45s)
+            setTimeout(() => {
+                if (toast && toast.parentElement) {
+                    toast.style.transform = 'translateX(120%)';
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 350);
+                }
+            }, duration);
+        }
+
+        // Global override for window.alert so user never has to click OK
+        window.alert = function(msg) {
+            showToast(msg, 'auto', 35000);
+        };
+
         let selectedVoice = "BV421_vivn_streaming";
         let selectedResourceId = null;
         let allVoices = [];
