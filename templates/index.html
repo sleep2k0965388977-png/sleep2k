@@ -1799,6 +1799,7 @@
         let cloneCharLimit = 2000;
 
         function isCurrentVoiceClone() {
+            if (typeof currentLangFilter !== 'undefined' && currentLangFilter === 'custom') return true;
             if (!selectedVoice) return false;
             if (selectedVoice.startsWith("clone_")) return true;
             if (typeof allVoices !== 'undefined' && Array.isArray(allVoices)) {
@@ -2143,7 +2144,18 @@
             currentLangFilter = lang;
             document.querySelectorAll(".lang-tab").forEach(el => el.classList.remove("active"));
             if (btnEl) btnEl.classList.add("active");
+            
+            if (lang === 'custom') {
+                const firstClone = allVoices.find(v => v.is_clone || (v.voice_type || "").startsWith("clone_"));
+                if (firstClone) {
+                    selectedVoice = firstClone.voice_type;
+                    selectedResourceId = firstClone.resource_id;
+                }
+            }
             applyFilters();
+            if (typeof updateCloneLimitState === 'function') {
+                updateCloneLimitState();
+            }
         }
 
         function applyFilters() {
