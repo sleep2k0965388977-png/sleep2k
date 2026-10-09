@@ -489,6 +489,32 @@
             text-transform: uppercase;
         }
 
+        
+        /* Clone Voice Character Limit Cards */
+        .clone-mode-card {
+            cursor: pointer;
+            background: rgba(24, 24, 27, 0.7);
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 12px 14px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .clone-mode-card:hover {
+            border-color: rgba(168, 85, 247, 0.6);
+            background: rgba(168, 85, 247, 0.08);
+            transform: translateY(-1px);
+        }
+        .clone-mode-card.active {
+            border-color: #a855f7 !important;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.12)) !important;
+            box-shadow: 0 0 16px rgba(168, 85, 247, 0.28) !important;
+        }
+        .clone-textarea-over {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.35) !important;
+        }
+
         /* STT Upload Dropzone CSS */
         .upload-dropzone {
             border: 2px dashed rgba(139, 92, 246, 0.4);
@@ -1017,6 +1043,11 @@
                         <i class="fa-solid fa-folder-plus"></i> T&#7843;i Danh S&#225;ch File (.TXT)
                     </button>
                     <span id="uploadedFileName" style="display:none; font-size:12px; color:#34d399; font-weight:600;"><i class="fa-solid fa-circle-check"></i> <span id="uploadedFileNameText"></span></span>
+                    
+                    <button type="button" id="btnAutoSplitText" onclick="splitCurrentTextToChapters()" style="background:linear-gradient(135deg, rgba(16,185,129,0.25), rgba(5,150,105,0.25)); border:1px solid rgba(16,185,129,0.45); color:#6ee7b7; padding:7px 16px; border-radius:10px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s;" title="Tự động chia nội dung đang dán thành các chương nhỏ (2.000 - 3.000 ký tự) để tạo tuần tự không lo đầy RAM">
+                        <i class="fa-solid fa-scissors"></i> Tự Động Chia Đoạn / Chương
+                    </button>
+
                     <input type="file" id="chapterFileInput" accept=".txt" style="display:none;" onchange="handleChapterFileUpload(this.files[0]);">
                     <input type="file" id="batchFilesInput" accept=".txt" multiple style="display:none;" onchange="handleBatchFilesUpload(this.files);">
                 </div>
@@ -1052,7 +1083,7 @@
 
                 <!-- Chapter List Panel (shown after file upload) -->
                 
-                <div id="chapterListPanel"<div id="chapterListPanel" style="display:none; margin-bottom:12px; padding:14px; background:rgba(30,41,59,0.7); border:1px solid var(--card-border); border-radius:12px; max-height:300px; overflow-y:auto;">
+                <div id="chapterListPanel" style="display:none; margin-bottom:12px; padding:14px; background:rgba(30,41,59,0.7); border:1px solid var(--card-border); border-radius:12px; max-height:300px; overflow-y:auto;">
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                         <span style="font-weight:700; color:#fff; font-size:13px;"><i class="fa-solid fa-list-ol" style="color:var(--accent-purple);"></i> Danh s&#225;ch ch&#432;&#417;ng (<span id="chapterTotalCount">0</span>)</span>
                         <div style="display:flex; gap:6px;">
@@ -1061,6 +1092,78 @@
                         </div>
                     </div>
                     <div id="chapterItems" style="display:flex; flex-direction:column; gap:6px;"></div>
+                </div>
+            </div>
+
+            
+            <!-- Cảnh Báo & Chọn Chế Độ Giới Hạn Ký Tự (CHỈ HIỂN THỊ KHI CHỌN GIỌNG CLONE) -->
+            <div id="cloneLimitBanner" style="display:none; margin-bottom:14px; background:linear-gradient(135deg, rgba(168,85,247,0.12), rgba(236,72,153,0.08)); border:1.5px solid rgba(168,85,247,0.45); border-radius:14px; padding:16px; backdrop-filter:blur(8px); box-shadow:0 8px 24px rgba(168,85,247,0.15);">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:8px; color:#f3e8ff; font-weight:700; font-size:13.5px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b; font-size:17px;"></i>
+                        <span>CẢNH BÁO GIỚI HẠN KÝ TỰ (GIỌNG CLONE AI)</span>
+                        <span style="font-size:11px; background:rgba(236,72,153,0.22); color:#f472b6; padding:2px 8px; border-radius:12px; font-weight:700; border:1px solid rgba(236,72,153,0.45);">
+                            Mô hình Neural AI
+                        </span>
+                    </div>
+                    <div id="cloneCharCounterBadge" style="font-size:12px; font-weight:700; color:#cbd5e1; background:rgba(0,0,0,0.35); padding:5px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.12);">
+                        Đang nhập: <span id="cloneCurrentChars" style="color:#a78bfa;">0</span> / <span id="cloneMaxChars">2,000</span> ký tự
+                    </div>
+                </div>
+
+                <div style="font-size:12px; color:#cbd5e1; margin-bottom:12px; line-height:1.5;">
+                    Mô hình AI Clone cần tính toán sóng âm chi tiết theo âm sắc thật của bạn. Vui lòng chọn <strong>1 trong 2 chế độ ký tự</strong> dưới đây để giọng đọc mượt mà và chuẩn xác nhất:
+                </div>
+
+                <!-- 2 Chế độ lựa chọn -->
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap:12px; margin-bottom:8px;">
+                    <!-- Chế độ 1: 2000 ký tự -->
+                    <div id="modeCard2k" onclick="setCloneCharMode(2000)" class="clone-mode-card active">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                            <div style="font-weight:700; color:#fff; font-size:13.5px; display:flex; align-items:center; gap:8px;">
+                                <input type="radio" name="clone_mode_radio" id="radio2k" checked style="accent-color:#a855f7; cursor:pointer; width:15px; height:15px;">
+                                <span>1.000 – 2.000 Ký Tự</span>
+                            </div>
+                            <span style="font-size:11px; background:rgba(52,211,153,0.15); color:#34d399; padding:2px 8px; border-radius:6px; font-weight:700; border:1px solid rgba(52,211,153,0.3);">
+                                ⚡ Siêu tốc 2–5s
+                            </span>
+                        </div>
+                        <div style="font-size:11.5px; color:#a1a1aa; line-height:1.45;">
+                            Thời lượng 1–2 phút (Chuẩn video ngắn <strong>TikTok / Reels / Shorts</strong>). 🟢 <em>Mượt nhất tuyệt đối, bấm phát có ngay.</em>
+                        </div>
+                    </div>
+
+                    <!-- Chế độ 2: 5000 ký tự -->
+                    <div id="modeCard5k" onclick="setCloneCharMode(5000)" class="clone-mode-card">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                            <div style="font-weight:700; color:#e4e4e7; font-size:13.5px; display:flex; align-items:center; gap:8px;">
+                                <input type="radio" name="clone_mode_radio" id="radio5k" style="accent-color:#a855f7; cursor:pointer; width:15px; height:15px;">
+                                <span>3.000 – 5.000 Ký Tự</span>
+                            </div>
+                            <span style="font-size:11px; background:rgba(96,165,250,0.15); color:#60a5fa; padding:2px 8px; border-radius:6px; font-weight:700; border:1px solid rgba(96,165,250,0.3);">
+                                🎯 Tạo xong 8–15s
+                            </span>
+                        </div>
+                        <div style="font-size:11.5px; color:#a1a1aa; line-height:1.45;">
+                            Thời lượng 3–5 phút (Chuẩn <strong>Review phim / Tin tức dài</strong>). 🟢 <em>Giọng ổn định, ngữ điệu tự nhiên, an toàn 100%.</em>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hộp Cảnh báo khi vượt quá ký tự -->
+                <div id="cloneLimitAlertBox" style="display:none; margin-top:10px; background:rgba(239,68,68,0.14); border:1px solid rgba(239,68,68,0.4); border-radius:10px; padding:10px 14px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <div style="font-size:12px; color:#fca5a5; display:flex; align-items:center; gap:8px;">
+                        <i class="fa-solid fa-circle-xmark" style="color:#ef4444; font-size:15px;"></i>
+                        <span>Văn bản dài <strong><span id="alertOverCount">0</span></strong> ký tự, đã vượt quá mức tối đa <strong><span id="alertMaxLimit">2,000</span></strong> ký tự!</span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="trimCloneTextToLimit()" type="button" style="background:#ef4444; border:none; color:#fff; font-size:11.5px; font-weight:700; padding:5px 12px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+                            <i class="fa-solid fa-scissors"></i> Cắt vừa đủ mốc này
+                        </button>
+                        <button onclick="splitCurrentTextToChapters()" type="button" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:#fff; font-size:11.5px; font-weight:600; padding:5px 12px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+                            <i class="fa-solid fa-layer-group"></i> Chia thành các tập nhỏ
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1691,6 +1794,175 @@
         let activePreviewBtn = null;
         const previewAudioEl = document.getElementById("previewAudio");
 
+        
+        // ── Voice Clone Character Limit Modes (2.000 / 5.000) ──
+        let cloneCharLimit = 2000;
+
+        function isCurrentVoiceClone() {
+            if (!selectedVoice) return false;
+            if (selectedVoice.startsWith("clone_")) return true;
+            if (typeof allVoices !== 'undefined' && Array.isArray(allVoices)) {
+                const v = allVoices.find(x => x.voice_type === selectedVoice);
+                if (v && (v.is_clone || (v.voice_type && v.voice_type.startsWith("clone_")))) return true;
+            }
+            return false;
+        }
+
+        function setCloneCharMode(limit) {
+            cloneCharLimit = limit;
+            const card2k = document.getElementById("modeCard2k");
+            const card5k = document.getElementById("modeCard5k");
+            const r2k = document.getElementById("radio2k");
+            const r5k = document.getElementById("radio5k");
+            if (!card2k || !card5k) return;
+
+            if (limit === 2000) {
+                card2k.classList.add("active");
+                if (r2k) r2k.checked = true;
+                card5k.classList.remove("active");
+                if (r5k) r5k.checked = false;
+            } else {
+                card5k.classList.add("active");
+                if (r5k) r5k.checked = true;
+                card2k.classList.remove("active");
+                if (r2k) r2k.checked = false;
+            }
+            updateCloneLimitState();
+        }
+
+        function updateCloneLimitState() {
+            const isClone = isCurrentVoiceClone();
+            const banner = document.getElementById("cloneLimitBanner");
+            const badge = document.querySelector(".text-stats-bar > span:last-child");
+            const ta = document.getElementById("textInput");
+            if (!banner) return;
+
+            if (!isClone) {
+                banner.style.display = "none";
+                if (badge) {
+                    badge.innerHTML = '<i class="fa-solid fa-check"></i> Không giới hạn';
+                    badge.style.color = '#34d399';
+                    badge.style.fontWeight = '600';
+                }
+                if (ta) ta.classList.remove("clone-textarea-over");
+                return;
+            }
+
+            banner.style.display = "block";
+            const text = (ta ? ta.value : "") || "";
+            const charLen = text.length;
+
+            const curSpan = document.getElementById("cloneCurrentChars");
+            const maxSpan = document.getElementById("cloneMaxChars");
+            if (curSpan) curSpan.innerText = charLen.toLocaleString();
+            if (maxSpan) maxSpan.innerText = cloneCharLimit.toLocaleString();
+
+            if (badge) {
+                badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giới hạn Clone: ${cloneCharLimit.toLocaleString()} ký tự`;
+                badge.style.color = charLen > cloneCharLimit ? '#ef4444' : '#ec4899';
+                badge.style.fontWeight = '700';
+            }
+
+            const alertBox = document.getElementById("cloneLimitAlertBox");
+            if (charLen > cloneCharLimit) {
+                if (alertBox) alertBox.style.display = "flex";
+                const overEl = document.getElementById("alertOverCount");
+                const maxEl = document.getElementById("alertMaxLimit");
+                if (overEl) overEl.innerText = charLen.toLocaleString();
+                if (maxEl) maxEl.innerText = cloneCharLimit.toLocaleString();
+                if (curSpan) curSpan.style.color = "#ef4444";
+                if (ta) ta.classList.add("clone-textarea-over");
+            } else {
+                if (alertBox) alertBox.style.display = "none";
+                if (curSpan) curSpan.style.color = "#a78bfa";
+                if (ta) ta.classList.remove("clone-textarea-over");
+            }
+        }
+
+        function trimCloneTextToLimit() {
+            const ta = document.getElementById("textInput");
+            if (!ta) return;
+            let text = ta.value || "";
+            if (text.length <= cloneCharLimit) return;
+
+            let sub = text.substring(0, cloneCharLimit);
+            let lastPunct = Math.max(
+                sub.lastIndexOf('.'),
+                sub.lastIndexOf('!'),
+                sub.lastIndexOf('?'),
+                sub.lastIndexOf('\n'),
+                sub.lastIndexOf(';')
+            );
+            if (lastPunct > cloneCharLimit * 0.7) {
+                ta.value = sub.substring(0, lastPunct + 1).trim();
+            } else {
+                ta.value = sub.trim();
+            }
+            updateTextStats();
+        }
+
+        function splitCurrentTextToChapters() {
+            const ta = document.getElementById("textInput");
+            const fullText = (ta ? ta.value : "").trim();
+            if (!fullText) {
+                alert("Vui lòng dán văn bản vào khung trước khi thực hiện chia đoạn/chương!");
+                return;
+            }
+
+            const targetLimit = isCurrentVoiceClone() ? cloneCharLimit : 2500;
+            const paragraphs = fullText.split(/\n+/);
+            let chunks = [];
+            let currentChunk = "";
+
+            for (let p of paragraphs) {
+                p = p.trim();
+                if (!p) continue;
+                if ((currentChunk.length + p.length + 1) <= targetLimit) {
+                    currentChunk += (currentChunk ? "\n\n" : "") + p;
+                } else {
+                    if (currentChunk) {
+                        chunks.push(currentChunk);
+                        currentChunk = "";
+                    }
+                    if (p.length <= targetLimit) {
+                        currentChunk = p;
+                    } else {
+                        let sentences = p.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [p];
+                        for (let s of sentences) {
+                            s = s.trim();
+                            if (!s) continue;
+                            if ((currentChunk.length + s.length + 1) <= targetLimit) {
+                                currentChunk += (currentChunk ? " " : "") + s;
+                            } else {
+                                if (currentChunk) chunks.push(currentChunk);
+                                currentChunk = s;
+                            }
+                        }
+                    }
+                }
+            }
+            if (currentChunk) chunks.push(currentChunk);
+
+            if (chunks.length <= 1) {
+                alert(`Văn bản hiện tại (${fullText.length.toLocaleString()} ký tự) đã nằm gọn trong mức giới hạn ${targetLimit.toLocaleString()} ký tự, không cần phải chia nhỏ!`);
+                return;
+            }
+
+            chapterList = chunks.map((chunkText, idx) => ({
+                index: idx + 1,
+                title: `Tập ${idx + 1} (${chunkText.length.toLocaleString()} ký tự)`,
+                content: chunkText,
+                charCount: chunkText.length
+            }));
+            chapterDoneStatus = {};
+            document.getElementById('chapterTotalCount').textContent = chapterList.length;
+            renderChapterItems();
+            document.getElementById('chapterListPanel').style.display = 'block';
+            selectChapter(0);
+
+            alert(`🎉 Đã tự động chia thành công ${chapterList.length} tập nhỏ (mỗi tập dưới ${targetLimit.toLocaleString()} ký tự)!\n\nBạn có thể bấm 'Tạo tất cả' để hệ thống tự động tạo và tải về lần lượt từng tập.`);
+        }
+
         function updateTextStats() {
             const text = document.getElementById("textInput").value;
             document.getElementById("charCount").innerText = text.length.toLocaleString();
@@ -1974,6 +2246,7 @@
             selectedVoice = voiceType; selectedResourceId = resourceId;
             document.querySelectorAll(".voice-item").forEach(el => el.classList.remove("active"));
             element.classList.add("active");
+            updateCloneLimitState();
         }
 
         async function previewVoice(voiceType, lan, btnEl, event) {
@@ -2015,6 +2288,13 @@
         async function startGeneration() {
             const text = document.getElementById("textInput").value.trim();
             if (!text) { alert("Vui lòng nhập văn bản!"); return; }
+            if (isCurrentVoiceClone()) {
+                if (text.length > cloneCharLimit) {
+                    alert(`⚠️ GIỌNG CLONE BẢN THÂN:\nVăn bản hiện tại dài ${text.length.toLocaleString()} ký tự, vượt quá chế độ giới hạn ${cloneCharLimit.toLocaleString()} ký tự bạn đã chọn.\n\nVui lòng bấm 'Cắt vừa đủ mốc này' hoặc sử dụng công cụ 'Chia thành các tập nhỏ' để tạo giọng mượt và không bị nghẽn!`);
+                    return;
+                }
+            }
+
             const btn = document.getElementById("btnGenerate"), rate = document.getElementById("rateSelect").value;
             const progressCard = document.getElementById("progressCard"), playerCard = document.getElementById("playerCard");
             const fillEl = document.getElementById("progressFill"), pctEl = document.getElementById("progressPercentage"), statusEl = document.getElementById("progressStatus");
@@ -2025,7 +2305,7 @@
             statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản...';
 
             try {
-                const resp = await fetch("/api/generate_job", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({text, voice:selectedVoice, resource_id:selectedResourceId, rate}) });
+                const resp = await fetch("/api/generate_job", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({text, voice:selectedVoice, resource_id:selectedResourceId, rate, clone_max_chars: cloneCharLimit}) });
                 const data = await resp.json();
                 if (data.status !== "success") { alert("Lỗi: " + (data.message||"")); progressCard.classList.remove("show"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3'; return; }
 

@@ -1185,6 +1185,16 @@ def generate_job():
         if not text:
             return jsonify({"status": "error", "message": "Vui lòng nhập văn bản cần đọc."}), 400
 
+        if is_clone_voice(voice):
+            max_clone_limit = int(data.get("clone_max_chars", 5000))
+            if max_clone_limit not in (2000, 5000):
+                max_clone_limit = 5000
+            if len(text) > (max_clone_limit + 100):
+                return jsonify({
+                    "status": "error",
+                    "message": "Văn bản dài " + str(len(text)) + " ký tự, vượt quá giới hạn " + str(max_clone_limit) + " ký tự của chế độ giọng Clone đã chọn. Vui lòng rút gọn hoặc dùng tính năng Tách chương tự động!"
+                }), 400
+
         vinfo = find_voice_info(voice)
         if vinfo and not resource_id:
             resource_id = vinfo.get("resource_id")
