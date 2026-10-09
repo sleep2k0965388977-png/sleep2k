@@ -546,9 +546,9 @@
 
         .container {
             flex: 1;
-            max-width: 900px;
+            max-width: 1060px;
             min-width: 0;
-            margin: 0 !important;
+            margin: 0 auto !important;
         }
 
         .side-panel {
@@ -916,86 +916,7 @@
 </head>
 <body>
     <div class="main-layout-wrapper">
-        <!-- Cột Trái: Hướng Dẫn Sử Dụng Toàn Bộ Chức Năng App -->
-        <aside class="side-panel side-panel-left" id="guidePanel">
-            <div class="side-panel-header">
-                <div class="side-panel-icon" style="background: linear-gradient(135deg, #3b82f6, #6366f1); box-shadow: 0 0 15px rgba(59,130,246,0.35);">
-                    <i class="fa-solid fa-book-open"></i>
-                </div>
-                <div>
-                    <h3 style="margin:0; font-size:15px; font-weight:700; color:#fff;">Hướng Dẫn Sử Dụng</h3>
-                    <div style="font-size:11.5px; color:#94a3b8;">Toàn bộ tính năng từ A – Z</div>
-                </div>
-            </div>
-
-            <!-- Bước 1: Nhập & Tải văn bản -->
-            <div class="guide-step-card">
-                <div class="guide-step-title">
-                    <span style="color:#60a5fa;"><i class="fa-solid fa-file-pen"></i></span>
-                    1. Nhập hoặc Tải File Hàng Loạt
-                </div>
-                <div class="guide-step-desc">
-                    • Dán văn bản trực tiếp <strong>không giới hạn ký tự</strong>.<br/>
-                    • Bấm <span class="guide-tag">Tải File Truyện (.TXT)</span>: Tự động tách chương đọc 1 cuốn tiểu thuyết dài.<br/>
-                    • Bấm <span class="guide-tag" style="color:#f472b6; border-color:rgba(236,72,153,0.4); background:rgba(236,72,153,0.15);">Tải Danh Sách File (.TXT)</span>: Chọn cùng lúc nhiều file, hệ thống sẽ tự động tạo lần lượt từng file từ trên xuống dưới, tạo xong file nào tự động tải xuống file đó rồi mới tiếp tục file kế tiếp!
-                </div>
-            </div>
-
-            <!-- Bước 2: Gắn biểu cảm AI -->
-            <div class="guide-step-card">
-                <div class="guide-step-title">
-                    <span style="color:#f59e0b;"><i class="fa-solid fa-masks-theater"></i></span>
-                    2. Gắn Biểu Cảm Cảm Xúc AI
-                </div>
-                <div class="guide-step-desc">
-                    Chèn nhanh các tag <span class="guide-tag">[cười]</span>, <span class="guide-tag">[thở dài]</span>, <span class="guide-tag">[hắng giọng]</span>, <span class="guide-tag">[nghỉ nhịp]</span>. Hoặc bấm nút <span class="guide-tag">⚡ Tự Động Quét</span> để AI tự phân tích ngữ cảnh và thêm cảm xúc.
-                </div>
-            </div>
-
-            <!-- Bước 3: Chọn giọng đọc -->
-            <div class="guide-step-card">
-                <div class="guide-step-title">
-                    <span style="color:#a855f7;"><i class="fa-solid fa-microphone-lines"></i></span>
-                    3. 154+ Giọng Đọc Đa Ngôn Ngữ
-                </div>
-                <div class="guide-step-desc">
-                    Chọn các tab ngôn ngữ: <strong>Tiếng Việt</strong> (Hoài My, Nam Minh, Thảo Trinh, Bé, Việt Méo...), Anh, Trung, Nhật... Có sẵn <strong>VieNeu 48kHz</strong> đặc sắc vùng miền. Bấm <span class="guide-tag"><i class="fa-solid fa-volume-high"></i> Nghe thử</span> trước khi tạo.
-                </div>
-            </div>
-
-            <!-- Bước 4: Clone giọng bản thân -->
-            <div class="guide-step-card" style="border-color: rgba(236,72,153,0.3); background: rgba(236,72,153,0.03);">
-                <div class="guide-step-title">
-                    <span style="color:#ec4899;"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
-                    4. Nhân Bản Giọng Của Bạn (Lưu Tạm Thời)
-                </div>
-                <div class="guide-step-desc">
-                    Bấm thẻ <span class="guide-tag" style="background:rgba(236,72,153,0.15); color:#f472b6; border-color:rgba(236,72,153,0.3);">+ Clone Giọng Bản Thân</span> &rarr; Thu âm 5–15s hoặc tải file vocal. Giọng được <strong>lưu tạm thời trong phiên làm việc</strong>, khi bạn đóng trình duyệt Google Chrome sẽ tự động xóa sạch để bảo vệ riêng tư và tránh đầy bộ nhớ máy chủ!
-                </div>
-            </div>
-
-            <!-- Bước 5: Tạo audio & Xuất file -->
-            <div class="guide-step-card">
-                <div class="guide-step-title">
-                    <span style="color:#10b981;"><i class="fa-solid fa-circle-play"></i></span>
-                    5. Tạo Âm Thanh & Xuất MP3
-                </div>
-                <div class="guide-step-desc">
-                    Chỉnh tốc độ đọc (0.75x – 1.5x) &rarr; Bấm <strong>Tạo Giọng Đọc MP3</strong>. Công nghệ chia đoạn song song ghép nối mượt mà trong 1–3s. Nghe trực tiếp hoặc tải file MP3 về máy.
-                </div>
-            </div>
-
-            <!-- Bước 6: Chuyển âm thanh thành chữ STT -->
-            <div class="guide-step-card">
-                <div class="guide-step-title">
-                    <span style="color:#06b6d4;"><i class="fa-solid fa-file-audio"></i></span>
-                    6. Chuyển Âm Thanh Thành Chữ (STT)
-                </div>
-                <div class="guide-step-desc">
-                    Bấm tab <strong>STT</strong> ở đầu trang để chuyển file ghi âm, video thành văn bản hoặc xuất tệp phụ đề <strong>.SRT</strong> khớp từng giây.
-                </div>
-            </div>
-        </aside>
+        
 
         <div class="container">
         <header>
@@ -1410,46 +1331,6 @@
         </div>
         <!-- End Section STT -->
 
-        <!-- Support & Contact Footer -->
-        <footer class="app-footer">
-            <div class="footer-content">
-                <div class="footer-title">
-                    <i class="fa-solid fa-headset"></i> Trung Tâm Hỗ Trợ & Liên Hệ Trực Tiếp
-                </div>
-                <div class="footer-social-row">
-                    <a href="https://www.youtube.com/channel/UCJZbbNNQi_3b7woAWsxfcOA" target="_blank" rel="noopener noreferrer" class="footer-social-card yt-card">
-                        <div class="social-card-icon"><i class="fa-brands fa-youtube"></i></div>
-                        <div class="social-card-info">
-                            <div class="social-card-name">Kênh YouTube</div>
-                            <div class="social-card-sub">Xem video hướng dẫn & cập nhật mới nhất</div>
-                        </div>
-                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
-                    </a>
-                    <a href="https://www.facebook.com/profile.php?id=61573341676326" target="_blank" rel="noopener noreferrer" class="footer-social-card fb-card">
-                        <div class="social-card-icon"><i class="fa-brands fa-facebook"></i></div>
-                        <div class="social-card-info">
-                            <div class="social-card-name">Facebook Cá Nhân</div>
-                            <div class="social-card-sub">Nhắn tin Messenger hỗ trợ trực tiếp 24/7</div>
-                        </div>
-                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
-                    </a>
-                    <a href="mailto:sleepchill2002@gmail.com" class="footer-social-card mail-card">
-                        <div class="social-card-icon"><i class="fa-solid fa-envelope"></i></div>
-                        <div class="social-card-info">
-                            <div class="social-card-name">sleepchill2002@gmail.com</div>
-                            <div class="social-card-sub">Gửi phản hồi, góp ý & yêu cầu tính năng</div>
-                        </div>
-                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
-                    </a>
-                </div>
-                <div class="footer-copyright">
-                    © 2026 SLEEP2K TTS AI — Phát triển vì cộng đồng sáng tạo nội dung.
-                </div>
-            </div>
-        </footer>
-        </div>
-
-        
         <!-- Video Downloader Section (TikTok & Douyin Bulk Downloader) -->
         <div id="sectionDownloader" style="display: none;">
             <div class="flow-banner">
@@ -1597,15 +1478,47 @@
                     <!-- Danh sách thẻ video sẽ được render động tại đây -->
                 </div>
             </div>
+        </div>
+        <!-- End Section Downloader -->
 
-            <!-- Footer Section Downloader -->
-            <footer class="app-footer" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--card-border);">
-                <div class="footer-container" style="text-align: center;">
-                    <div class="footer-copyright" style="font-size: 13px; color: var(--text-muted);">
-                        © 2026 SLEEP2K — Công cụ tải video hàng loạt chất lượng cao, bảo vệ 100% dung lượng máy chủ.
-                    </div>
+
+        <!-- Support & Contact Footer -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <div class="footer-title">
+                    <i class="fa-solid fa-headset"></i> Trung Tâm Hỗ Trợ & Liên Hệ Trực Tiếp
                 </div>
-            </footer>
+                <div class="footer-social-row">
+                    <a href="https://www.youtube.com/channel/UCJZbbNNQi_3b7woAWsxfcOA" target="_blank" rel="noopener noreferrer" class="footer-social-card yt-card">
+                        <div class="social-card-icon"><i class="fa-brands fa-youtube"></i></div>
+                        <div class="social-card-info">
+                            <div class="social-card-name">Kênh YouTube</div>
+                            <div class="social-card-sub">Xem video hướng dẫn & cập nhật mới nhất</div>
+                        </div>
+                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
+                    </a>
+                    <a href="https://www.facebook.com/profile.php?id=61573341676326" target="_blank" rel="noopener noreferrer" class="footer-social-card fb-card">
+                        <div class="social-card-icon"><i class="fa-brands fa-facebook"></i></div>
+                        <div class="social-card-info">
+                            <div class="social-card-name">Facebook Cá Nhân</div>
+                            <div class="social-card-sub">Nhắn tin Messenger hỗ trợ trực tiếp 24/7</div>
+                        </div>
+                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
+                    </a>
+                    <a href="mailto:sleepchill2002@gmail.com" class="footer-social-card mail-card">
+                        <div class="social-card-icon"><i class="fa-solid fa-envelope"></i></div>
+                        <div class="social-card-info">
+                            <div class="social-card-name">sleepchill2002@gmail.com</div>
+                            <div class="social-card-sub">Gửi phản hồi, góp ý & yêu cầu tính năng</div>
+                        </div>
+                        <i class="fa-solid fa-arrow-up-right-from-square arrow-icon"></i>
+                    </a>
+                </div>
+                <div class="footer-copyright">
+                    © 2026 SLEEP2K TTS AI — Phát triển vì cộng đồng sáng tạo nội dung.
+                </div>
+            </div>
+        </footer>
         </div>
 
 
