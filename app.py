@@ -975,15 +975,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
                 return idx, audio_bytes, est_duration
         except Exception as ex:
             print(f"Clone Voice synthesis error chunk {idx+1}: {ex}")
-            try:
-                # Intelligent fallback: read with warm expressive neural voice
-                audio_bytes = edge_tts_synthesize_audio(text_chunk, "vi-VN-HoaiMyNeural", rate=rate, max_retries=2)
-                if audio_bytes and len(audio_bytes) > 0:
-                    return idx, audio_bytes, int(len(text_chunk) / 150 * 1000)
-            except Exception:
-                pass
-        silence = generate_silent_mp3_bytes(300)
-        return idx, silence, 300
+            raise RuntimeError(f"Chưa kết nối AI Clone Worker: Hãy mở file CHAY_AI_CLONE_GIONG.bat trên máy tính để nhân bản đúng giọng thật của bạn! ({ex})")
 
     # ── 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
     if is_vieneu_voice(voice):
