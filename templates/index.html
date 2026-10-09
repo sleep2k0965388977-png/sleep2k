@@ -1923,6 +1923,15 @@
                 card2k.classList.remove("active");
                 if (r2k) r2k.checked = false;
             }
+
+            const ta = document.getElementById("textInput");
+            const textLen = (ta ? ta.value.length : 0);
+            if (textLen > limit) {
+                showToast(`⚠️ VĂN BẢN VƯỢT QUÁ MỐC: Bạn vừa chọn mốc ${limit.toLocaleString()} ký tự, nhưng nội dung hiện tại dài ${textLen.toLocaleString()} ký tự. Vui lòng cắt bớt hoặc dùng Tách chương!`, 'warning', 35000);
+            } else {
+                showToast(`✅ Đã chọn mốc ${limit.toLocaleString()} ký tự (${limit === 2000 ? 'Siêu tốc 2–5s video ngắn' : 'Review / Tin tức dài 8–15s'}).`, 'info', 15000);
+            }
+
             updateCloneLimitState();
         }
 
@@ -1968,6 +1977,14 @@
                 if (maxEl) maxEl.innerText = cloneCharLimit.toLocaleString();
                 if (curSpan) curSpan.style.color = "#ef4444";
                 if (ta) ta.classList.add("clone-textarea-over");
+
+                // Cảnh báo ở góc màn hình khi văn bản vượt quá mốc yêu cầu
+                const now = Date.now();
+                if (typeof window._lastLimitToastTime === 'undefined') window._lastLimitToastTime = 0;
+                if (now - window._lastLimitToastTime > 12000) {
+                    window._lastLimitToastTime = now;
+                    showToast(`⚠️ CẢNH BÁO VƯỢT MỐC: Văn bản đang dài ${charLen.toLocaleString()} ký tự, đã vượt quá mốc ${cloneCharLimit.toLocaleString()} ký tự của giọng Clone! Bạn hãy bấm 'Cắt vừa đủ' hoặc 'Chia thành các tập nhỏ'.`, 'warning', 35000);
+                }
             } else {
                 if (alertBox) alertBox.style.display = "none";
                 if (curSpan) curSpan.style.color = "#a78bfa";
