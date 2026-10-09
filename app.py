@@ -1205,7 +1205,7 @@ def index_downloader():
 
 @app.route("/favicon.ico")
 def favicon():
-    return Response(status=204)
+    return send_from_directory(os.path.join(app.root_path, "static"), "logo_1.png", mimetype="image/png")
 
 @app.route("/robots.txt")
 def robots_txt():
