@@ -1168,7 +1168,40 @@ def add_cache_control_headers(response):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", 
+        mode="tts",
+        page_title="SLEEP2K TTS - Chuyển Văn Bản Thành Giọng Nói AI Miễn Phí (Không Giới Hạn) & Tải Video TikTok Douyin",
+        page_desc="SLEEP2K TTS là công cụ AI chuyển văn bản thành giọng nói (Text-to-Speech) tiếng Việt tự nhiên miễn phí, không giới hạn ký tự. Hỗ trợ tạo audio truyện dài, clone giọng AI, đọc song song siêu tốc và tải video TikTok Douyin không logo.",
+        page_canonical="https://sleep2k-tts-production.up.railway.app/"
+    )
+
+@app.route("/chuyen-van-ban-thanh-giong-noi")
+def index_tts():
+    return render_template("index.html", 
+        mode="tts",
+        page_title="Chuyển Văn Bản Thành Giọng Nói AI Miễn Phí (Không Giới Hạn) - SLEEP2K TTS",
+        page_desc="Công cụ chuyển văn bản thành giọng nói tiếng Việt miễn phí, không giới hạn ký tự. Hỗ trợ đọc truyện audio, clone giọng nói AI mượt mà và chia đoạn song song siêu tốc.",
+        page_canonical="https://sleep2k-tts-production.up.railway.app/chuyen-van-ban-thanh-giong-noi"
+    )
+
+@app.route("/lay-text-tu-video")
+def index_stt():
+    return render_template("index.html", 
+        mode="stt",
+        page_title="Lấy Text Từ Video & Chuyển Âm Thanh Thành Văn Bản Tự Động - SLEEP2K",
+        page_desc="Công cụ tự động lấy text từ video, chuyển đổi file ghi âm âm thanh MP3/WAV/MP4 thành văn bản tiếng Việt chính xác cao và dịch thuật AI đa ngôn ngữ.",
+        page_canonical="https://sleep2k-tts-production.up.railway.app/lay-text-tu-video"
+    )
+
+@app.route("/tai-video-tiktok-douyin")
+def index_downloader():
+    return render_template("index.html", 
+        mode="downloader",
+        page_title="Tải Toàn Bộ Video Kênh TikTok & Douyin Không Logo Miễn Phí - SLEEP2K",
+        page_desc="Công cụ tải toàn bộ video kênh TikTok và Douyin Trung Quốc chất lượng cao không dính logo watermark. Hỗ trợ tải lẻ từng video hoặc tải cả kênh siêu tốc.",
+        page_canonical="https://sleep2k-tts-production.up.railway.app/tai-video-tiktok-douyin"
+    )
+
 
 @app.route("/favicon.ico")
 def favicon():
@@ -1192,8 +1225,27 @@ def sitemap_xml():
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
+  <url>
+    <loc>https://sleep2k-tts-production.up.railway.app/chuyen-van-ban-thanh-giong-noi</loc>
+    <lastmod>2026-10-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://sleep2k-tts-production.up.railway.app/lay-text-tu-video</loc>
+    <lastmod>2026-10-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://sleep2k-tts-production.up.railway.app/tai-video-tiktok-douyin</loc>
+    <lastmod>2026-10-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
 </urlset>"""
     return Response(xml, mimetype="application/xml")
+
 
 
 @app.route("/api/voices", methods=["GET"])
