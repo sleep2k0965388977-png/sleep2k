@@ -488,6 +488,8 @@ def api_protection():
         '/api/custom_voices': 60,
         '/api/delete_custom_voice': 30,
         '/api/cleanup_session_voices': 60,
+        '/api/scan_channel': 30,
+        '/api/download_video_stream': 150,
         '/api/clone_worker_status': 30,
         '/api/set_clone_worker_url': 30,
     }
@@ -3111,6 +3113,181 @@ def drive_upload_endpoint():
     
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ==========================================================
+# TIKTOK & DOUYIN BULK CHANNEL VIDEO DOWNLOADER API
+# ==========================================================
+
+@app.route("/api/scan_channel", methods=["POST"])
+def scan_channel():
+    """
+    Scrapes all videos from a TikTok or Douyin channel or list of URLs.
+    Extracts metadata without downloading files: title, thumbnail, duration, id, url.
+    """
+    try:
+        data = request.get_json(force=True) or {}
+        raw_url = data.get("url", "").strip()
+        limit = int(data.get("limit", 60))
+        if not raw_url:
+            return jsonify({"status": "error", "message": "Vui lòng nhập link kênh hoặc link video TikTok / Douyin."}), 400
+
+        urls = [u.strip() for u in raw_url.splitlines() if u.strip()]
+        
+        from yt_dlp import YoutubeDL
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+        
+        target = ImpersonateTarget.from_str('chrome')
+        videos = []
+        channel_name = ""
+        
+        for single_url in urls:
+            if single_url.startswith("@"):
+                single_url = f"https://www.tiktok.com/{single_url}"
+            elif not single_url.startswith("http://") and not single_url.startswith("https://"):
+                single_url = f"https://www.tiktok.com/@{single_url}"
+                
+            ydl_opts = {
+                'impersonate': target,
+                'extract_flat': 'in_playlist',
+                'quiet': True,
+                'playlistend': limit,
+                'no_warnings': True,
+                'ignoreerrors': True,
+            }
+            
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(single_url, download=False)
+                if not info:
+                    continue
+                    
+                channel_name = info.get("channel") or info.get("uploader") or info.get("title") or channel_name
+                entries = info.get("entries")
+                if entries:
+                    for entry in entries:
+                        if not entry:
+                            continue
+                        vid_id = entry.get("id") or str(len(videos) + 1)
+                        vid_title = entry.get("title") or entry.get("description") or f"Video {vid_id}"
+                        thumbs = entry.get("thumbnails") or []
+                        thumb_url = thumbs[0].get("url") if thumbs else (entry.get("thumbnail") or "")
+                        duration = entry.get("duration") or 0
+                        v_url = entry.get("url") or entry.get("webpage_url") or f"https://www.tiktok.com/video/{vid_id}"
+                        
+                        videos.append({
+                            "id": vid_id,
+                            "title": vid_title[:120].strip(),
+                            "thumbnail": thumb_url,
+                            "duration": duration,
+                            "url": v_url,
+                            "author": entry.get("uploader") or channel_name or "TikTok",
+                            "like_count": entry.get("like_count") or 0,
+                            "view_count": entry.get("view_count") or 0
+                        })
+                else:
+                    vid_id = info.get("id") or "1"
+                    vid_title = info.get("title") or info.get("description") or f"Video {vid_id}"
+                    thumbs = info.get("thumbnails") or []
+                    thumb_url = thumbs[0].get("url") if thumbs else (info.get("thumbnail") or "")
+                    videos.append({
+                        "id": vid_id,
+                        "title": vid_title[:120].strip(),
+                        "thumbnail": thumb_url,
+                        "duration": info.get("duration") or 0,
+                        "url": info.get("webpage_url") or single_url,
+                        "author": info.get("uploader") or "TikTok",
+                        "like_count": info.get("like_count") or 0,
+                        "view_count": info.get("view_count") or 0
+                    })
+                    
+        if not videos:
+            return jsonify({"status": "error", "message": "Không tìm thấy video nào từ đường link được cung cấp. Vui lòng kiểm tra lại link."}), 404
+            
+        return jsonify({
+            "status": "success",
+            "channel": channel_name or "Kênh Video",
+            "total": len(videos),
+            "videos": videos
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Lỗi quét kênh: {str(e)}"}), 500
+
+
+@app.route("/api/download_video_stream", methods=["GET"])
+def download_video_stream():
+    """
+    Downloads a single video via yt-dlp, streams it to client,
+    and immediately deletes the temp file on the server.
+    Ensures 0 MB persistent storage on VPS!
+    """
+    import tempfile, shutil, re
+    from flask import Response
+    from yt_dlp import YoutubeDL
+    from yt_dlp.networking.impersonate import ImpersonateTarget
+
+    target_url = request.args.get("url", "").strip()
+    custom_title = request.args.get("title", "").strip()
+    if not target_url:
+        return jsonify({"error": "Thiếu URL video"}), 400
+
+    temp_dir = tempfile.mkdtemp(prefix="dl_vid_")
+    out_tmpl = os.path.join(temp_dir, "%(id)s.%(ext)s")
+    
+    target = ImpersonateTarget.from_str('chrome')
+    ydl_opts = {
+        'impersonate': target,
+        'quiet': True,
+        'no_warnings': True,
+        'outtmpl': out_tmpl,
+        'format': 'best',
+    }
+
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(target_url, download=True)
+            real_file = ydl.prepare_filename(info)
+            if not os.path.exists(real_file):
+                files = os.listdir(temp_dir)
+                if files:
+                    real_file = os.path.join(temp_dir, files[0])
+                else:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    return jsonify({"error": "Không thể tải video từ máy chủ nguồn."}), 500
+
+        file_size = os.path.getsize(real_file)
+        raw_name = custom_title or info.get("title") or "video"
+        clean_name = re.sub(r'[\\/*?:"<>|]', "", raw_name).strip()[:80] or "video"
+        filename = f"{clean_name}.mp4"
+
+        def generate_and_cleanup():
+            try:
+                with open(real_file, "rb") as f:
+                    while True:
+                        chunk = f.read(65536) # 64KB chunk
+                        if not chunk:
+                            break
+                        yield chunk
+            finally:
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except Exception:
+                    pass
+
+        import urllib.parse
+        encoded_filename = urllib.parse.quote(filename)
+        headers = {
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+            "Content-Length": str(file_size),
+            "Content-Type": "video/mp4",
+            "Cache-Control": "no-cache"
+        }
+        return Response(generate_and_cleanup(), headers=headers)
+
+    except Exception as e:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return jsonify({"error": f"Lỗi tải video: {str(e)}"}), 500
+
 
 if __name__ == "__main__":
     import sys

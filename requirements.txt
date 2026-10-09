@@ -13,3 +13,6 @@ google-auth-httplib2
 
 imageio-ffmpeg>=0.5.1
 static-ffmpeg>=2.7
+
+yt-dlp>=2026.8.19
+curl-cffi>=0.16.0

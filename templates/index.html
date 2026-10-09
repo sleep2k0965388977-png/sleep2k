@@ -445,7 +445,7 @@
         /* Main Mode Switcher CSS */
         .main-mode-switcher {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 12px;
             margin-bottom: 22px;
             background: rgba(18, 24, 38, 0.7);
@@ -749,7 +749,170 @@
             border: 1px solid rgba(239, 68, 68, 0.35);
         }
 
-</style>
+
+        /* ===================================================
+           TIKTOK & DOUYIN BULK DOWNLOADER STYLES
+           =================================================== */
+        .dl-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(12px);
+        }
+        .dl-title-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
+        }
+        .dl-title {
+            font-size: 17px; font-weight: 700; color: #fff;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .dl-textarea {
+            width: 100%; background: rgba(11, 15, 25, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px; padding: 14px; color: #fff;
+            font-size: 14px; line-height: 1.5; resize: vertical;
+            outline: none; transition: all 0.2s ease;
+        }
+        .dl-textarea:focus {
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+        }
+        .dl-options-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px; margin-top: 14px; padding: 14px;
+            background: rgba(255, 255, 255, 0.03); border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05); align-items: center;
+        }
+        .dl-select {
+            background: rgba(11, 15, 25, 0.9); border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;
+            outline: none; cursor: pointer; width: 100%;
+        }
+        .dl-checkbox-label {
+            display: flex; align-items: center; gap: 8px; font-size: 13px;
+            color: var(--text-main); cursor: pointer; user-select: none;
+        }
+        .dl-btn {
+            padding: 10px 22px; border-radius: 10px; font-weight: 700;
+            font-size: 14px; cursor: pointer; border: none;
+            display: inline-flex; align-items: center; gap: 8px;
+            transition: all 0.2s ease;
+        }
+        .dl-btn-primary {
+            background: linear-gradient(135deg, #a855f7, #3b82f6); color: #fff;
+            box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+        }
+        .dl-btn-primary:hover {
+            transform: translateY(-2px); box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5);
+        }
+        .dl-btn-success {
+            background: linear-gradient(135deg, #10b981, #059669); color: #fff;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+        }
+        .dl-btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff;
+        }
+        .dl-btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff;
+        }
+        .dl-btn-secondary {
+            background: rgba(255, 255, 255, 0.08); color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .dl-btn-secondary:hover { background: rgba(255, 255, 255, 0.14); }
+        .dl-progress-box {
+            background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px; padding: 18px; margin-bottom: 16px;
+        }
+        .dl-progress-header {
+            display: flex; justify-content: space-between; font-size: 13px;
+            margin-bottom: 8px; font-weight: 600;
+        }
+        .dl-progress-bar-track {
+            width: 100%; height: 10px; background: rgba(255, 255, 255, 0.08);
+            border-radius: 6px; overflow: hidden; position: relative; margin-bottom: 14px;
+        }
+        .dl-progress-bar-fill {
+            height: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 6px;
+        }
+        .dl-video-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px; margin-top: 16px;
+        }
+        .dl-video-card {
+            background: rgba(18, 24, 38, 0.9); border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;
+            transition: all 0.2s ease; position: relative;
+        }
+        .dl-video-card:hover {
+            transform: translateY(-3px); border-color: rgba(139, 92, 246, 0.4);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        .dl-video-card.is-downloaded {
+            border-color: rgba(16, 185, 129, 0.45);
+            background: rgba(16, 185, 129, 0.04);
+        }
+        .dl-thumb-wrap {
+            width: 100%; height: 160px; position: relative;
+            background: #000; overflow: hidden;
+        }
+        .dl-thumb-img {
+            width: 100%; height: 100%; object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        .dl-video-card:hover .dl-thumb-img { transform: scale(1.05); }
+        .dl-duration-tag {
+            position: absolute; bottom: 8px; right: 8px;
+            background: rgba(0, 0, 0, 0.75); color: #fff;
+            padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600;
+        }
+        .dl-status-badge {
+            position: absolute; top: 8px; right: 8px;
+            padding: 4px 9px; border-radius: 20px; font-size: 11px;
+            font-weight: 700; backdrop-filter: blur(8px);
+        }
+        .dl-status-badge.pending {
+            background: rgba(0, 0, 0, 0.65); color: #9ca3af;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .dl-status-badge.downloading {
+            background: rgba(59, 130, 246, 0.9); color: #fff;
+        }
+        .dl-status-badge.downloaded {
+            background: rgba(16, 185, 129, 0.95); color: #fff;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+        .dl-card-content {
+            padding: 14px; display: flex; flex-direction: column;
+            flex: 1; justify-content: space-between;
+        }
+        .dl-video-title {
+            font-size: 13px; font-weight: 600; color: #f3f4f6;
+            line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px;
+        }
+        .dl-video-meta {
+            font-size: 11px; color: var(--text-muted);
+            display: flex; justify-content: space-between; margin-bottom: 12px;
+        }
+        .dl-card-btn {
+            padding: 7px 12px; font-size: 12px; border-radius: 8px;
+            border: none; cursor: pointer; font-weight: 600;
+            display: flex; align-items: center; justify-content: center;
+            gap: 6px; background: rgba(255, 255, 255, 0.08); color: #fff;
+            transition: all 0.2s ease;
+        }
+        .dl-card-btn:hover { background: rgba(139, 92, 246, 0.4); color: #fff; }
+        .dl-card-btn.downloaded {
+            background: rgba(16, 185, 129, 0.2); color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+    </style>
 </head>
 <body>
     <div class="main-layout-wrapper">
@@ -869,6 +1032,11 @@
                 <i class="fa-solid fa-file-waveform"></i>
                 <span>Chuyển Âm Thanh Thành Văn Bản (STT)</span>
                 <span class="mode-badge-new">Mới</span>
+            </button>
+            <button class="mode-btn" id="btnModeDownloader" onclick="switchMode('downloader')">
+                <i class="fa-brands fa-tiktok" style="color:#fe2c55;"></i>
+                <span>Tải Video TikTok / Douyin</span>
+                <span class="mode-badge-new" style="background:linear-gradient(135deg,#fe2c55,#25f4ee); color:#000; font-weight:800;">HOT</span>
             </button>
         </div>
 
@@ -1280,6 +1448,166 @@
             </div>
         </footer>
         </div>
+
+        
+        <!-- Video Downloader Section (TikTok & Douyin Bulk Downloader) -->
+        <div id="sectionDownloader" style="display: none;">
+            <div class="flow-banner">
+                <div class="flow-step"><i class="fa-brands fa-tiktok" style="color:#fe2c55;"></i><span>1. Dán Link Kênh / Video</span></div>
+                <i class="fa-solid fa-chevron-right flow-arrow"></i>
+                <div class="flow-step"><i class="fa-solid fa-magnifying-glass"></i><span>2. Quét Toàn Bộ Video</span></div>
+                <i class="fa-solid fa-chevron-right flow-arrow"></i>
+                <div class="flow-step"><i class="fa-solid fa-forward-step"></i><span>3. Bỏ Qua Video Đã Tải</span></div>
+                <i class="fa-solid fa-chevron-right flow-arrow"></i>
+                <div class="flow-step" style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1);">
+                    <i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent-emerald);"></i>
+                    <span style="color: #34d399;">4. Tải Tuần Tự Về Máy Tính</span>
+                </div>
+            </div>
+
+            <!-- Card Nhập Link & Điều Khiển -->
+            <div class="dl-card">
+                <div class="dl-title-row">
+                    <div class="dl-title">
+                        <i class="fa-brands fa-tiktok" style="color:#fe2c55; font-size:22px;"></i>
+                        <span>Tải Toàn Bộ Video Kênh TikTok & Douyin (Không Logo / Watermark)</span>
+                    </div>
+                    <span style="font-size:12px; color:var(--accent-emerald); background:rgba(16,185,129,0.12); padding:4px 10px; border-radius:20px; font-weight:700;">
+                        <i class="fa-solid fa-shield-halved"></i> Tải Trực Tiếp Máy Tính — 0MB VPS
+                    </span>
+                </div>
+
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px; line-height:1.5;">
+                    Nhập link kênh cá nhân (ví dụ: <code style="color:#93c5fd;">https://www.tiktok.com/@username</code> hoặc <code style="color:#93c5fd;">https://v.douyin.com/...</code>) hoặc dán danh sách nhiều link video (mỗi dòng một link).
+                </p>
+
+                <textarea id="dlChannelUrl" class="dl-textarea" rows="3" placeholder="Dán link kênh TikTok / Douyin hoặc danh sách link video tại đây..."></textarea>
+
+                <div class="dl-options-grid">
+                    <div>
+                        <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Số lượng video quét:</label>
+                        <select id="dlScanLimit" class="dl-select">
+                            <option value="30">30 video gần nhất</option>
+                            <option value="60" selected>60 video gần nhất</option>
+                            <option value="100">100 video gần nhất</option>
+                            <option value="200">200 video gần nhất</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="font-size:12px; color:var(--text-muted); display:block; margin-bottom:4px; font-weight:600;">Độ trễ nghỉ giữa 2 video:</label>
+                        <select id="dlDelay" class="dl-select">
+                            <option value="1000">1.0 giây (Nhanh)</option>
+                            <option value="1500" selected>1.5 giây (Chuẩn mượt)</option>
+                            <option value="2000">2.0 giây (An toàn)</option>
+                            <option value="3000">3.0 giây (Chống chặn)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="dl-checkbox-label" style="margin-top:16px;">
+                            <input type="checkbox" id="dlSkipDownloaded" checked style="accent-color:var(--accent-purple); width:16px; height:16px;">
+                            <span style="font-weight:600;">Tự động bỏ qua video đã tải</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:18px; flex-wrap:wrap; gap:12px;">
+                    <div style="display:flex; gap:10px;">
+                        <button class="dl-btn dl-btn-primary" id="btnScanChannel" onclick="startScanChannel()">
+                            <i class="fa-solid fa-magnifying-glass"></i> Bắt Đầu Quét Kênh
+                        </button>
+                    </div>
+                    <div>
+                        <button class="dl-btn dl-btn-secondary" onclick="clearDownloadedHistory()">
+                            <i class="fa-solid fa-trash-can"></i> Xóa Lịch Sử Đã Tải (<span id="downloadedHistoryCount">0</span>)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Khu Vực Hai Thanh Tiến Độ Trực Quan (Realtime Dual Progress Bars) -->
+            <div id="dlProgressSection" class="dl-card" style="display:none; border-color:rgba(139,92,246,0.3); background:rgba(15,23,42,0.85);">
+                <div class="dl-title-row">
+                    <div class="dl-title">
+                        <i class="fa-solid fa-sliders" style="color:var(--accent-purple);"></i>
+                        <span>Bảng Điều Khiển & Tiến Độ Tải Tuần Tự</span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="dl-btn dl-btn-success" id="btnStartBulk" onclick="startBulkDownload()">
+                            <i class="fa-solid fa-play"></i> Bắt Đầu Tải Tuần Tự
+                        </button>
+                        <button class="dl-btn dl-btn-warning" id="btnPauseBulk" onclick="pauseBulkDownload()" style="display:none;">
+                            <i class="fa-solid fa-pause"></i> Tạm Dừng
+                        </button>
+                        <button class="dl-btn dl-btn-danger" id="btnStopBulk" onclick="stopBulkDownload()" style="display:none;">
+                            <i class="fa-solid fa-stop"></i> Dừng Lại
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Thanh 1: Tiến độ toàn bộ kênh -->
+                <div class="dl-progress-box">
+                    <div class="dl-progress-header">
+                        <span><i class="fa-solid fa-list-check" style="color:#93c5fd;"></i> [1] Tiến Độ Toàn Bộ: <strong id="dlTotalStats" style="color:#fff;">0 / 0 video (0%)</strong></span>
+                        <span id="dlTotalPercent" style="color:#93c5fd; font-weight:700;">0%</span>
+                    </div>
+                    <div class="dl-progress-bar-track">
+                        <div id="dlOverallBar" class="dl-progress-bar-fill" style="width:0%; background:linear-gradient(90deg, #8b5cf6, #3b82f6);"></div>
+                    </div>
+
+                    <!-- Thanh 2: Tiến độ của video hiện tại -->
+                    <div class="dl-progress-header" style="margin-top:12px;">
+                        <span style="display:flex; align-items:center; gap:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:70%;">
+                            <i class="fa-solid fa-cloud-arrow-down" style="color:#34d399;"></i>
+                            [2] Đang tải: <strong id="dlCurrentVideoTitle" style="color:#f3f4f6; font-weight:600;">Chưa bắt đầu</strong>
+                        </span>
+                        <span id="dlCurrentVideoStats" style="color:#34d399; font-weight:700;">0 MB / 0 MB (0%)</span>
+                    </div>
+                    <div class="dl-progress-bar-track" style="margin-bottom:0;">
+                        <div id="dlCurrentBar" class="dl-progress-bar-fill" style="width:0%; background:linear-gradient(90deg, #10b981, #06b6d4);"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Khu Vực Danh Sách Video Quét Được -->
+            <div id="dlVideoListSection" class="dl-card" style="display:none;">
+                <div class="dl-title-row">
+                    <div>
+                        <div class="dl-title" style="margin-bottom:4px;">
+                            <i class="fa-solid fa-circle-play" style="color:#38bdf8;"></i>
+                            <span id="dlChannelHeading">Danh Sách Video</span>
+                        </div>
+                        <span style="font-size:12px; color:var(--text-muted);" id="dlChannelSubText">Đang hiển thị các video quét được</span>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <span class="social-btn" style="background:rgba(59,130,246,0.15); color:#93c5fd; border-color:rgba(59,130,246,0.3);">
+                            Tổng: <strong id="dlBadgeTotal" style="margin-left:4px;">0</strong>
+                        </span>
+                        <span class="social-btn" style="background:rgba(16,185,129,0.15); color:#6ee7b7; border-color:rgba(16,185,129,0.3);">
+                            Đã tải: <strong id="dlBadgeDownloaded" style="margin-left:4px;">0</strong>
+                        </span>
+                        <span class="social-btn" style="background:rgba(245,158,11,0.15); color:#fcd34d; border-color:rgba(245,158,11,0.3);">
+                            Chờ tải: <strong id="dlBadgePending" style="margin-left:4px;">0</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="dl-video-grid" id="dlVideoGridContainer">
+                    <!-- Danh sách thẻ video sẽ được render động tại đây -->
+                </div>
+            </div>
+
+            <!-- Footer Section Downloader -->
+            <footer class="app-footer" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--card-border);">
+                <div class="footer-container" style="text-align: center;">
+                    <div class="footer-copyright" style="font-size: 13px; color: var(--text-muted);">
+                        © 2026 SLEEP2K — Công cụ tải video hàng loạt chất lượng cao, bảo vệ 100% dung lượng máy chủ.
+                    </div>
+                </div>
+            </footer>
+        </div>
+
 
         <!-- Cột Phải: Mã QR Kêu Gọi Ủng Hộ Cà Phê -->
         <aside class="side-panel side-panel-right" id="donatePanel">
@@ -1843,19 +2171,23 @@
         function switchMode(mode) {
             const btnTTS = document.getElementById("btnModeTTS");
             const btnSTT = document.getElementById("btnModeSTT");
+            const btnDownloader = document.getElementById("btnModeDownloader");
             const secTTS = document.getElementById("sectionTTS");
             const secSTT = document.getElementById("sectionSTT");
+            const secDownloader = document.getElementById("sectionDownloader");
+
+            [btnTTS, btnSTT, btnDownloader].forEach(b => b && b.classList.remove("active"));
+            [secTTS, secSTT, secDownloader].forEach(s => s && (s.style.display = "none"));
 
             if (mode === "tts") {
-                btnTTS.classList.add("active");
-                btnSTT.classList.remove("active");
-                secTTS.style.display = "block";
-                secSTT.style.display = "none";
-            } else {
-                btnTTS.classList.remove("active");
-                btnSTT.classList.add("active");
-                secTTS.style.display = "none";
-                secSTT.style.display = "block";
+                if (btnTTS) btnTTS.classList.add("active");
+                if (secTTS) secTTS.style.display = "block";
+            } else if (mode === "stt") {
+                if (btnSTT) btnSTT.classList.add("active");
+                if (secSTT) secSTT.style.display = "block";
+            } else if (mode === "downloader") {
+                if (btnDownloader) btnDownloader.classList.add("active");
+                if (secDownloader) secDownloader.style.display = "block";
             }
         }
 
@@ -3367,6 +3699,440 @@
             }
         }
 
-</script>
+
+        // ===================================================
+        // TIKTOK & DOUYIN BULK DOWNLOADER JAVASCRIPT ENGINE
+        // ===================================================
+
+        let dlScannedVideos = [];
+        let isBulkDownloading = false;
+        let isBulkPaused = false;
+        let bulkQueue = [];
+        let currentQueueIndex = 0;
+
+        // Quản lý lịch sử đã tải qua LocalStorage
+        function getDownloadedVideoSet() {
+            try {
+                const raw = localStorage.getItem("sleep2k_downloaded_videos");
+                return raw ? new Set(JSON.parse(raw)) : new Set();
+            } catch (e) {
+                return new Set();
+            }
+        }
+
+        function saveDownloadedVideoId(id) {
+            try {
+                const s = getDownloadedVideoSet();
+                s.add(String(id));
+                localStorage.setItem("sleep2k_downloaded_videos", JSON.stringify([...s]));
+                updateHistoryCountBadge();
+            } catch (e) {}
+        }
+
+        function updateHistoryCountBadge() {
+            const count = getDownloadedVideoSet().size;
+            const el = document.getElementById("downloadedHistoryCount");
+            if (el) el.innerText = count;
+        }
+
+        function clearDownloadedHistory() {
+            if (confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử đánh dấu đã tải? (Các video cũ sẽ hiển thị lại trạng thái Chờ tải)")) {
+                localStorage.removeItem("sleep2k_downloaded_videos");
+                updateHistoryCountBadge();
+                renderVideoGrid();
+                updateStatsBadges();
+                showToast("Đã xóa lịch sử đánh dấu tải!", "success");
+            }
+        }
+
+        // Bắt đầu Quét Kênh
+        async function startScanChannel() {
+            const urlInput = document.getElementById("dlChannelUrl").value.trim();
+            const limit = document.getElementById("dlScanLimit").value;
+            const btn = document.getElementById("btnScanChannel");
+
+            if (!urlInput) {
+                showToast("Vui lòng nhập link kênh TikTok hoặc Douyin!", "warning");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang quét video...';
+
+            try {
+                const resp = await fetch("/api/scan_channel", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: urlInput, limit: parseInt(limit) })
+                });
+
+                const data = await resp.json();
+                if (!resp.ok || data.status !== "success") {
+                    throw new Error(data.message || "Lỗi quét kênh");
+                }
+
+                dlScannedVideos = data.videos || [];
+                const channelName = data.channel || "Kênh Video";
+
+                document.getElementById("dlChannelHeading").innerText = `${channelName} (${dlScannedVideos.length} Video)`;
+                document.getElementById("dlChannelSubText").innerText = `Đã tìm thấy ${dlScannedVideos.length} video sẵn sàng tải về máy`;
+
+                // Hiển thị các khối
+                document.getElementById("dlProgressSection").style.display = "block";
+                document.getElementById("dlVideoListSection").style.display = "block";
+
+                renderVideoGrid();
+                updateStatsBadges();
+                showToast(`Quét thành công ${dlScannedVideos.length} video từ ${channelName}!`, "success");
+
+            } catch (err) {
+                showToast(err.message || "Lỗi khi quét kênh", "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Bắt Đầu Quét Kênh';
+            }
+        }
+
+        // Render danh sách video lên giao diện
+        function renderVideoGrid() {
+            const container = document.getElementById("dlVideoGridContainer");
+            if (!container) return;
+
+            const downloadedSet = getDownloadedVideoSet();
+            container.innerHTML = "";
+
+            dlScannedVideos.forEach((v, idx) => {
+                const isDownloaded = downloadedSet.has(String(v.id));
+                const card = document.createElement("div");
+                card.className = `dl-video-card ${isDownloaded ? 'is-downloaded' : ''}`;
+                card.id = `dl-card-${v.id}`;
+
+                const durationStr = formatDuration(v.duration);
+                const thumb = v.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400";
+
+                card.innerHTML = `
+                    <div class="dl-thumb-wrap">
+                        <img src="${thumb}" class="dl-thumb-img" alt="${escapeHtml(v.title)}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400'">
+                        <span class="dl-duration-tag">${durationStr}</span>
+                        <span class="dl-status-badge ${isDownloaded ? 'downloaded' : 'pending'}" id="dl-badge-${v.id}">
+                            ${isDownloaded ? '<i class="fa-solid fa-check"></i> ĐÃ TẢI XUỐNG' : 'Chờ tải'}
+                        </span>
+                    </div>
+                    <div class="dl-card-content">
+                        <div class="dl-video-title" title="${escapeHtml(v.title)}">#${idx+1}. ${escapeHtml(v.title)}</div>
+                        <div class="dl-video-meta">
+                            <span><i class="fa-regular fa-user"></i> ${escapeHtml(v.author || 'TikTok')}</span>
+                            <span>ID: ${v.id.substring(0, 8)}...</span>
+                        </div>
+                        <button class="dl-card-btn ${isDownloaded ? 'downloaded' : ''}" id="dl-btn-single-${v.id}" onclick="downloadSingleVideo('${v.id}')">
+                            ${isDownloaded ? '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy' : '<i class="fa-solid fa-arrow-down"></i> Tải Video Này'}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            updateStatsBadges();
+        }
+
+        function formatDuration(sec) {
+            if (!sec) return "00:00";
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return "";
+            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function updateStatsBadges() {
+            const downloadedSet = getDownloadedVideoSet();
+            let downloadedCount = 0;
+            dlScannedVideos.forEach(v => {
+                if (downloadedSet.has(String(v.id))) downloadedCount++;
+            });
+
+            const total = dlScannedVideos.length;
+            const pending = total - downloadedCount;
+
+            const bTotal = document.getElementById("dlBadgeTotal");
+            const bDown = document.getElementById("dlBadgeDownloaded");
+            const bPend = document.getElementById("dlBadgePending");
+
+            if (bTotal) bTotal.innerText = total;
+            if (bDown) bDown.innerText = downloadedCount;
+            if (bPend) bPend.innerText = pending;
+
+            const totalStats = document.getElementById("dlTotalStats");
+            const totalPercent = document.getElementById("dlTotalPercent");
+            const overallBar = document.getElementById("dlOverallBar");
+
+            if (total > 0 && totalStats && overallBar) {
+                const pct = ((downloadedCount / total) * 100).toFixed(1);
+                totalStats.innerText = `${downloadedCount} / ${total} video (${pct}%)`;
+                if (totalPercent) totalPercent.innerText = `${pct}%`;
+                overallBar.style.width = `${pct}%`;
+            }
+        }
+
+        // Tải lẻ 1 video
+        async function downloadSingleVideo(videoId) {
+            const v = dlScannedVideos.find(x => String(x.id) === String(videoId));
+            if (!v) return;
+
+            const btn = document.getElementById(`dl-btn-single-${v.id}`);
+            const badge = document.getElementById(`dl-badge-${v.id}`);
+            const card = document.getElementById(`dl-card-${v.id}`);
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
+            }
+            if (badge) {
+                badge.className = 'dl-status-badge downloading';
+                badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
+            }
+
+            try {
+                await downloadVideoDirect(v, (percent, loadedMb, totalMb) => {
+                    if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${percent.toFixed(0)}%`;
+                });
+
+                // Đánh dấu đã tải
+                saveDownloadedVideoId(v.id);
+                if (badge) {
+                    badge.className = 'dl-status-badge downloaded';
+                    badge.innerHTML = '<i class="fa-solid fa-check"></i> ĐÃ TẢI XUỐNG';
+                }
+                if (card) card.classList.add('is-downloaded');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.className = 'dl-card-btn downloaded';
+                    btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy';
+                }
+                updateStatsBadges();
+                showToast(`Đã tải xuống video "${v.title.substring(0, 30)}..." thành công!`, "success");
+
+            } catch (err) {
+                showToast(`Lỗi tải video: ${err.message}`, "error");
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-arrow-down"></i> Thử Lại';
+                }
+                if (badge) {
+                    badge.className = 'dl-status-badge pending';
+                    badge.innerHTML = 'Thất bại';
+                }
+            }
+        }
+
+        // Hàm lõi: Tải video stream qua browser ReadableStream và lưu đĩa
+        async function downloadVideoDirect(v, progressCb) {
+            const streamUrl = `/api/download_video_stream?url=${encodeURIComponent(v.url)}&title=${encodeURIComponent(v.title)}`;
+            const response = await fetch(streamUrl);
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${response.status}`);
+            }
+
+            const contentLength = response.headers.get("content-length");
+            const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+            let loadedBytes = 0;
+
+            const reader = response.body.getReader();
+            const chunks = [];
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                loadedBytes += value.length;
+
+                if (totalBytes > 0 && progressCb) {
+                    const pct = (loadedBytes / totalBytes) * 100;
+                    const loadedMb = (loadedBytes / (1024 * 1024)).toFixed(1);
+                    const totalMb = (totalBytes / (1024 * 1024)).toFixed(1);
+                    progressCb(pct, loadedMb, totalMb);
+                }
+            }
+
+            const blob = new Blob(chunks, { type: "video/mp4" });
+            const safeTitle = (v.title || "video").replace(/[\\/*?:"<>|]/g, "").trim().substring(0, 60) || "video";
+            const filename = `${safeTitle}.mp4`;
+
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+
+            return true;
+        }
+
+        // ===================================================
+        // TIẾN TRÌNH TẢI TUẦN TỰ TOÀN BỘ KÊNH (QUEUE ENGINE)
+        // ===================================================
+
+        async function startBulkDownload() {
+            if (dlScannedVideos.length === 0) {
+                showToast("Vui lòng quét kênh trước khi bấm tải tuần tự!", "warning");
+                return;
+            }
+
+            const skipDownloaded = document.getElementById("dlSkipDownloaded").checked;
+            const downloadedSet = getDownloadedVideoSet();
+
+            bulkQueue = dlScannedVideos.filter(v => {
+                if (skipDownloaded && downloadedSet.has(String(v.id))) {
+                    return false;
+                }
+                return true;
+            });
+
+            if (bulkQueue.length === 0) {
+                showToast("Tất cả video đã được tải về máy trước đó!", "info");
+                return;
+            }
+
+            isBulkDownloading = true;
+            isBulkPaused = false;
+            currentQueueIndex = 0;
+
+            // Cập nhật nút điều khiển
+            document.getElementById("btnStartBulk").style.display = "none";
+            document.getElementById("btnPauseBulk").style.display = "inline-flex";
+            document.getElementById("btnPauseBulk").innerHTML = '<i class="fa-solid fa-pause"></i> Tạm Dừng';
+            document.getElementById("btnStopBulk").style.display = "inline-flex";
+
+            const delayMs = parseInt(document.getElementById("dlDelay").value) || 1500;
+
+            showToast(`Bắt đầu tải tuần tự ${bulkQueue.length} video...`, "info");
+
+            for (let i = 0; i < bulkQueue.length; i++) {
+                if (!isBulkDownloading) break;
+
+                while (isBulkPaused) {
+                    await new Promise(r => setTimeout(r, 500));
+                    if (!isBulkDownloading) break;
+                }
+                if (!isBulkDownloading) break;
+
+                currentQueueIndex = i;
+                const v = bulkQueue[i];
+
+                // Cập nhật Thanh 1 (Tiến độ toàn bộ)
+                const totalPct = ((i / bulkQueue.length) * 100).toFixed(1);
+                document.getElementById("dlTotalStats").innerText = `${i} / ${bulkQueue.length} video (${totalPct}%)`;
+                document.getElementById("dlTotalPercent").innerText = `${totalPct}%`;
+                document.getElementById("dlOverallBar").style.width = `${totalPct}%`;
+
+                // Cập nhật thẻ video sang trạng thái đang tải
+                const card = document.getElementById(`dl-card-${v.id}`);
+                const badge = document.getElementById(`dl-badge-${v.id}`);
+                const btnSingle = document.getElementById(`dl-btn-single-${v.id}`);
+
+                if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (badge) {
+                    badge.className = 'dl-status-badge downloading';
+                    badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
+                }
+                if (btnSingle) {
+                    btnSingle.disabled = true;
+                    btnSingle.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải...';
+                }
+
+                // Cập nhật Thanh 2 (Tiến độ video hiện tại)
+                document.getElementById("dlCurrentVideoTitle").innerText = `[#${i+1}/${bulkQueue.length}] ${v.title.substring(0, 50)}...`;
+                document.getElementById("dlCurrentVideoStats").innerText = "0 MB / 0 MB (0%)";
+                document.getElementById("dlCurrentBar").style.width = "0%";
+
+                try {
+                    await downloadVideoDirect(v, (pct, loadedMb, totalMb) => {
+                        document.getElementById("dlCurrentVideoStats").innerText = `${loadedMb} MB / ${totalMb} MB (${pct.toFixed(1)}%)`;
+                        document.getElementById("dlCurrentBar").style.width = `${pct}%`;
+                    });
+
+                    // Lưu ID đánh dấu đã tải
+                    saveDownloadedVideoId(v.id);
+
+                    if (badge) {
+                        badge.className = 'dl-status-badge downloaded';
+                        badge.innerHTML = '<i class="fa-solid fa-check"></i> ĐÃ TẢI XUỐNG';
+                    }
+                    if (card) card.classList.add('is-downloaded');
+                    if (btnSingle) {
+                        btnSingle.disabled = false;
+                        btnSingle.className = 'dl-card-btn downloaded';
+                        btnSingle.innerHTML = '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy';
+                    }
+
+                    updateStatsBadges();
+
+                } catch (err) {
+                    console.error("Lỗi tải video", v.id, err);
+                    if (badge) {
+                        badge.className = 'dl-status-badge pending';
+                        badge.innerHTML = 'Thất bại';
+                    }
+                    if (btnSingle) {
+                        btnSingle.disabled = false;
+                        btnSingle.innerHTML = '<i class="fa-solid fa-arrow-down"></i> Thử Lại';
+                    }
+                }
+
+                // Nghỉ giữa 2 video để trình duyệt lưu file vào máy
+                if (i < bulkQueue.length - 1 && isBulkDownloading) {
+                    document.getElementById("dlCurrentVideoTitle").innerText = `Nghỉ ${delayMs/1000}s trước video tiếp theo...`;
+                    await new Promise(r => setTimeout(r, delayMs));
+                }
+            }
+
+            // Hoàn tất chuỗi tải
+            if (isBulkDownloading) {
+                document.getElementById("dlTotalStats").innerText = `${bulkQueue.length} / ${bulkQueue.length} video (100%)`;
+                document.getElementById("dlTotalPercent").innerText = "100%";
+                document.getElementById("dlOverallBar").style.width = "100%";
+                document.getElementById("dlCurrentVideoTitle").innerText = "🎉 Hoàn tất 100% tất cả video!";
+                document.getElementById("dlCurrentBar").style.width = "100%";
+                showToast("🎉 ĐÃ HOÀN TẤT TẢI TOÀN BỘ VIDEO VỀ MÁY TÍNH!", "success");
+            }
+
+            stopBulkDownload();
+        }
+
+        function pauseBulkDownload() {
+            if (!isBulkDownloading) return;
+            isBulkPaused = !isBulkPaused;
+            const btn = document.getElementById("btnPauseBulk");
+            if (isBulkPaused) {
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> Tiếp Tục';
+                btn.className = 'dl-btn dl-btn-success';
+                showToast("Đã tạm dừng tải tuần tự", "warning");
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm Dừng';
+                btn.className = 'dl-btn dl-btn-warning';
+                showToast("Đang tiếp tục tải...", "info");
+            }
+        }
+
+        function stopBulkDownload() {
+            isBulkDownloading = false;
+            isBulkPaused = false;
+            document.getElementById("btnStartBulk").style.display = "inline-flex";
+            document.getElementById("btnPauseBulk").style.display = "none";
+            document.getElementById("btnStopBulk").style.display = "none";
+        }
+
+        // Tự động khởi tạo số lượng đã tải khi mở trang
+        document.addEventListener("DOMContentLoaded", () => {
+            updateHistoryCountBadge();
+        });
+
+    </script>
 </body>
 </html>
