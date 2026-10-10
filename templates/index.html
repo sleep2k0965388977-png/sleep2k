@@ -935,6 +935,19 @@
             border-color: rgba(16, 185, 129, 0.45);
             background: rgba(16, 185, 129, 0.04);
         }
+        .dl-remove-card-btn {
+            position: absolute; top: 8px; left: 8px;
+            width: 26px; height: 26px; border-radius: 50%;
+            background: rgba(15, 23, 42, 0.75); color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 11px; z-index: 6;
+            backdrop-filter: blur(4px); transition: all 0.2s ease;
+        }
+        .dl-remove-card-btn:hover {
+            background: #ef4444; color: #fff; transform: scale(1.1);
+            border-color: #ef4444;
+        }
         .dl-thumb-wrap {
             width: 100%; height: 160px; position: relative;
             background: #000; overflow: hidden;
@@ -1286,7 +1299,20 @@
             .dl-video-card {
                 border-radius: 12px !important;
             }
-            .dl-thumb-wrap {
+            .dl-remove-card-btn {
+            position: absolute; top: 8px; left: 8px;
+            width: 26px; height: 26px; border-radius: 50%;
+            background: rgba(15, 23, 42, 0.75); color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 11px; z-index: 6;
+            backdrop-filter: blur(4px); transition: all 0.2s ease;
+        }
+        .dl-remove-card-btn:hover {
+            background: #ef4444; color: #fff; transform: scale(1.1);
+            border-color: #ef4444;
+        }
+        .dl-thumb-wrap {
                 height: 200px !important;
             }
             .dl-card-btn {
@@ -1345,7 +1371,20 @@
                 padding: 6px 12px !important;
                 justify-content: center !important;
             }
-            .dl-thumb-wrap {
+            .dl-remove-card-btn {
+            position: absolute; top: 8px; left: 8px;
+            width: 26px; height: 26px; border-radius: 50%;
+            background: rgba(15, 23, 42, 0.75); color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 11px; z-index: 6;
+            backdrop-filter: blur(4px); transition: all 0.2s ease;
+        }
+        .dl-remove-card-btn:hover {
+            background: #ef4444; color: #fff; transform: scale(1.1);
+            border-color: #ef4444;
+        }
+        .dl-thumb-wrap {
                 height: 180px !important;
             }
         }
@@ -1904,6 +1943,13 @@
                         <label class="dl-checkbox-label" style="margin-top:16px;">
                             <input type="checkbox" id="dlSkipDownloaded" checked style="accent-color:var(--accent-purple); width:16px; height:16px;">
                             <span style="font-weight:600;">Tự động bỏ qua video đã tải</span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label class="dl-checkbox-label" style="margin-top:16px;">
+                            <input type="checkbox" id="dlAutoRemoveDone" checked style="accent-color:#38bdf8; width:16px; height:16px;">
+                            <span style="font-weight:600; color:#38bdf8;"><i class="fa-solid fa-broom"></i> Tải xong xóa ngay khỏi danh sách</span>
                         </label>
                     </div>
                 </div>
@@ -4614,7 +4660,23 @@
         }
 
         // Render danh sách video lên giao diện
-        function renderVideoGrid() {
+                // Xóa một video khỏi hàng chờ
+        function removeVideoFromQueue(videoId) {
+            const card = document.getElementById(`dl-card-${videoId}`);
+            if (card) {
+                card.style.transition = "all 0.3s ease";
+                card.style.opacity = "0";
+                card.style.transform = "scale(0.85)";
+                setTimeout(() => {
+                    if (card && card.parentNode) card.parentNode.removeChild(card);
+                }, 300);
+            }
+            dlScannedVideos = dlScannedVideos.filter(x => String(x.id) !== String(videoId));
+            updateStatsBadges();
+            showToast("Đã xóa video khỏi danh sách chờ", "info");
+        }
+
+function renderVideoGrid() {
             const container = document.getElementById("dlVideoGridContainer");
             if (!container) return;
 
@@ -4632,6 +4694,9 @@
 
                 card.innerHTML = `
                     <div class="dl-thumb-wrap">
+                        <button class="dl-remove-card-btn" onclick="event.stopPropagation(); removeVideoFromQueue('${v.id}')" title="Xóa video này khỏi hàng chờ">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                         <img src="${thumb}" class="dl-thumb-img" alt="${escapeHtml(v.title)}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400'">
                         <span class="dl-duration-tag">${durationStr}</span>
                         <span class="dl-status-badge ${isDownloaded ? 'downloaded' : 'pending'}" id="dl-badge-${v.id}">
@@ -4722,18 +4787,33 @@
 
                 // Đánh dấu đã tải
                 saveDownloadedVideoId(v.id);
-                if (badge) {
-                    badge.className = 'dl-status-badge downloaded';
-                    badge.innerHTML = '<i class="fa-solid fa-check"></i> ĐÃ TẢI XUỐNG';
+                const autoRemove = document.getElementById("dlAutoRemoveDone")?.checked ?? true;
+                if (autoRemove) {
+                    if (card) {
+                        card.style.transition = "all 0.4s ease";
+                        card.style.opacity = "0";
+                        card.style.transform = "scale(0.85) translateY(15px)";
+                        setTimeout(() => {
+                            if (card && card.parentNode) card.parentNode.removeChild(card);
+                        }, 400);
+                    }
+                    dlScannedVideos = dlScannedVideos.filter(x => String(x.id) !== String(v.id));
+                    updateStatsBadges();
+                    showToast(`Đã tải xong & dọn khỏi danh sách: "${v.title.substring(0, 25)}..."`, "success");
+                } else {
+                    if (badge) {
+                        badge.className = 'dl-status-badge downloaded';
+                        badge.innerHTML = '<i class="fa-solid fa-check"></i> ĐÃ TẢI XUỐNG';
+                    }
+                    if (card) card.classList.add('is-downloaded');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.className = 'dl-card-btn downloaded';
+                        btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy';
+                    }
+                    updateStatsBadges();
+                    showToast(`Đã tải xuống video "${v.title.substring(0, 30)}..." thành công!`, "success");
                 }
-                if (card) card.classList.add('is-downloaded');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.className = 'dl-card-btn downloaded';
-                    btn.innerHTML = '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy';
-                }
-                updateStatsBadges();
-                showToast(`Đã tải xuống video "${v.title.substring(0, 30)}..." thành công!`, "success");
 
             } catch (err) {
                 showToast(`Lỗi tải video: ${err.message}`, "error");
@@ -4903,18 +4983,32 @@
                     // Lưu ID đánh dấu đã tải
                     saveDownloadedVideoId(v.id);
 
-                    if (badge) {
-                        badge.className = 'dl-status-badge downloaded';
-                        badge.innerHTML = '<i class="fa-solid fa-check"></i> ĐÃ TẢI XUỐNG';
+                    const autoRemove = document.getElementById("dlAutoRemoveDone")?.checked ?? true;
+                    if (autoRemove) {
+                        if (card) {
+                            card.style.transition = "all 0.4s ease";
+                            card.style.opacity = "0";
+                            card.style.transform = "scale(0.85) translateY(15px)";
+                            setTimeout(() => {
+                                if (card && card.parentNode) card.parentNode.removeChild(card);
+                            }, 400);
+                        }
+                        dlScannedVideos = dlScannedVideos.filter(x => String(x.id) !== String(v.id));
+                        updateStatsBadges();
+                        showToast(`Đã tải xong & dọn khỏi danh sách: #${i+1}`, "success");
+                    } else {
+                        if (badge) {
+                            badge.className = 'dl-status-badge downloaded';
+                            badge.innerHTML = '<i class="fa-solid fa-check"></i> ĐÃ TẢI XUỐNG';
+                        }
+                        if (card) card.classList.add('is-downloaded');
+                        if (btnSingle) {
+                            btnSingle.disabled = false;
+                            btnSingle.className = 'dl-card-btn downloaded';
+                            btnSingle.innerHTML = '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy';
+                        }
+                        updateStatsBadges();
                     }
-                    if (card) card.classList.add('is-downloaded');
-                    if (btnSingle) {
-                        btnSingle.disabled = false;
-                        btnSingle.className = 'dl-card-btn downloaded';
-                        btnSingle.innerHTML = '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy';
-                    }
-
-                    updateStatsBadges();
 
                 } catch (err) {
                     console.error("Lỗi tải video", v.id, err);
