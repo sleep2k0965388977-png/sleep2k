@@ -3218,6 +3218,117 @@ def drive_upload_endpoint():
 # TIKTOK & DOUYIN BULK CHANNEL VIDEO DOWNLOADER API
 # ==========================================================
 
+
+_cached_douyin_ttwid = None
+_cached_douyin_ttwid_time = 0
+
+def get_douyin_ttwid():
+    global _cached_douyin_ttwid, _cached_douyin_ttwid_time
+    now = time.time()
+    if _cached_douyin_ttwid and (now - _cached_douyin_ttwid_time) < 3600:
+        return _cached_douyin_ttwid
+    try:
+        url = 'https://ttwid.bytedance.com/ttwid/union/register/'
+        data = {
+            'region': 'cn', 'aid': 1768, 'needFid': False, 'service': 'www.ixigua.com',
+            'migrate_info': {'ticket': '', 'src_aid': 1768}, 'cbUrlProtocol': 'https', 'union': True
+        }
+        r = requests.post(url, json=data, timeout=5)
+        _cached_douyin_ttwid = r.cookies.get('ttwid')
+        _cached_douyin_ttwid_time = now
+        return _cached_douyin_ttwid
+    except Exception as e:
+        logger.warning(f"Error fetching douyin ttwid: {e}")
+        return ''
+
+def extract_douyin_info(text_or_url):
+    clean = text_or_url.strip()
+    m_url = re.search(r'https?://[^\s,]+', clean)
+    if m_url:
+        url = m_url.group(0)
+    elif 'douyin.com' in clean:
+        m_dy = re.search(r'(?:www\.)?douyin\.com/[^\s,]+|v\.douyin\.com/[^\s,]+', clean)
+        url = ('https://' + m_dy.group(0)) if m_dy else clean
+    else:
+        url = clean
+
+    video_id = None
+    m = re.search(r'(?:video/|share/video/|note/|modal_id=|vid=|from_gid=)(\d{15,25})', url)
+    if m:
+        video_id = m.group(1)
+
+    if not video_id and 'v.douyin.com' in url:
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X)'}
+            r = requests.get(url, headers=headers, allow_redirects=True, timeout=8)
+            final_url = r.url
+            m = re.search(r'(?:video/|share/video/|note/|modal_id=|vid=|from_gid=)(\d{15,25})', final_url)
+            if m:
+                video_id = m.group(1)
+        except Exception as e:
+            logger.warning(f"Error following douyin redirect: {e}")
+
+    if not video_id:
+        return None
+
+    ttwid = get_douyin_ttwid()
+    share_url = f'https://www.iesdouyin.com/share/video/{video_id}/'
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        'Cookie': f'ttwid={ttwid}',
+        'Referer': 'https://www.douyin.com/'
+    }
+    resp = requests.get(share_url, headers=headers, timeout=10)
+    idx = resp.text.find('play_addr')
+    if idx == -1:
+        return None
+
+    script_start = resp.text.rfind('<script', 0, idx)
+    script_end = resp.text.find('</script>', idx)
+    if script_start == -1 or script_end == -1:
+        return None
+
+    raw = resp.text[script_start:script_end+9].strip()
+    if raw.startswith('<script>'): raw = raw[8:]
+    if raw.endswith('</script>'): raw = raw[:-9]
+    raw = raw.strip()
+    if raw.startswith('window._ROUTER_DATA = '): raw = raw[len('window._ROUTER_DATA = '):]
+    if raw.endswith(';'): raw = raw[:-1]
+
+    data = json.loads(raw)
+    loader = data.get('loaderData', {})
+    page = next((v for k, v in loader.items() if 'page' in k), {})
+    video_res = page.get('videoInfoRes', {})
+    item_list = video_res.get('item_list', [])
+    if not item_list:
+        return None
+    item = item_list[0]
+
+    title = item.get('desc') or f'Douyin Video {video_id}'
+    author = item.get('author', {}).get('nickname') or 'Douyin'
+    play_addr = item.get('video', {}).get('play_addr', {})
+    urls = play_addr.get('url_list', [])
+    no_watermark_url = urls[0].replace('playwm', 'play') if urls else ''
+    cover_urls = item.get('video', {}).get('cover', {}).get('url_list', [])
+    thumbnail = cover_urls[0] if cover_urls else ''
+    duration = item.get('duration', 0)
+    if duration > 1000:
+        duration = duration // 1000
+
+    return {
+        'id': video_id,
+        'title': title.strip(),
+        'thumbnail': thumbnail,
+        'duration': duration,
+        'url': no_watermark_url or share_url,
+        'original_url': url,
+        'author': author,
+        'like_count': item.get('statistics', {}).get('digg_count', 0),
+        'view_count': item.get('statistics', {}).get('play_count', 0),
+        'platform': 'douyin'
+    }
+
+
 @app.route("/api/scan_channel", methods=["POST"])
 def scan_channel():
     """
@@ -3241,6 +3352,14 @@ def scan_channel():
         channel_name = ""
         
         for single_url in urls:
+            # Handle Douyin Links / Share text
+            if any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
+                dy_info = extract_douyin_info(single_url)
+                if dy_info:
+                    channel_name = dy_info["author"] or channel_name
+                    videos.append(dy_info)
+                continue
+
             if single_url.startswith("@"):
                 single_url = f"https://www.tiktok.com/{single_url}"
             elif not single_url.startswith("http://") and not single_url.startswith("https://"):
@@ -3329,6 +3448,44 @@ def download_video_stream():
     custom_title = request.args.get("title", "").strip()
     if not target_url:
         return jsonify({"error": "Thiếu URL video"}), 400
+
+    # Fast direct streaming for Douyin (0 VPS disk usage)
+    if any(k in target_url for k in ["snssdk.com", "douyin.com", "zjcdn.com", "byteoversea.com"]):
+        direct_url = target_url
+        if "snssdk.com" not in target_url and "zjcdn.com" not in target_url:
+            dy_info = extract_douyin_info(target_url)
+            if dy_info and dy_info.get("url"):
+                direct_url = dy_info["url"]
+
+        headers_stream = {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+            "Referer": "https://www.douyin.com/"
+        }
+        try:
+            req = requests.get(direct_url, headers=headers_stream, stream=True, allow_redirects=True, timeout=20)
+            if req.status_code == 200:
+                import urllib.parse
+                raw_name = custom_title or "douyin_video"
+                clean_name = re.sub(r'[\/*?:"<>|]', "", raw_name).strip()[:80] or "douyin_video"
+                filename = f"{clean_name}.mp4"
+                encoded_filename = urllib.parse.quote(filename)
+
+                resp_headers = {
+                    "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+                    "Content-Type": "video/mp4",
+                    "Cache-Control": "no-cache"
+                }
+                if req.headers.get("Content-Length"):
+                    resp_headers["Content-Length"] = req.headers.get("Content-Length")
+
+                def generate_douyin_stream():
+                    for chunk in req.iter_content(chunk_size=65536):
+                        if chunk:
+                            yield chunk
+
+                return Response(generate_douyin_stream(), headers=resp_headers)
+        except Exception as e:
+            logger.warning(f"Douyin direct stream error: {e}")
 
     temp_dir = tempfile.mkdtemp(prefix="dl_vid_")
     out_tmpl = os.path.join(temp_dir, "%(id)s.%(ext)s")
