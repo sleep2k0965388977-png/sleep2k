@@ -4852,7 +4852,7 @@ function renderVideoGrid() {
                 const chunks = [];
 
                 while (true) {
-                    if (!isBulkDownloading && typeof isBulkDownloading !== 'undefined') {
+                    if (currentDownloadAbortController && currentDownloadAbortController.signal.aborted) {
                         try { await reader.cancel(); } catch(e){}
                         break;
                     }
@@ -4869,7 +4869,7 @@ function renderVideoGrid() {
                     }
                 }
 
-                if (!isBulkDownloading && typeof isBulkDownloading !== 'undefined') {
+                if (currentDownloadAbortController && currentDownloadAbortController.signal.aborted) {
                     return false;
                 }
 
