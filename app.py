@@ -3336,6 +3336,10 @@ def fetch_douyin_channel_videos(sec_uid, limit=50):
     Supports multi-page cursor pagination and sync wait.
     """
     try:
+        if not limit or int(limit) <= 0:
+            limit = 999999
+        else:
+            limit = int(limit)
         s = requests.Session()
         r_demo = s.get('https://api.douyin.wtf/api/v1/auth/demo', timeout=8).json()
         creds = r_demo.get('data') or {}
@@ -3433,7 +3437,12 @@ def scan_channel():
     try:
         data = request.get_json(force=True) or {}
         raw_url = data.get("url", "").strip()
-        limit = int(data.get("limit", 60))
+        try:
+            limit = int(data.get("limit", 0))
+        except Exception:
+            limit = 0
+        if limit <= 0:
+            limit = 999999
         if not raw_url:
             return jsonify({"status": "error", "message": "Vui lòng nhập link kênh hoặc link video TikTok / Douyin."}), 400
 
@@ -3486,7 +3495,7 @@ def scan_channel():
                 'impersonate': target,
                 'extract_flat': 'in_playlist',
                 'quiet': True,
-                'playlistend': limit,
+                'playlistend': limit if limit < 999999 else None,
                 'no_warnings': True,
                 'ignoreerrors': True,
             }
