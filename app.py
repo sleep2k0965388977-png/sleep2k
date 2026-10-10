@@ -3449,7 +3449,7 @@ def download_video_stream():
     if not target_url:
         return jsonify({"error": "Thiếu URL video"}), 400
 
-    # Fast direct streaming for Douyin (0 VPS disk usage)
+    # Fast direct CDN redirect for Douyin (0 VPS disk/bandwidth bottleneck, full ISP speed)
     if any(k in target_url for k in ["snssdk.com", "douyin.com", "zjcdn.com", "byteoversea.com"]):
         direct_url = target_url
         if "snssdk.com" not in target_url and "zjcdn.com" not in target_url:
@@ -3462,28 +3462,14 @@ def download_video_stream():
             "Referer": "https://www.douyin.com/"
         }
         try:
-            req = requests.get(direct_url, headers=headers_stream, stream=True, allow_redirects=True, timeout=20)
-            if req.status_code == 200:
-                import urllib.parse
-                raw_name = custom_title or "douyin_video"
-                clean_name = re.sub(r'[\/*?:"<>|]', "", raw_name).strip()[:80] or "douyin_video"
-                filename = f"{clean_name}.mp4"
-                encoded_filename = urllib.parse.quote(filename)
+            if "zjcdn.com" in direct_url or "byteoversea.com" in direct_url:
+                final_cdn = direct_url
+            else:
+                r_head = requests.get(direct_url, headers=headers_stream, allow_redirects=False, timeout=8)
+                final_cdn = r_head.headers.get("Location") or direct_url
 
-                resp_headers = {
-                    "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
-                    "Content-Type": "video/mp4",
-                    "Cache-Control": "no-cache"
-                }
-                if req.headers.get("Content-Length"):
-                    resp_headers["Content-Length"] = req.headers.get("Content-Length")
-
-                def generate_douyin_stream():
-                    for chunk in req.iter_content(chunk_size=65536):
-                        if chunk:
-                            yield chunk
-
-                return Response(generate_douyin_stream(), headers=resp_headers)
+            from flask import redirect
+            return redirect(final_cdn, code=302)
         except Exception as e:
             logger.warning(f"Douyin direct stream error: {e}")
 
