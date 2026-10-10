@@ -3403,7 +3403,9 @@ def fetch_douyin_channel_videos(sec_uid, limit=50):
                 if not streams and isinstance(v_obj, dict):
                     streams = v_obj.get('streams') or []
 
-                play_url = streams[0].get('url') if streams else ('https://www.douyin.com/video/' + vid_id)
+                if not streams:
+                    continue
+                play_url = streams[0].get('url')
 
                 videos.append({
                     'id': vid_id,
