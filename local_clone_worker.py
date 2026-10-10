@@ -3,7 +3,11 @@ SLEEP2K AI CLONE WORKER - LOCAL / COLAB GPU WORKER
 Chạy trên máy tính cá nhân (16GB RAM) hoặc Google Colab (GPU T4 miễn phí)
 Nhận request nhân bản giọng nói từ Railway App và trả về audio chuẩn 100% âm sắc gốc.
 """
-import os, sys, io, time, uuid, subprocess, tempfile
+import sys, io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+import os, time, uuid, subprocess, tempfile
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file
 import soundfile as sf
@@ -71,7 +75,7 @@ def clone_voice():
         ], capture_output=True, check=True)
 
         t0 = time.time()
-        wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=8, speed=rate)
+        wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=16, speed=rate)
         print(f"Synthesized '{text[:30]}...' in {time.time()-t0:.2f}s")
 
         temp_synth_wav = temp_dir / "temp_synth.wav"

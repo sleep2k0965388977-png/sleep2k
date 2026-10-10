@@ -3329,6 +3329,99 @@ def extract_douyin_info(text_or_url):
     }
 
 
+
+def fetch_douyin_channel_videos(sec_uid, limit=50):
+    """
+    Fetches all videos from a Douyin creator channel using dynamic signature identity pool.
+    Supports multi-page cursor pagination and sync wait.
+    """
+    try:
+        s = requests.Session()
+        r_demo = s.get('https://api.douyin.wtf/api/v1/auth/demo', timeout=8).json()
+        creds = r_demo.get('data') or {}
+        if not creds:
+            return None
+        s.post('https://api.douyin.wtf/api/v1/auth/login', json={'username': creds['username'], 'password': creds['password']}, timeout=8)
+
+        videos = []
+        channel_name = ''
+        cursor = None
+        has_more = True
+
+        while len(videos) < limit and has_more:
+            count = min(limit - len(videos), 50)
+            params = {'sec_user_id': sec_uid, 'count': count, 'wait': 15}
+            if cursor:
+                params['cursor'] = cursor
+
+            r_posts = s.get('https://api.douyin.wtf/api/v1/douyin/user/posts', params=params, timeout=20)
+            resp_json = r_posts.json()
+            
+            raw_items = []
+            if r_posts.status_code == 200:
+                data_obj = resp_json.get('data') or {}
+                raw_items = data_obj.get('items', [])
+                cursor = data_obj.get('cursor')
+                has_more = bool(data_obj.get('has_more') and cursor)
+            elif resp_json.get('data', {}).get('task_id'):
+                task_id = resp_json['data']['task_id']
+                import time
+                for _ in range(12):
+                    time.sleep(1.2)
+                    r_task = s.get(f'https://api.douyin.wtf/api/v1/tasks/{task_id}', timeout=8)
+                    td = r_task.json().get('data') or {}
+                    if td.get('state') == 'done':
+                        task_data = td.get('data') or {}
+                        raw_items = task_data.get('items', [])
+                        cursor = task_data.get('cursor')
+                        has_more = bool(task_data.get('has_more') and cursor)
+                        break
+                    elif td.get('state') == 'failed':
+                        break
+            else:
+                break
+
+            if not raw_items:
+                break
+
+            for it in raw_items:
+                vid_id = str(it.get('content_id') or '')
+                title = it.get('title') or it.get('description') or ('Video ' + vid_id)
+                duration = int((it.get('duration_ms') or 0) / 1000)
+                
+                author_obj = it.get('author') or {}
+                author_name = author_obj.get('nickname') or ''
+                if author_name and not channel_name:
+                    channel_name = author_name
+
+                media = it.get('media') or {}
+                covers = media.get('covers') or []
+                thumb_url = covers[0].get('url') if covers else ''
+
+                streams = media.get('streams') or []
+                v_obj = media.get('video')
+                if not streams and isinstance(v_obj, dict):
+                    streams = v_obj.get('streams') or []
+
+                play_url = streams[0].get('url') if streams else ('https://www.douyin.com/video/' + vid_id)
+
+                videos.append({
+                    'id': vid_id,
+                    'title': title[:120].strip(),
+                    'thumbnail': thumb_url,
+                    'duration': duration,
+                    'url': play_url,
+                    'author': author_name or channel_name or 'Douyin',
+                    'like_count': (it.get('stats') or {}).get('digg_count') or 0,
+                    'view_count': (it.get('stats') or {}).get('play_count') or 0,
+                    'platform': 'douyin'
+                })
+
+        return {'channel': channel_name or 'Douyin Creator', 'videos': videos}
+    except Exception as e:
+        logger.warning(f"Error fetching douyin channel videos: {e}")
+        return None
+
 @app.route("/api/scan_channel", methods=["POST"])
 def scan_channel():
     """
@@ -3352,7 +3445,29 @@ def scan_channel():
         channel_name = ""
         
         for single_url in urls:
-            # Handle Douyin Links / Share text
+            # Expand shortened v.douyin.com links to uncover full user or video URLs
+            if "v.douyin.com" in single_url:
+                try:
+                    s_tmp = requests.Session()
+                    s_tmp.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+                    resp = s_tmp.get(single_url, allow_redirects=True, timeout=5)
+                    if resp.url:
+                        single_url = resp.url
+                except Exception:
+                    pass
+
+            # Handle Douyin Creator Channel Profile Link
+            m_sec = re.search(r'douyin\.com/user/([A-Za-z0-9_-]+)', single_url)
+            if m_sec:
+                sec_uid = m_sec.group(1)
+                ch_data = fetch_douyin_channel_videos(sec_uid, limit=limit)
+                if ch_data and ch_data.get('videos'):
+                    channel_name = ch_data.get('channel') or channel_name
+                    for cv in ch_data['videos']:
+                        videos.append(cv)
+                    continue
+
+            # Handle Douyin Single Video or Share text
             if any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
                 dy_info = extract_douyin_info(single_url)
                 if dy_info:
