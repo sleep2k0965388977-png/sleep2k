@@ -1,4 +1,6 @@
-﻿import os
+import logging
+logger = logging.getLogger("sleep2k")
+import os
 import re
 import math
 import json
@@ -3358,16 +3360,19 @@ def fetch_douyin_channel_videos(sec_uid, limit=50):
             if cursor:
                 params['cursor'] = cursor
 
-            r_posts = s.get('https://api.douyin.wtf/api/v1/douyin/user/posts', params=params, timeout=20)
-            resp_json = r_posts.json()
+            try:
+                r_posts = s.get('https://api.douyin.wtf/api/v1/douyin/user/posts', params=params, timeout=20)
+                resp_json = r_posts.json()
+            except Exception:
+                resp_json = {}
             
             raw_items = []
-            if r_posts.status_code == 200:
+            if getattr(r_posts, 'status_code', 0) == 200:
                 data_obj = resp_json.get('data') or {}
                 raw_items = data_obj.get('items', [])
                 cursor = data_obj.get('cursor')
                 has_more = bool(data_obj.get('has_more') and cursor)
-            elif resp_json.get('data', {}).get('task_id'):
+            elif (resp_json.get('data') or {}).get('task_id'):
                 task_id = resp_json['data']['task_id']
                 import time
                 for _ in range(12):
@@ -3467,24 +3472,52 @@ def scan_channel():
                 except Exception:
                     pass
 
-            # Handle Douyin Creator Channel Profile Link
+            # 1. If URL contains a specific video ID (even inside user link modal), extract video directly
+            has_vid_param = bool(re.search(r'(?:modal_id=|vid=|from_gid=|/video/|/note/)(\d{15,25})', single_url))
+            if has_vid_param and any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
+                try:
+                    dy_info = extract_douyin_info(single_url)
+                    if dy_info:
+                        channel_name = dy_info.get("author") or channel_name
+                        videos.append(dy_info)
+                        continue
+                except Exception as ex:
+                    logger.warning(f"Error extracting Douyin modal video: {ex}")
+
+            # 2. Handle Douyin Creator Channel Profile Link
             m_sec = re.search(r'douyin\.com/user/([A-Za-z0-9_-]+)', single_url)
             if m_sec:
                 sec_uid = m_sec.group(1)
-                ch_data = fetch_douyin_channel_videos(sec_uid, limit=limit)
-                if ch_data and ch_data.get('videos'):
-                    channel_name = ch_data.get('channel') or channel_name
-                    for cv in ch_data['videos']:
-                        videos.append(cv)
-                    continue
+                try:
+                    ch_data = fetch_douyin_channel_videos(sec_uid, limit=limit)
+                    if ch_data and ch_data.get('videos'):
+                        channel_name = ch_data.get('channel') or channel_name
+                        for cv in ch_data['videos']:
+                            videos.append(cv)
+                        continue
+                except Exception as ex:
+                    logger.warning(f"Error fetching Douyin channel: {ex}")
 
-            # Handle Douyin Single Video or Share text
+                # Fallback: Check if URL can be resolved to single video
+                try:
+                    dy_info = extract_douyin_info(single_url)
+                    if dy_info:
+                        channel_name = dy_info.get("author") or channel_name
+                        videos.append(dy_info)
+                        continue
+                except Exception:
+                    pass
+
+            # 3. Handle Douyin Single Video or Share text
             if any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
-                dy_info = extract_douyin_info(single_url)
-                if dy_info:
-                    channel_name = dy_info["author"] or channel_name
-                    videos.append(dy_info)
-                continue
+                try:
+                    dy_info = extract_douyin_info(single_url)
+                    if dy_info:
+                        channel_name = dy_info.get("author") or channel_name
+                        videos.append(dy_info)
+                        continue
+                except Exception as ex:
+                    logger.warning(f"Error extracting Douyin single video: {ex}")
 
             if single_url.startswith("@"):
                 single_url = f"https://www.tiktok.com/{single_url}"
