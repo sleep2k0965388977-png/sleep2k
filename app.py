@@ -3453,10 +3453,6 @@ def scan_channel():
 
         urls = [u.strip() for u in raw_url.splitlines() if u.strip()]
         
-        from yt_dlp import YoutubeDL
-        from yt_dlp.networking.impersonate import ImpersonateTarget
-        
-        target = ImpersonateTarget.from_str('chrome')
         videos = []
         channel_name = ""
         
@@ -3524,14 +3520,26 @@ def scan_channel():
             elif not single_url.startswith("http://") and not single_url.startswith("https://"):
                 single_url = f"https://www.tiktok.com/@{single_url}"
                 
+            try:
+                from yt_dlp import YoutubeDL
+                try:
+                    from yt_dlp.networking.impersonate import ImpersonateTarget
+                    target = ImpersonateTarget.from_str('chrome')
+                except Exception:
+                    target = None
+            except ImportError:
+                logger.error("yt-dlp is not installed")
+                continue
+                
             ydl_opts = {
-                'impersonate': target,
                 'extract_flat': 'in_playlist',
                 'quiet': True,
                 'playlistend': limit if limit < 999999 else None,
                 'no_warnings': True,
                 'ignoreerrors': True,
             }
+            if target:
+                ydl_opts['impersonate'] = target
             
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(single_url, download=False)
@@ -3600,8 +3608,6 @@ def download_video_stream():
     """
     import tempfile, shutil, re
     from flask import Response
-    from yt_dlp import YoutubeDL
-    from yt_dlp.networking.impersonate import ImpersonateTarget
 
     target_url = request.args.get("url", "").strip()
     custom_title = request.args.get("title", "").strip()
@@ -3659,14 +3665,24 @@ def download_video_stream():
     temp_dir = tempfile.mkdtemp(prefix="dl_vid_")
     out_tmpl = os.path.join(temp_dir, "%(id)s.%(ext)s")
     
-    target = ImpersonateTarget.from_str('chrome')
+    try:
+        from yt_dlp import YoutubeDL
+        try:
+            from yt_dlp.networking.impersonate import ImpersonateTarget
+            target = ImpersonateTarget.from_str('chrome')
+        except Exception:
+            target = None
+    except ImportError:
+        return jsonify({"error": "yt-dlp chưa được cài đặt trên máy chủ"}), 500
+
     ydl_opts = {
-        'impersonate': target,
         'quiet': True,
         'no_warnings': True,
         'outtmpl': out_tmpl,
         'format': 'best',
     }
+    if target:
+        ydl_opts['impersonate'] = target
 
     try:
         with YoutubeDL(ydl_opts) as ydl:
