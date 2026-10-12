@@ -4330,11 +4330,28 @@
 
         async function checkWorkerStatusUI() {
             try {
+                const input = document.getElementById('cloneWorkerUrlInput');
+                const badge = document.getElementById('workerStatusBadge');
+
+                // 1. Phục hồi ngay từ localStorage nếu server bị restart
+                const cachedUrl = localStorage.getItem('sleep2k_clone_worker_url') || '';
+                if (cachedUrl && input && !input.value) {
+                    input.value = cachedUrl;
+                    fetch('/api/set_clone_worker_url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ worker_url: cachedUrl })
+                    }).catch(() => {});
+                }
+
                 const resp = await fetch('/api/clone_worker_status');
                 const data = await resp.json();
-                const badge = document.getElementById('workerStatusBadge');
-                const input = document.getElementById('cloneWorkerUrlInput');
-                if (data.worker_url) input.value = data.worker_url;
+                
+                if (data.worker_url && input) {
+                    input.value = data.worker_url;
+                    localStorage.setItem('sleep2k_clone_worker_url', data.worker_url);
+                }
+
                 if (data.status === 'online') {
                     badge.style.background = 'rgba(16,185,129,0.2)';
                     badge.style.color = '#10b981';
@@ -4342,7 +4359,7 @@
                 } else if (data.status === 'offline') {
                     badge.style.background = 'rgba(239,68,68,0.2)';
                     badge.style.color = '#ef4444';
-                    badge.innerText = '🔴 Worker Offline';
+                    badge.innerText = '🔴 Worker Offline (Máy cá nhân đã tắt)';
                 } else {
                     badge.style.background = 'rgba(100,116,139,0.2)';
                     badge.style.color = '#94a3b8';
@@ -4354,7 +4371,16 @@
         }
 
         async function saveWorkerUrlFromUI() {
-            const url = document.getElementById('cloneWorkerUrlInput').value.trim();
+            const input = document.getElementById('cloneWorkerUrlInput');
+            const url = input ? input.value.trim() : '';
+
+            // Lưu vĩnh viễn vào bộ nhớ trình duyệt máy tính của người dùng
+            if (url) {
+                localStorage.setItem('sleep2k_clone_worker_url', url);
+            } else {
+                localStorage.removeItem('sleep2k_clone_worker_url');
+            }
+
             try {
                 const resp = await fetch('/api/set_clone_worker_url', {
                     method: 'POST',
@@ -4363,14 +4389,13 @@
                 });
                 const data = await resp.json();
                 if (data.status === 'success') {
-                    alert('Đã lưu URL Worker AI!');
+                    alert('Đã lưu URL Worker AI! Trình duyệt sẽ ghi nhớ URL này vĩnh viễn không bao giờ bị mất.');
                     checkWorkerStatusUI();
                 }
             } catch (e) {
                 alert('Lỗi lưu worker: ' + e.message);
             }
         }
-    
 
         // ── Batch Multiple Text Files Sequential Generator ──
         let batchFilesQueue = [];
