@@ -23,6 +23,10 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 from capcut_tts_api import CapCutClient, CapCutError
 
 def get_ffmpeg_exe():
+    import shutil
+    cmd = shutil.which("ffmpeg")
+    if cmd:
+        return cmd
     try:
         import imageio_ffmpeg
         exe = imageio_ffmpeg.get_ffmpeg_exe()
@@ -30,13 +34,14 @@ def get_ffmpeg_exe():
             return exe
     except Exception:
         pass
-    import shutil
-    cmd = shutil.which("ffmpeg")
-    if cmd:
-        return cmd
-    for p in ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/root/.nix-profile/bin/ffmpeg"]:
-        if Path(p).exists():
-            return p
+    try:
+        import static_ffmpeg
+        static_ffmpeg.add_paths()
+        cmd = shutil.which("ffmpeg")
+        if cmd:
+            return cmd
+    except Exception:
+        pass
     return "ffmpeg"
 
 FFMPEG_BIN = get_ffmpeg_exe()
@@ -464,13 +469,6 @@ def api_protection():
     # Only protect /api/* POST routes
     if not path.startswith('/api/'):
         return None
-
-    # Allow worker self-registration without browser session
-    if path == '/api/set_clone_worker_url':
-        api_key = request.headers.get('X-API-Key') or (request.json or {}).get('api_key')
-        if api_key == CLONE_API_KEY or _is_same_origin():
-            return None
-        return jsonify({'error': 'Unauthorized worker', 'message': 'Invalid API key'}), 401
     
     # Check 1: Bot detection
     if _is_bot_request():
@@ -485,9 +483,7 @@ def api_protection():
         '/api/generate_job': 10,      # 10 per minute
         '/api/preview_voice': 30,     # 30 per minute
         '/api/batch_generate': 5,     # 5 per minute
-        '/api/transcribe_job': 10,
-        '/api/youtube_info': 30,
-        '/api/transcribe_youtube': 15,    # 10 per minute
+        '/api/transcribe_job': 10,    # 10 per minute
         '/api/translate_content': 10, # 10 per minute
         '/api/upload_chunk': 20,      # 20 per minute
         '/api/upload_custom_voice': 20,
@@ -498,7 +494,6 @@ def api_protection():
         '/api/download_video_stream': 150,
         '/api/clone_worker_status': 30,
         '/api/set_clone_worker_url': 30,
-        '/api/youtube_cookies': 30,
     }
     max_req = rate_limits.get(path, 30)  # default 30/min
     if not _rate_check(path, max_req):
@@ -538,34 +533,22 @@ def auto_clean_stale_custom_voices():
     except Exception:
         pass
 
-ACTIVE_WORKER_URL = None
-
 def get_clone_worker_url():
-    """Retrieve the AI Clone Worker URL from memory, environment or persistent config file."""
-    global ACTIVE_WORKER_URL
-    if ACTIVE_WORKER_URL is not None:
-        return ACTIVE_WORKER_URL
+    """Retrieve the AI Clone Worker URL from environment or persistent config file."""
     env_url = os.environ.get("CLONE_WORKER_URL", "").strip()
     if env_url:
-        ACTIVE_WORKER_URL = env_url
         return env_url
     if WORKER_CONFIG_FILE.exists():
         try:
             with open(WORKER_CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                val = data.get("worker_url", "").strip()
-                if val:
-                    ACTIVE_WORKER_URL = val
-                    return val
+                return data.get("worker_url", "").strip()
         except Exception:
             pass
-    ACTIVE_WORKER_URL = ""
     return ""
 
 def set_clone_worker_url(url):
-    """Save the AI Clone Worker URL to memory and persistent config file."""
-    global ACTIVE_WORKER_URL
-    ACTIVE_WORKER_URL = url.strip()
+    """Save the AI Clone Worker URL to persistent config file."""
     try:
         with open(WORKER_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump({"worker_url": url.strip()}, f, ensure_ascii=False, indent=2)
@@ -574,47 +557,31 @@ def set_clone_worker_url(url):
         print(f"Error saving worker URL: {e}")
         return False
 
-
-YOUTUBE_COOKIE_FILE = Path(__file__).parent / "youtube_cookies.txt"
-
-def get_youtube_cookies_path():
-    """Retrieve path to valid YouTube Netscape cookies file."""
-    env_c = os.environ.get("YOUTUBE_COOKIES", "").strip()
-    if env_c:
-        try:
-            with open(YOUTUBE_COOKIE_FILE, "w", encoding="utf-8") as f:
-                f.write(env_c)
-            return str(YOUTUBE_COOKIE_FILE)
-        except Exception:
-            pass
-    if YOUTUBE_COOKIE_FILE.exists() and YOUTUBE_COOKIE_FILE.stat().st_size > 30:
-        return str(YOUTUBE_COOKIE_FILE)
-    root_c = Path("D:/sleep2k-deploy/cookies.txt") if Path("D:/sleep2k-deploy/cookies.txt").exists() else Path("cookies.txt")
-    if root_c.exists() and root_c.stat().st_size > 30:
-        return str(root_c)
-    return None
-
-def set_youtube_cookies(content):
-    try:
-        with open(YOUTUBE_COOKIE_FILE, "w", encoding="utf-8") as f:
-            f.write(content.strip())
-        return True
-    except Exception as e:
-        logger.error(f"Error saving youtube cookies: {e}")
-        return False
-
-
 def load_custom_voices(session_id=None):
     """Load temporary custom voices for the active browser session only."""
     auto_clean_stale_custom_voices()
     if not session_id:
         return []
+    try:
+        for p in CUSTOM_VOICES_DIR.glob("clone_*.json"):
+            vid = p.stem
+            if vid not in TEMP_CUSTOM_VOICES:
+                with open(p, "r", encoding="utf-8") as f:
+                    TEMP_CUSTOM_VOICES[vid] = json.load(f)
+    except Exception:
+        pass
     return [v for v in TEMP_CUSTOM_VOICES.values() if v.get("session_id") == session_id]
 
 def save_custom_voice_entry(voice_entry):
-    """Save a temporary custom voice to in-memory session store."""
+    """Save a temporary custom voice to in-memory session store and sync to disk."""
     voice_type = voice_entry.get("voice_type")
     TEMP_CUSTOM_VOICES[voice_type] = voice_entry
+    try:
+        meta_p = CUSTOM_VOICES_DIR / f"{voice_type}.json"
+        with open(meta_p, "w", encoding="utf-8") as f:
+            json.dump(voice_entry, f, ensure_ascii=False)
+    except Exception:
+        pass
     return voice_entry
 
 def delete_custom_voice_entry(voice_type):
@@ -831,6 +798,15 @@ def find_voice_info(voice_type):
     # Check temporary custom voices first
     if voice_type in TEMP_CUSTOM_VOICES:
         return TEMP_CUSTOM_VOICES[voice_type]
+    meta_p = CUSTOM_VOICES_DIR / f"{voice_type}.json"
+    if meta_p.exists():
+        try:
+            with open(meta_p, "r", encoding="utf-8") as f:
+                entry = json.load(f)
+                TEMP_CUSTOM_VOICES[voice_type] = entry
+                return entry
+        except Exception:
+            pass
     for v in TEMP_CUSTOM_VOICES.values():
         if v.get("display_name") == voice_type:
             return v
@@ -941,6 +917,12 @@ def cleanup_all_temp_files(max_age_seconds=600):
                 for sub in p.glob("*"):
                     sub.unlink(missing_ok=True)
                 p.rmdir()
+        except Exception:
+            pass
+    for p in CHECKPOINTS_DIR.glob("*.json"):
+        try:
+            if now - p.stat().st_mtime > 1800:
+                p.unlink(missing_ok=True)
         except Exception:
             pass
 
@@ -1146,6 +1128,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
 
         if total_chunks == 0:
             JOBS[job_id] = {"status": "error", "message": "Văn bản rỗng hoặc không hợp lệ."}
+            save_atomic_checkpoint(job_id, JOBS[job_id])
             return
 
         JOBS[job_id] = {
@@ -1156,6 +1139,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
             "completed_chunks": 0,
             "result": None,
         }
+        save_atomic_checkpoint(job_id, JOBS[job_id])
 
         chunk_results = [None] * total_chunks
         durations = [0] * total_chunks
@@ -1183,14 +1167,17 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
                 JOBS[job_id]["progress"] = progress_pct
                 JOBS[job_id]["completed_chunks"] = completed_count
                 JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
+                save_atomic_checkpoint(job_id, JOBS[job_id])
 
         JOBS[job_id]["progress"] = 96
         JOBS[job_id]["message"] = "Đang ghép nối mượt mà toàn bộ tệp âm thanh hoàn chỉnh..."
+        save_atomic_checkpoint(job_id, JOBS[job_id])
 
         valid_bytes = [r for r in chunk_results if r is not None and len(r) > 0]
         if not valid_bytes:
             JOBS[job_id]["status"] = "error"
             JOBS[job_id]["message"] = "Không thể tạo tệp âm thanh. Vui lòng thử lại!"
+            save_atomic_checkpoint(job_id, JOBS[job_id])
             return
 
         total_duration_ms = sum(durations)
@@ -1202,6 +1189,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         if not stitch_ok or not local_path.exists():
             JOBS[job_id]["status"] = "error"
             JOBS[job_id]["message"] = "Lỗi khi lưu tệp âm thanh hoàn chỉnh."
+            save_atomic_checkpoint(job_id, JOBS[job_id])
             return
 
         JOBS[job_id]["progress"] = 100
@@ -1215,10 +1203,13 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
             "total_chunks": total_chunks,
             "voice": voice
         }
+        save_atomic_checkpoint(job_id, JOBS[job_id])
 
     except Exception as e:
-        JOBS[job_id]["status"] = "error"
-        JOBS[job_id]["message"] = f"Lỗi hệ thống: {str(e)}"
+        if job_id in JOBS:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["message"] = f"Lỗi hệ thống: {str(e)}"
+            save_atomic_checkpoint(job_id, JOBS[job_id])
 
 @app.after_request
 def add_cache_control_headers(response):
@@ -1353,6 +1344,7 @@ def generate_job():
             "message": "Đang phân tích văn bản không giới hạn ký tự...",
             "result": None,
         }
+        save_atomic_checkpoint(job_id, JOBS[job_id])
 
         t = threading.Thread(
             target=run_with_queue,
@@ -1370,508 +1362,16 @@ def generate_job():
 def get_job_status(job_id):
     job = JOBS.get(job_id)
     if not job:
+        job = load_checkpoint(job_id)
+        if job:
+            JOBS[job_id] = job
+    if not job:
         return jsonify({
             "status": "error",
             "error_type": "job_not_found",
             "message": "Tiến trình không tồn tại. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
         }), 404
     return jsonify(job)
-
-
-# ==============================================================================
-# YOUTUBE SPEECH-TO-TEXT & SUBTITLE EXTRACTION PIPELINE
-# ==============================================================================
-
-def clean_youtube_url(text):
-    if not text:
-        return ""
-    # Extract 11-char video ID cleanly
-    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([A-Za-z0-9_-]{11})', text)
-    if m:
-        return f"https://www.youtube.com/watch?v={m.group(1)}"
-    return text.strip()
-
-def get_youtube_audio_stream_url(clean_url):
-    """
-    Extract direct audio stream URL using Smart TV / Android client with Cookie injection.
-    """
-    from yt_dlp import YoutubeDL
-    cookie_p = get_youtube_cookies_path()
-    client_candidates = [
-        ['tv_embedded'],
-        ['android_vr'],
-        ['tv_embedded', 'android_vr'],
-        ['android']
-    ]
-    for clients in client_candidates:
-        try:
-            ydl_opts = {
-                'skip_download': True,
-                'quiet': True,
-                'no_warnings': True,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': clients
-                    }
-                }
-            }
-            if cookie_p:
-                ydl_opts['cookiefile'] = cookie_p
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(clean_url, download=False)
-                stream_url = info.get('url')
-                if not stream_url and 'formats' in info:
-                    audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none']
-                    if audio_formats:
-                        stream_url = audio_formats[-1].get('url')
-                if stream_url:
-                    return stream_url, info, clients[0]
-        except Exception as ex:
-            logger.warning(f"yt-dlp client {clients} attempt failed: {ex}")
-    return None, None, None
-
-def extract_youtube_info_fast(url):
-    clean_url = clean_youtube_url(url)
-    m = re.search(r'(?:v=|\/|shorts\/|youtu\.be\/)([A-Za-z0-9_-]{11})', clean_url)
-    video_id = m.group(1) if m else "video"
-
-    # Tier 1: Official YouTube oEmbed API (Guaranteed 100% unblockable, works on all datacenter IPs in 0.1s)
-    oembed_data = {}
-    try:
-        r_oe = requests.get(f"https://www.youtube.com/oembed?url={clean_url}&format=json", timeout=5)
-        if r_oe.status_code == 200:
-            oembed_data = r_oe.json()
-    except Exception as e:
-        logger.warning(f"oEmbed fetch error: {e}")
-
-    title = oembed_data.get("title") or "Video YouTube"
-    channel = oembed_data.get("author_name") or "YouTube"
-    thumb = oembed_data.get("thumbnail_url") or f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
-    duration = 0
-    subs = {}
-    auto_subs = {}
-
-    # Tier 1.5: Direct HTML scrape for lengthSeconds (0.3s, 100% reliable, never blocked on any IP)
-    try:
-        headers_html = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language': 'vi,en;q=0.9'
-        }
-        r_html = requests.get(f"https://www.youtube.com/watch?v={video_id}", headers=headers_html, timeout=6)
-        if r_html.status_code == 200:
-            m_sec = re.search(r'"lengthSeconds":"(\d+)"', r_html.text)
-            if m_sec:
-                duration = int(m_sec.group(1))
-            else:
-                m_ms = re.search(r'"approxDurationMs":"(\d+)"', r_html.text)
-                if m_ms:
-                    duration = int(m_ms.group(1)) // 1000
-    except Exception as ex_html:
-        logger.warning(f"HTML duration extraction: {ex_html}")
-
-    # Tier 2: yt-dlp tv_embedded client fallback
-    if duration <= 0:
-        try:
-            _, info, _ = get_youtube_audio_stream_url(clean_url)
-            if info:
-                title = info.get("title") or title
-                channel = info.get("channel") or info.get("uploader") or channel
-                thumb = info.get("thumbnail") or thumb
-                duration = int(info.get("duration") or 0)
-                subs = info.get("subtitles", {})
-                auto_subs = info.get("automatic_captions", {})
-        except Exception as ex_dl:
-            logger.warning(f"yt-dlp detailed info extraction fallback: {ex_dl}")
-
-    all_langs = list(set(list(subs.keys()) + [k for k in auto_subs.keys() if len(k) <= 5]))
-
-    return {
-        'id': video_id,
-        'title': title,
-        'thumbnail': thumb,
-        'duration': duration,
-        'duration_str': format_hms(duration) if duration > 0 else "N/A",
-        'channel': channel,
-        'has_subtitles': bool(subs or auto_subs),
-        'languages': all_langs[:15]
-    }
-
-def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_captions=True):
-    temp_dir = Path(tempfile.mkdtemp(prefix=f"yt_stt_{job_id}_"))
-    try:
-        clean_url = clean_youtube_url(url)
-        JOBS[job_id]["progress"] = 5
-        JOBS[job_id]["message"] = "Đang phân tích video và kiểm tra phụ đề YouTube..."
-        save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "processing", "progress": 5, "message": "Đang phân tích video YouTube..."})
-
-        lang_short = language.split('-')[0].lower() if '-' in language else language.lower()
-
-        # 1. Trích xuất thông tin video nhanh & chính xác thời lượng
-        yt_meta = extract_youtube_info_fast(clean_url)
-        total_duration = float(yt_meta.get("duration") or 0.0)
-        total_time_str = yt_meta.get("duration_str") or (format_hms(total_duration) if total_duration > 0 else "N/A")
-
-        # 2. Lấy link luồng âm thanh YouTube (chống chặn bot bằng Smart TV Engine)
-        JOBS[job_id]["progress"] = 8
-        JOBS[job_id]["message"] = f"Video: [{total_time_str}]. Đang kết nối luồng phát âm thanh (Smart TV Engine)..."
-        stream_url, info, used_client = get_youtube_audio_stream_url(clean_url)
-
-        if not total_duration and info:
-            total_duration = float(info.get("duration") or 0.0)
-            total_time_str = format_hms(total_duration) if total_duration > 0 else "N/A"
-
-        # 3. Kiểm tra nếu có phụ đề YouTube sẵn
-        extracted_captions = False
-        if prefer_captions and info:
-            subs = info.get('subtitles', {})
-            auto_subs = info.get('automatic_captions', {})
-            target_subs = (
-                subs.get(lang_short) or 
-                subs.get(language) or 
-                auto_subs.get(lang_short) or 
-                auto_subs.get(language) or
-                (subs.get('en') if lang_short != 'en' else None) or
-                (auto_subs.get('en') if lang_short != 'en' else None)
-            )
-
-            if target_subs:
-                JOBS[job_id]["progress"] = 30
-                JOBS[job_id]["message"] = "Đang trích xuất phụ đề YouTube gốc siêu tốc..."
-                srt_entry = next((s for s in target_subs if s.get('ext') == 'srt'), None)
-                if not srt_entry:
-                    srt_entry = next((s for s in target_subs if s.get('ext') == 'vtt'), None)
-                if not srt_entry and target_subs:
-                    srt_entry = target_subs[0]
-
-                if srt_entry and srt_entry.get('url'):
-                    try:
-                        r = requests.get(srt_entry['url'], timeout=12)
-                        if r.status_code == 200 and r.text.strip():
-                            raw_srt = r.text
-                            blocks = re.split(r'\n\s*\n', raw_srt.strip())
-                            entries = []
-                            for b in blocks:
-                                m = re.search(r'(\d{2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,\.]\d{3})', b)
-                                if m:
-                                    st_sec = srt_time_to_seconds(m.group(1))
-                                    et_sec = srt_time_to_seconds(m.group(2))
-                                    lines = [l.strip() for l in b.splitlines() if l.strip()]
-                                    time_idx = next(i for i, l in enumerate(lines) if '-->' in l)
-                                    txt = ' '.join(lines[time_idx + 1:])
-                                    txt = re.sub(r'<[^>]+>', '', txt).strip()
-                                    if txt:
-                                        entries.append((st_sec, et_sec, txt))
-
-                            if entries:
-                                if total_duration <= 0:
-                                    total_duration = entries[-1][1]
-                                total_time_str = format_hms(total_duration)
-                                PART_SECONDS = 40 * 60.0
-                                total_parts = max(1, math.ceil(total_duration / PART_SECONDS))
-                                parts_data = []
-
-                                for p_idx in range(total_parts):
-                                    p_st = p_idx * PART_SECONDS
-                                    p_et = min((p_idx + 1) * PART_SECONDS, total_duration)
-                                    p_entries = [e for e in entries if e[0] >= p_st and e[0] < p_et]
-                                    p_texts = [e[2] for e in p_entries]
-                                    p_srt_lines = []
-                                    for s_i, e in enumerate(p_entries, 1):
-                                        p_srt_lines.append(f"{s_i}\n{format_timestamp_srt(e[0])} --> {format_timestamp_srt(e[1])}\n{e[2]}\n")
-                                    
-                                    p_full_txt = '\n\n'.join(p_texts)
-                                    p_words = [w for w in p_full_txt.split() if w]
-                                    parts_data.append({
-                                        'part_index': p_idx + 1,
-                                        'timeline': f"{format_timestamp_srt(p_st)} - {format_timestamp_srt(p_et)}",
-                                        'start_sec': p_st,
-                                        'end_sec': p_et,
-                                        'text': p_full_txt,
-                                        'srt': '\n'.join(p_srt_lines),
-                                        'word_count': len(p_words),
-                                        'char_count': len(p_full_txt)
-                                    })
-
-                                full_text = '\n\n'.join([e[2] for e in entries])
-                                full_srt = '\n'.join([f"{i}\n{format_timestamp_srt(e[0])} --> {format_timestamp_srt(e[1])}\n{e[2]}\n" for i, e in enumerate(entries, 1)])
-                                words = [w for w in full_text.split() if w]
-
-                                res = {
-                                    'text': full_text,
-                                    'srt': full_srt,
-                                    'duration': round(total_duration, 1),
-                                    'total_time': total_time_str,
-                                    'word_count': len(words),
-                                    'char_count': len(full_text),
-                                    'total_chunks': math.ceil(total_duration / 60.0),
-                                    'total_parts': total_parts,
-                                    'parts': parts_data
-                                }
-
-                                JOBS[job_id]["progress"] = 100
-                                JOBS[job_id]["status"] = "completed"
-                                JOBS[job_id]["message"] = f"Hoàn tất! Bóc tách thành công phụ đề YouTube [{total_time_str}] ({len(words)} từ)."
-                                JOBS[job_id]["result"] = res
-                                save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "completed", "result": res})
-                                extracted_captions = True
-                    except Exception as e:
-                        logger.warning(f"Error extracting youtube subtitle stream: {e}")
-
-        # 4. Nếu không có phụ đề sẵn -> Chạy phân mảnh 1 phút/lần
-        if not extracted_captions:
-            if not stream_url:
-                raise Exception("YouTube chặn IP máy chủ Cloud (yêu cầu xác thực bot). Vui lòng nhấn vào nút 'Cookie YouTube' màu vàng để nạp Cookie, hoặc kết nối URL Worker GPU!")
-
-            if total_duration <= 0:
-                total_duration = 3600.0
-
-            total_chunks = max(1, math.ceil(total_duration / 60.0))
-            CHUNKS_PER_PART = 40
-            total_parts = max(1, math.ceil(total_chunks / CHUNKS_PER_PART))
-
-            chk = load_checkpoint(job_id)
-            if not chk or chk.get("total_chunks") != total_chunks:
-                chk = {
-                    "job_id": job_id,
-                    "url": clean_url,
-                    "language": language,
-                    "total_duration": total_duration,
-                    "total_chunks": total_chunks,
-                    "total_parts": total_parts,
-                    "total_time": total_time_str,
-                    "status": "processing",
-                    "segments": {}
-                }
-                save_atomic_checkpoint(job_id, chk)
-
-            completed_minutes = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
-
-            for idx in range(total_chunks):
-                idx_str = str(idx)
-                st_sec = idx * 60.0
-                et_sec = min((idx + 1) * 60.0, total_duration)
-                dur_sec = et_sec - st_sec
-                st_str = format_hms(st_sec)
-                et_str = format_hms(et_sec)
-                min_num = idx + 1
-                part_num = (idx // CHUNKS_PER_PART) + 1
-
-                # Đã lấy rồi -> Bỏ qua tránh trùng lặp
-                if idx_str in chk.get("segments", {}) and chk["segments"][idx_str].get("status") == "completed":
-                    continue
-
-                prog = int(8 + (completed_minutes / total_chunks) * 90)
-                JOBS[job_id]["progress"] = prog
-                JOBS[job_id]["message"] = f"⏳ [Phần {part_num}/{total_parts}] Đang lấy & nhận diện Phút {min_num}/{total_chunks} [{st_str} - {et_str}] ({prog}%)..."
-
-                temp_slice = temp_dir / f"yt_min_{job_id}_{idx}.wav"
-                slice_ok = False
-
-                for attempt in range(2):
-                    cmd = [
-                        FFMPEG_BIN, "-y",
-                        "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
-                        "-ss", str(st_sec),
-                        "-i", stream_url,
-                        "-t", str(dur_sec),
-                        "-vn", "-c:a", "pcm_s16le", "-ar", "16000", "-ac", "1",
-                        str(temp_slice)
-                    ]
-                    try:
-                        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=40)
-                        if temp_slice.exists() and temp_slice.stat().st_size > 1000:
-                            slice_ok = True
-                            break
-                    except Exception:
-                        pass
-
-                    # Làm mới luồng nếu đường truyền bị gián đoạn
-                    try:
-                        refreshed_url, _, _ = get_youtube_audio_stream_url(clean_url)
-                        if refreshed_url:
-                            stream_url = refreshed_url
-                    except Exception:
-                        pass
-
-                transcript = ""
-                if slice_ok and temp_slice.exists():
-                    try:
-                        _, transcript = transcribe_audio_chunk(idx, temp_slice, language=language, max_retries=2)
-                    except Exception as ex_stt:
-                        logger.warning(f"Error STT minute {min_num}: {ex_stt}")
-                    finally:
-                        # XÓA NGAY LẬP TỨC: chỉ cần lưu lại text, không lưu âm thanh
-                        try:
-                            temp_slice.unlink(missing_ok=True)
-                        except Exception:
-                            pass
-
-                # ĐÁNH DẤU SỐ LẦN VÀ VỊ TRÍ PHÚT VÀO DỮ LIỆU
-                chk["segments"][idx_str] = {
-                    "minute": min_num,
-                    "part_index": part_num,
-                    "timeline": f"{st_str} - {et_str}",
-                    "start_sec": st_sec,
-                    "end_sec": et_sec,
-                    "text": transcript.strip(),
-                    "status": "completed"
-                }
-                save_atomic_checkpoint(job_id, chk)
-                completed_minutes += 1
-
-                # Live text preview
-                live_texts = []
-                for i in range(idx + 1):
-                    seg = chk["segments"].get(str(i))
-                    if seg and seg.get("text"):
-                        live_texts.append(f"[Phút {seg['minute']}: {seg['timeline']}]\n" + seg['text'])
-
-                JOBS[job_id]["result"] = {
-                    "text": "\n\n".join(live_texts) if live_texts else "Đang nhận diện giọng nói...",
-                    "duration": round(et_sec, 1),
-                    "total_time": total_time_str,
-                    "processed_chunks": completed_minutes,
-                    "total_chunks": total_chunks,
-                    "total_parts": total_parts
-                }
-
-                time.sleep(0.8)
-
-            # TỔNG HỢP TOÀN BỘ KẾT QUẢ KHI HOÀN TẤT
-            final_formatted_texts = []
-            final_srt_blocks = []
-            srt_idx = 1
-            parts_data = []
-
-            for p_idx in range(total_parts):
-                p_start_chunk = p_idx * CHUNKS_PER_PART
-                p_end_chunk = min((p_idx + 1) * CHUNKS_PER_PART, total_chunks)
-                p_st_sec = p_start_chunk * 60.0
-                p_et_sec = min(p_end_chunk * 60.0, total_duration)
-                p_timeline = f"{format_timestamp_srt(p_st_sec)} - {format_timestamp_srt(p_et_sec)}"
-
-                p_texts = []
-                p_srt_blocks = []
-                p_srt_idx = 1
-
-                for i in range(p_start_chunk, p_end_chunk):
-                    seg = chk.get("segments", {}).get(str(i), {})
-                    txt = (seg.get("text") or "").strip()
-                    if txt:
-                        p_texts.append(f"[Phút {seg.get('minute', i+1)}: {seg.get('timeline', '')}]\n" + txt)
-                        st = seg.get("start_sec", i * 60.0)
-                        et = seg.get("end_sec", min((i + 1) * 60.0, total_duration))
-                        p_srt_blocks.append(f"{p_srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n")
-                        p_srt_idx += 1
-
-                p_full_txt = "\n\n".join(p_texts)
-                p_words = [w for w in p_full_txt.split() if w]
-                parts_data.append({
-                    "part_index": p_idx + 1,
-                    "timeline": p_timeline,
-                    "start_sec": p_st_sec,
-                    "end_sec": p_et_sec,
-                    "text": p_full_txt,
-                    "srt": "\n".join(p_srt_blocks),
-                    "word_count": len(p_words),
-                    "char_count": len(p_full_txt)
-                })
-
-            for i in range(total_chunks):
-                seg = chk.get("segments", {}).get(str(i), {})
-                txt = (seg.get("text") or "").strip()
-                if txt:
-                    final_formatted_texts.append(f"[Phút {seg.get('minute', i+1)}: {seg.get('timeline', '')}]\n" + txt)
-                    st = seg.get("start_sec", i * 60.0)
-                    et = seg.get("end_sec", min((i + 1) * 60.0, total_duration))
-                    final_srt_blocks.append(f"{srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n")
-                    srt_idx += 1
-
-            full_text = "\n\n".join(final_formatted_texts) if final_formatted_texts else "Không nhận diện được giọng nói trong video này."
-            full_srt = "\n".join(final_srt_blocks) if final_srt_blocks else ""
-            words = [w for w in full_text.split() if w]
-
-            final_res = {
-                "text": full_text,
-                "srt": full_srt,
-                "duration": round(total_duration, 1),
-                "total_time": total_time_str,
-                "word_count": len(words),
-                "char_count": len(full_text),
-                "total_chunks": total_chunks,
-                "total_parts": total_parts,
-                "parts": parts_data
-            }
-
-            JOBS[job_id]["progress"] = 100
-            JOBS[job_id]["status"] = "completed"
-            JOBS[job_id]["message"] = f"Hoàn tất 100%! Đã nhận diện toàn bộ {total_chunks} phút [{total_time_str}] thành công."
-            JOBS[job_id]["result"] = final_res
-            save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "completed", "result": final_res})
-
-    except Exception as e:
-        logger.error(f"Error in youtube transcribe job {job_id}: {e}")
-        JOBS[job_id]["status"] = "error"
-        JOBS[job_id]["message"] = f"Lỗi xử lý YouTube: {str(e)}"
-    finally:
-        try:
-            for f in temp_dir.glob("*"):
-                f.unlink(missing_ok=True)
-            temp_dir.rmdir()
-        except Exception:
-            pass
-
-@app.route("/api/youtube_info", methods=["POST"])
-def api_youtube_info():
-    try:
-        data = request.get_json(force=True) or {}
-        raw_url = data.get("url", "").strip()
-        if not raw_url:
-            return jsonify({"status": "error", "message": "Vui lòng nhập đường link video YouTube!"}), 400
-
-        info = extract_youtube_info_fast(raw_url)
-        return jsonify({"status": "success", "data": info})
-    except Exception as e:
-        logger.warning(f"Error fetching youtube info: {e}")
-        return jsonify({"status": "error", "message": f"Không thể lấy thông tin video YouTube: {str(e)}"}), 400
-
-@app.route("/api/transcribe_youtube", methods=["POST"])
-def api_transcribe_youtube():
-    try:
-        data = request.get_json(force=True) or {}
-        raw_url = data.get("url", "").strip()
-        if not raw_url:
-            return jsonify({"status": "error", "message": "Vui lòng nhập đường link video YouTube!"}), 400
-
-        language = data.get("language", "vi-VN")
-        prefer_captions = bool(data.get("prefer_captions", True))
-        job_id = uuid.uuid4().hex[:8]
-
-        JOBS[job_id] = {
-            "status": "processing",
-            "progress": 5,
-            "message": "Đang kết nối tới máy chủ YouTube...",
-            "result": None
-        }
-
-        save_atomic_checkpoint(job_id, {
-            "job_id": job_id,
-            "status": "processing",
-            "progress": 5,
-            "message": "Đang kết nối tới máy chủ YouTube...",
-            "total_segments": 1,
-            "segments": {}
-        })
-
-        t = threading.Thread(target=process_youtube_transcribe_job, args=(job_id, raw_url, language, prefer_captions))
-        t.daemon = True
-        t.start()
-
-        return jsonify({"status": "success", "job_id": job_id})
-    except Exception as e:
-        logger.error(f"Error starting youtube transcribe: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
 
 @app.route("/api/preview_voice", methods=["POST"])
 def preview_voice():
@@ -2120,7 +1620,7 @@ def clone_worker_status():
     if not url:
         return jsonify({"status": "not_configured", "message": "Chưa kết nối URL Worker AI Clone."})
     try:
-        r = requests.get(f"{url.rstrip('/')}/health", timeout=6)
+        r = requests.get(f"{url.rstrip('/')}/health", timeout=5)
         if r.status_code == 200:
             data = r.json()
             return jsonify({
@@ -2136,23 +1636,6 @@ def clone_worker_status():
         "worker_url": url,
         "message": "Worker đang tắt hoặc URL Ngrok chưa kết nối."
     })
-
-
-@app.route("/api/youtube_cookies", methods=["GET", "POST"])
-def api_youtube_cookies():
-    if request.method == "POST":
-        data = request.json or {}
-        content = data.get("cookies", "").strip()
-        if not content:
-            return jsonify({"status": "error", "message": "Nội dung cookie trống."}), 400
-        ok = set_youtube_cookies(content)
-        if ok:
-            return jsonify({"status": "success", "message": "Đã lưu YouTube Cookies thành công!"})
-        return jsonify({"status": "error", "message": "Không thể lưu file cookie."}), 500
-    
-    cookie_p = get_youtube_cookies_path()
-    has_cookie = bool(cookie_p and Path(cookie_p).exists() and Path(cookie_p).stat().st_size > 30)
-    return jsonify({"status": "success", "has_cookies": has_cookie})
 
 @app.route("/api/set_clone_worker_url", methods=["POST"])
 def set_clone_worker():
@@ -4017,25 +3500,31 @@ def scan_channel():
         channel_name = ""
         
         for single_url in urls:
-            # Clean URL if user pasted raw share text containing descriptions or Chinese text
-            m_u = re.search(r'https?://[^\s,]+', single_url)
-            if m_u:
-                single_url = m_u.group(0)
-
             # Expand shortened v.douyin.com links to uncover full user or video URLs
             if "v.douyin.com" in single_url:
                 try:
                     s_tmp = requests.Session()
-                    s_tmp.headers.update({"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"})
-                    resp = s_tmp.get(single_url, allow_redirects=True, timeout=8)
+                    s_tmp.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+                    resp = s_tmp.get(single_url, allow_redirects=True, timeout=5)
                     if resp.url:
                         single_url = resp.url
-                except Exception as ex:
-                    logger.warning(f"Error expanding v.douyin.com link: {ex}")
+                except Exception:
+                    pass
 
-            # 1. Handle Douyin Creator Channel Profile Link (desktop and mobile share profile)
-            # Priority: If link contains /user/, user is scanning a creator channel (even if URL has modal_id or vid param)
-            m_sec = re.search(r'douyin\.com/(?:share/)?user/([A-Za-z0-9_-]+)', single_url)
+            # 1. If URL contains a specific video ID (even inside user link modal), extract video directly
+            has_vid_param = bool(re.search(r'(?:modal_id=|vid=|from_gid=|/video/|/note/)(\d{15,25})', single_url))
+            if has_vid_param and any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
+                try:
+                    dy_info = extract_douyin_info(single_url)
+                    if dy_info:
+                        channel_name = dy_info.get("author") or channel_name
+                        videos.append(dy_info)
+                        continue
+                except Exception as ex:
+                    logger.warning(f"Error extracting Douyin modal video: {ex}")
+
+            # 2. Handle Douyin Creator Channel Profile Link
+            m_sec = re.search(r'douyin\.com/user/([A-Za-z0-9_-]+)', single_url)
             if m_sec:
                 sec_uid = m_sec.group(1)
                 try:
@@ -4057,18 +3546,6 @@ def scan_channel():
                         continue
                 except Exception:
                     pass
-
-            # 2. If URL contains a specific video ID (single video link or modal /video/ /note/ /vid= /modal_id=), extract video directly
-            has_vid_param = bool(re.search(r'(?:modal_id=|vid=|from_gid=|/video/|/note/)(\d{15,25})', single_url))
-            if has_vid_param and any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
-                try:
-                    dy_info = extract_douyin_info(single_url)
-                    if dy_info:
-                        channel_name = dy_info.get("author") or channel_name
-                        videos.append(dy_info)
-                        continue
-                except Exception as ex:
-                    logger.warning(f"Error extracting Douyin modal/single video: {ex}")
 
             # 3. Handle Douyin Single Video or Share text
             if any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
