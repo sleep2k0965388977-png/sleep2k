@@ -3473,19 +3473,8 @@ def scan_channel():
                 except Exception as ex:
                     logger.warning(f"Error expanding v.douyin.com link: {ex}")
 
-            # 1. If URL contains a specific video ID (even inside user link modal), extract video directly
-            has_vid_param = bool(re.search(r'(?:modal_id=|vid=|from_gid=|/video/|/note/)(\d{15,25})', single_url))
-            if has_vid_param and any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
-                try:
-                    dy_info = extract_douyin_info(single_url)
-                    if dy_info:
-                        channel_name = dy_info.get("author") or channel_name
-                        videos.append(dy_info)
-                        continue
-                except Exception as ex:
-                    logger.warning(f"Error extracting Douyin modal video: {ex}")
-
-            # 2. Handle Douyin Creator Channel Profile Link (desktop and mobile share profile)
+            # 1. Handle Douyin Creator Channel Profile Link (desktop and mobile share profile)
+            # Priority: If link contains /user/, user is scanning a creator channel (even if URL has modal_id or vid param)
             m_sec = re.search(r'douyin\.com/(?:share/)?user/([A-Za-z0-9_-]+)', single_url)
             if m_sec:
                 sec_uid = m_sec.group(1)
@@ -3508,6 +3497,18 @@ def scan_channel():
                         continue
                 except Exception:
                     pass
+
+            # 2. If URL contains a specific video ID (single video link or modal /video/ /note/ /vid= /modal_id=), extract video directly
+            has_vid_param = bool(re.search(r'(?:modal_id=|vid=|from_gid=|/video/|/note/)(\d{15,25})', single_url))
+            if has_vid_param and any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
+                try:
+                    dy_info = extract_douyin_info(single_url)
+                    if dy_info:
+                        channel_name = dy_info.get("author") or channel_name
+                        videos.append(dy_info)
+                        continue
+                except Exception as ex:
+                    logger.warning(f"Error extracting Douyin modal/single video: {ex}")
 
             # 3. Handle Douyin Single Video or Share text
             if any(d in single_url for d in ["douyin.com", "iesdouyin.com"]):
