@@ -2249,8 +2249,8 @@
                             <i class="fa-solid fa-floppy-disk"></i> Lưu URL
                         </button>
                     </div>
-                    <div style="font-size: 10.5px; color: #94a3b8; margin-top: 6px; line-height: 1.4;">
-                        💡 Model 8.5GB chạy trên Google Colab GPU T4 miễn phí. Khi bạn ở nhà, chỉ cần chạy cell Colab hoặc Local Worker rồi dán URL vào đây.
+                    <div style="font-size: 10.5px; color: #a78bfa; margin-top: 6px; line-height: 1.4; background: rgba(168,85,247,0.1); padding: 8px 10px; border-radius: 6px; border-left: 3px solid #a855f7;">
+                        ✨ <b>Kết nối hoàn toàn tự động:</b> Khi cần nhân bản giọng, bạn chỉ cần click đúp mở file <b>CHAY_AI_CLONE_GIONG.bat</b> trên màn hình Desktop máy tính. Hệ thống sẽ tự động liên kết thẳng vào web mà không cần phải đi lấy và dán link thủ công!
                     </div>
                 </div>
             </details>
@@ -4355,15 +4355,15 @@
                 if (data.status === 'online') {
                     badge.style.background = 'rgba(16,185,129,0.2)';
                     badge.style.color = '#10b981';
-                    badge.innerText = '🟢 Worker Online (' + (data.gpu || 'GPU') + ')';
+                    badge.innerText = '🟢 Đã tự động kết nối (' + (data.gpu || 'Máy tính') + ')';
                 } else if (data.status === 'offline') {
                     badge.style.background = 'rgba(239,68,68,0.2)';
                     badge.style.color = '#ef4444';
-                    badge.innerText = '🔴 Worker Offline (Máy cá nhân đã tắt)';
+                    badge.innerText = '🔴 Worker chưa bật (Mở CHAY_AI_CLONE_GIONG.bat)';
                 } else {
                     badge.style.background = 'rgba(100,116,139,0.2)';
                     badge.style.color = '#94a3b8';
-                    badge.innerText = '⚪ Chưa cấu hình';
+                    badge.innerText = '⚪ Chưa kết nối (Mở CHAY_AI_CLONE_GIONG.bat)';
                 }
             } catch (e) {
                 console.log('Worker status error:', e);

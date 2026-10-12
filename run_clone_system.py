@@ -2,19 +2,33 @@ import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-import subprocess, time, re, os, requests
+import subprocess, time, re, os, requests, json
 from pathlib import Path
 
+CLONE_API_KEY = "sleep2k_clone_2024"
 RAILWAY_URL = "https://sleep2k.up.railway.app"
+LOCAL_APP_URL = "http://localhost:5000"
+
 CLOUDFLARED = r"C:\Program Files (x86)\cloudflared\cloudflared.exe"
-WORKER_SCRIPT = Path(__file__).parent / "local_clone_worker.py"
+if not Path(CLOUDFLARED).exists():
+    CLOUDFLARED = "cloudflared"
 
-print("=" * 65)
-print("🚀 HỆ THỐNG TỰ ĐỘNG KẾT NỐI AI CLONE WORKER (16GB RAM)")
-print("=" * 65)
+BASE_DIR = Path(__file__).parent
+WORKER_SCRIPT = BASE_DIR / "local_clone_worker.py"
+if not WORKER_SCRIPT.exists():
+    WORKER_SCRIPT = Path(r"D:\sleep2k-deploy\local_clone_worker.py")
 
-# 1. Start local worker on port 5005
-print("\n[1/3] Khởi động AI Clone Worker trên máy tính cá nhân...")
+CONFIG_FILE = BASE_DIR / "worker_config.json"
+DEPLOY_CONFIG_FILE = Path(r"D:\sleep2k-deploy\worker_config.json")
+
+print("=" * 70)
+print("  🚀 SLEEP2K - HỆ THỐNG TỰ ĐỘNG KẾT NỐI AI CLONE WORKER")
+print("  ⚡ Tận dụng sức mạnh máy tính để nhân bản giọng đọc chuẩn 100%")
+print("  ✨ TỰ ĐỘNG KẾT NỐI - KHÔNG CẦN COPY/DÁN URL THỦ CÔNG")
+print("=" * 70)
+
+# 1. Khởi động AI Worker cục bộ trên cổng 5005
+print("\n[1/3] Đang khởi động AI Clone Worker trên máy tính...")
 worker_proc = subprocess.Popen(
     [sys.executable, str(WORKER_SCRIPT)],
     stdout=subprocess.PIPE,
@@ -25,9 +39,9 @@ worker_proc = subprocess.Popen(
     bufsize=1
 )
 
-# Wait for worker to be ready
+# Chờ worker sẵn sàng
 ready = False
-for _ in range(30):
+for _ in range(35):
     try:
         r = requests.get("http://localhost:5005/health", timeout=1)
         if r.status_code == 200:
@@ -38,14 +52,14 @@ for _ in range(30):
     time.sleep(1)
 
 if not ready:
-    print("❌ Lỗi: Không thể khởi động worker.")
+    print("❌ Lỗi: Không thể khởi động worker local trên cổng 5005.")
     worker_proc.terminate()
     sys.exit(1)
 
 print("✅ Worker nội bộ đã sẵn sàng tại http://localhost:5005!")
 
-# 2. Start Cloudflare Tunnel
-print("\n[2/3] Mở đường hầm bảo mật Cloudflare Tunnel...")
+# 2. Mở đường hầm bảo mật Cloudflare Tunnel
+print("\n[2/3] Đang tạo đường hầm kết nối bảo mật (Cloudflare Tunnel)...")
 tunnel_proc = subprocess.Popen(
     [CLOUDFLARED, "tunnel", "--url", "http://localhost:5005"],
     stdout=subprocess.PIPE,
@@ -58,7 +72,7 @@ tunnel_proc = subprocess.Popen(
 
 tunnel_url = None
 t0 = time.time()
-while time.time() - t0 < 25:
+while time.time() - t0 < 30:
     line = tunnel_proc.stderr.readline()
     if not line:
         time.sleep(0.2)
@@ -74,54 +88,65 @@ if not tunnel_url:
     worker_proc.terminate()
     sys.exit(1)
 
-print(f"✅ Đường hầm bảo mật công khai: {tunnel_url}")
+print(f"✅ Đường hầm công khai đã tạo: {tunnel_url}")
 
-# 3. Auto-register URL to Railway App
-print("\n[3/3] Tự động liên kết URL Worker với Web App Railway...")
-set_resp = requests.post(
-    f"{RAILWAY_URL}/api/set_clone_worker_url",
-    headers={
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
-        "Referer": f"{RAILWAY_URL}/",
-        "Origin": RAILWAY_URL
-    },
-    json={"worker_url": tunnel_url},
-    timeout=15
-)
+# Lưu vào file config nội bộ
+try:
+    for cfg in [CONFIG_FILE, DEPLOY_CONFIG_FILE]:
+        with open(cfg, "w", encoding="utf-8") as f:
+            json.dump({"worker_url": tunnel_url}, f, indent=2)
+except Exception:
+    pass
 
-if set_resp.status_code == 200 and set_resp.json().get("status") == "success":
-    print("\n" + "=" * 65)
-    print("🎉 LIÊN KẾT THÀNH CÔNG VỚI WEB APP RAILWAY!")
-    print(f"👉 Trạng thái trên Web: ONLINE 🟢")
-    print(f"👉 URL Worker kết nối: {tunnel_url}")
-    print(f"👉 Bây giờ bạn có thể vào {RAILWAY_URL} và nhân bản giọng nói thật 100%!")
-    print("=" * 65)
-    print("\n⚠️ Giữ cửa sổ này mở khi sử dụng app. Nhấn Ctrl+C để dừng khi không cần.")
+# 3. Tự động đăng ký URL lên Railway & Local App
+print("\n[3/3] Đang tự động kết nối và đăng ký với Web App...")
+
+def register_url(target_base):
+    try:
+        resp = requests.post(
+            f"{target_base}/api/set_clone_worker_url",
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": CLONE_API_KEY
+            },
+            json={
+                "worker_url": tunnel_url,
+                "api_key": CLONE_API_KEY
+            },
+            timeout=15
+        )
+        return resp.status_code == 200 and resp.json().get("status") == "success"
+    except Exception:
+        return False
+
+railway_ok = register_url(RAILWAY_URL)
+local_ok = register_url(LOCAL_APP_URL)
+
+print("\n" + "=" * 70)
+if railway_ok:
+    print("  🎉 KẾT NỐI TỰ ĐỘNG THÀNH CÔNG VỚI WEB RAILWAY!")
+    print(f"  🌐 Web App: {RAILWAY_URL}")
+    print(f"  🟢 Trạng thái Web: ONLINE (Tự động nhận diện)")
+    print(f"  🔗 URL Worker: {tunnel_url}")
+    print("  ✨ BẠN KHÔNG CẦN COPY HAY DÁN GÌ NỮA! Web đã kết nối thẳng 100%!")
+elif local_ok:
+    print("  🎉 KẾT NỐI THÀNH CÔNG VỚI WEB CỤC BỘ (http://localhost:5000)!")
 else:
-    print(f"Lỗi liên kết: {set_resp.status_code} - {set_resp.text}")
+    print(f"  ⚠️ Đang kết nối lại với {RAILWAY_URL}...")
+print("=" * 70)
+print("\n💡 Giữ cửa sổ này mở trong khi sử dụng tạo giọng. Nhấn Ctrl+C để dừng.")
 
 last_ping = time.time()
 try:
     while True:
         time.sleep(2)
-        if time.time() - last_ping > 25:
+        if time.time() - last_ping > 20:
             last_ping = time.time()
-            try:
-                requests.post(
-                    f"{RAILWAY_URL}/api/set_clone_worker_url",
-                    headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
-                        "Referer": f"{RAILWAY_URL}/",
-                        "Origin": RAILWAY_URL
-                    },
-                    json={"worker_url": tunnel_url},
-                    timeout=5
-                )
-            except Exception:
-                pass
+            register_url(RAILWAY_URL)
+            if local_ok:
+                register_url(LOCAL_APP_URL)
 except KeyboardInterrupt:
-    print("\nĐang tắt hệ thống...")
+    print("\nĐang tắt an toàn hệ thống...")
     tunnel_proc.terminate()
     worker_proc.terminate()
-    print("Đã tắt an toàn.")
-
+    print("✅ Đã tắt an toàn.")

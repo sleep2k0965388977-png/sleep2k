@@ -4,10 +4,15 @@ title SLEEP2K - KET NOI AI CLONE GIONG NOI
 cls
 echo ================================================================
 echo   SLEEP2K TTS - HE THONG KET NOI AI CLONE GIONG NOI
-echo   Tan dung 16GB RAM tren may de nhan ban giong chuan 100%%
+echo   Tan dung RAM & GPU tren may de nhan ban giong chuan 100%%
+echo   TU DONG KET NOI VOI WEB - KHONG CAN DAN URL THU CONG!
 echo ================================================================
 echo.
-echo Dang khoi dong AI Worker va duong ham ket noi...
-echo.
-python "%~dp0run_clone_system.py"
+if exist "D:\sleep2k-deploy\run_clone_system.py" (
+    cd /d "D:\sleep2k-deploy"
+    python run_clone_system.py
+) else (
+    cd /d "D:\tự động tạo gmail"
+    python run_clone_system.py
+)
 pause

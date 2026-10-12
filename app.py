@@ -464,6 +464,13 @@ def api_protection():
     # Only protect /api/* POST routes
     if not path.startswith('/api/'):
         return None
+
+    # Allow worker self-registration without browser session
+    if path == '/api/set_clone_worker_url':
+        api_key = request.headers.get('X-API-Key') or (request.json or {}).get('api_key')
+        if api_key == CLONE_API_KEY or _is_same_origin():
+            return None
+        return jsonify({'error': 'Unauthorized worker', 'message': 'Invalid API key'}), 401
     
     # Check 1: Bot detection
     if _is_bot_request():
@@ -531,22 +538,33 @@ def auto_clean_stale_custom_voices():
     except Exception:
         pass
 
+ACTIVE_WORKER_URL = ""
+
 def get_clone_worker_url():
-    """Retrieve the AI Clone Worker URL from environment or persistent config file."""
+    """Retrieve the AI Clone Worker URL from memory, environment or persistent config file."""
+    global ACTIVE_WORKER_URL
+    if ACTIVE_WORKER_URL:
+        return ACTIVE_WORKER_URL
     env_url = os.environ.get("CLONE_WORKER_URL", "").strip()
     if env_url:
+        ACTIVE_WORKER_URL = env_url
         return env_url
     if WORKER_CONFIG_FILE.exists():
         try:
             with open(WORKER_CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data.get("worker_url", "").strip()
+                val = data.get("worker_url", "").strip()
+                if val:
+                    ACTIVE_WORKER_URL = val
+                    return val
         except Exception:
             pass
     return ""
 
 def set_clone_worker_url(url):
-    """Save the AI Clone Worker URL to persistent config file."""
+    """Save the AI Clone Worker URL to memory and persistent config file."""
+    global ACTIVE_WORKER_URL
+    ACTIVE_WORKER_URL = url.strip()
     try:
         with open(WORKER_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump({"worker_url": url.strip()}, f, ensure_ascii=False, indent=2)
@@ -2101,7 +2119,7 @@ def clone_worker_status():
     if not url:
         return jsonify({"status": "not_configured", "message": "Chưa kết nối URL Worker AI Clone."})
     try:
-        r = requests.get(f"{url.rstrip('/')}/health", timeout=5)
+        r = requests.get(f"{url.rstrip('/')}/health", timeout=6)
         if r.status_code == 200:
             data = r.json()
             return jsonify({
