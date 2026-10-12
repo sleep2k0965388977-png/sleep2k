@@ -562,12 +562,26 @@ def load_custom_voices(session_id=None):
     auto_clean_stale_custom_voices()
     if not session_id:
         return []
+    try:
+        for p in CUSTOM_VOICES_DIR.glob("clone_*.json"):
+            vid = p.stem
+            if vid not in TEMP_CUSTOM_VOICES:
+                with open(p, "r", encoding="utf-8") as f:
+                    TEMP_CUSTOM_VOICES[vid] = json.load(f)
+    except Exception:
+        pass
     return [v for v in TEMP_CUSTOM_VOICES.values() if v.get("session_id") == session_id]
 
 def save_custom_voice_entry(voice_entry):
-    """Save a temporary custom voice to in-memory session store."""
+    """Save a temporary custom voice to in-memory session store and sync to disk."""
     voice_type = voice_entry.get("voice_type")
     TEMP_CUSTOM_VOICES[voice_type] = voice_entry
+    try:
+        meta_p = CUSTOM_VOICES_DIR / f"{voice_type}.json"
+        with open(meta_p, "w", encoding="utf-8") as f:
+            json.dump(voice_entry, f, ensure_ascii=False)
+    except Exception:
+        pass
     return voice_entry
 
 def delete_custom_voice_entry(voice_type):
@@ -784,6 +798,15 @@ def find_voice_info(voice_type):
     # Check temporary custom voices first
     if voice_type in TEMP_CUSTOM_VOICES:
         return TEMP_CUSTOM_VOICES[voice_type]
+    meta_p = CUSTOM_VOICES_DIR / f"{voice_type}.json"
+    if meta_p.exists():
+        try:
+            with open(meta_p, "r", encoding="utf-8") as f:
+                entry = json.load(f)
+                TEMP_CUSTOM_VOICES[voice_type] = entry
+                return entry
+        except Exception:
+            pass
     for v in TEMP_CUSTOM_VOICES.values():
         if v.get("display_name") == voice_type:
             return v
@@ -894,6 +917,12 @@ def cleanup_all_temp_files(max_age_seconds=600):
                 for sub in p.glob("*"):
                     sub.unlink(missing_ok=True)
                 p.rmdir()
+        except Exception:
+            pass
+    for p in CHECKPOINTS_DIR.glob("*.json"):
+        try:
+            if now - p.stat().st_mtime > 1800:
+                p.unlink(missing_ok=True)
         except Exception:
             pass
 
@@ -1099,6 +1128,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
 
         if total_chunks == 0:
             JOBS[job_id] = {"status": "error", "message": "Văn bản rỗng hoặc không hợp lệ."}
+            save_atomic_checkpoint(job_id, JOBS[job_id])
             return
 
         JOBS[job_id] = {
@@ -1109,6 +1139,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
             "completed_chunks": 0,
             "result": None,
         }
+        save_atomic_checkpoint(job_id, JOBS[job_id])
 
         chunk_results = [None] * total_chunks
         durations = [0] * total_chunks
@@ -1136,14 +1167,17 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
                 JOBS[job_id]["progress"] = progress_pct
                 JOBS[job_id]["completed_chunks"] = completed_count
                 JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
+                save_atomic_checkpoint(job_id, JOBS[job_id])
 
         JOBS[job_id]["progress"] = 96
         JOBS[job_id]["message"] = "Đang ghép nối mượt mà toàn bộ tệp âm thanh hoàn chỉnh..."
+        save_atomic_checkpoint(job_id, JOBS[job_id])
 
         valid_bytes = [r for r in chunk_results if r is not None and len(r) > 0]
         if not valid_bytes:
             JOBS[job_id]["status"] = "error"
             JOBS[job_id]["message"] = "Không thể tạo tệp âm thanh. Vui lòng thử lại!"
+            save_atomic_checkpoint(job_id, JOBS[job_id])
             return
 
         total_duration_ms = sum(durations)
@@ -1155,6 +1189,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         if not stitch_ok or not local_path.exists():
             JOBS[job_id]["status"] = "error"
             JOBS[job_id]["message"] = "Lỗi khi lưu tệp âm thanh hoàn chỉnh."
+            save_atomic_checkpoint(job_id, JOBS[job_id])
             return
 
         JOBS[job_id]["progress"] = 100
@@ -1168,10 +1203,13 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
             "total_chunks": total_chunks,
             "voice": voice
         }
+        save_atomic_checkpoint(job_id, JOBS[job_id])
 
     except Exception as e:
-        JOBS[job_id]["status"] = "error"
-        JOBS[job_id]["message"] = f"Lỗi hệ thống: {str(e)}"
+        if job_id in JOBS:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["message"] = f"Lỗi hệ thống: {str(e)}"
+            save_atomic_checkpoint(job_id, JOBS[job_id])
 
 @app.after_request
 def add_cache_control_headers(response):
@@ -1306,6 +1344,7 @@ def generate_job():
             "message": "Đang phân tích văn bản không giới hạn ký tự...",
             "result": None,
         }
+        save_atomic_checkpoint(job_id, JOBS[job_id])
 
         t = threading.Thread(
             target=run_with_queue,
@@ -1322,6 +1361,10 @@ def generate_job():
 @app.route("/api/job_status/<job_id>", methods=["GET"])
 def get_job_status(job_id):
     job = JOBS.get(job_id)
+    if not job:
+        job = load_checkpoint(job_id)
+        if job:
+            JOBS[job_id] = job
     if not job:
         return jsonify({
             "status": "error",
