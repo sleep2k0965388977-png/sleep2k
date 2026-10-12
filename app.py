@@ -1601,7 +1601,7 @@ def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_caption
         # 4. Nếu không có phụ đề sẵn -> Chạy phân mảnh 1 phút/lần
         if not extracted_captions:
             if not stream_url:
-                raise Exception("Không thể kết nối luồng phát âm thanh YouTube. Vui lòng thử lại sau ít giây.")
+                raise Exception("YouTube chặn IP máy chủ Cloud (yêu cầu xác thực bot). Vui lòng nhấn vào nút 'Cookie YouTube' màu vàng để nạp Cookie, hoặc kết nối URL Worker GPU!")
 
             if total_duration <= 0:
                 total_duration = 3600.0

@@ -3363,7 +3363,10 @@
                                 }, 500);
                             } else if (sd.status === "error") {
                                 clearInterval(pollInterval);
-                                alert("Lỗi: " + sd.message);
+                                showToast(sd.message, "error");
+                                if (sd.message && (sd.message.includes("Cookie") || sd.message.includes("Bot") || sd.message.includes("bot") || sd.message.includes("chặn IP") || sd.message.includes("luồng phát"))) {
+                                    setTimeout(() => { openYoutubeCookieModal(); }, 600);
+                                }
                                 progressCard.classList.remove("show");
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
