@@ -1737,7 +1737,55 @@
 
             <div class="card">
                 <div class="card-title">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> Tải Lên Tệp Âm Thanh / Video Cần Chuyển Thành Văn Bản
+                    <i class="fa-solid fa-file-audio"></i> Chuyển Âm Thanh / Video / YouTube Thành Văn Bản
+                </div>
+
+                <!-- Mode Switcher: File Upload vs YouTube URL -->
+                <div class="stt-mode-switcher" style="display: flex; gap: 10px; margin-bottom: 18px; border-bottom: 1px solid var(--card-border); padding-bottom: 14px;">
+                    <button type="button" class="lang-tab active" id="btnModeUpload" onclick="switchSttInputMode('upload')" style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; font-size: 13px; font-weight: 700; border-radius: 10px; cursor: pointer;">
+                        <i class="fa-solid fa-file-arrow-up" style="color: var(--accent-blue);"></i> 1. Tải Tệp Lên (MP3, WAV, MP4...)
+                    </button>
+                    <button type="button" class="lang-tab" id="btnModeYoutube" onclick="switchSttInputMode('youtube')" style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; font-size: 13px; font-weight: 700; border-radius: 10px; cursor: pointer;">
+                        <i class="fa-brands fa-youtube" style="color: #ef4444; font-size: 16px;"></i> 2. Dán Link Video YouTube
+                    </button>
+                </div>
+
+                <!-- YouTube Input Container -->
+                <div id="youtubeInputContainer" style="display: none; margin-bottom: 18px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 18px;">
+                        <label style="display: block; font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 8px;">
+                            <i class="fa-brands fa-youtube" style="color: #ef4444;"></i> Nhập hoặc dán đường link video YouTube:
+                        </label>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <div style="position: relative; flex: 1; min-width: 280px;">
+                                <i class="fa-solid fa-link" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px;"></i>
+                                <input type="text" id="sttYoutubeUrl" class="dl-input" placeholder="https://www.youtube.com/watch?v=... hoặc https://youtu.be/..." style="width: 100%; padding-left: 38px; border-radius: 10px;" onkeydown="if(event.key==='Enter'){event.preventDefault();checkYoutubeVideo();}">
+                            </div>
+                            <button type="button" id="btnCheckYt" class="btn-preview" onclick="checkYoutubeVideo()" style="padding: 10px 20px; font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; cursor: pointer;">
+                                <i class="fa-solid fa-magnifying-glass"></i> Kiểm Tra Video
+                            </button>
+                        </div>
+
+                        <!-- YouTube Video Preview Card -->
+                        <div id="ytPreviewBox" style="display: none; margin-top: 16px; background: rgba(15,23,42,0.7); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 14px; align-items: center; gap: 14px;">
+                            <img id="ytThumbImg" src="" style="width: 130px; height: 75px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;" alt="Thumbnail">
+                            <div style="flex: 1; min-width: 0;">
+                                <div id="ytTitle" style="font-weight: 700; color: #fff; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+                                <div style="display: flex; gap: 14px; margin-top: 6px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap;">
+                                    <span><i class="fa-regular fa-clock"></i> Thời lượng: <b id="ytDuration" style="color: #38bdf8;">00:00</b></span>
+                                    <span><i class="fa-brands fa-youtube" style="color:#ef4444;"></i> <span id="ytChannel" style="color: #cbd5e1;"></span></span>
+                                </div>
+                                <div id="ytSubBadge" style="margin-top: 8px; font-size: 12px;"></div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 14px; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="ytPreferCaptions" checked style="accent-color: var(--accent-purple); width: 16px; height: 16px; cursor: pointer;">
+                            <label for="ytPreferCaptions" style="font-size: 12px; color: #cbd5e1; cursor: pointer;">
+                                <b>Ưu tiên trích xuất phụ đề YouTube có sẵn (Siêu tốc ~2–5 giây)</b> — Nếu video không có phụ đề, hệ thống sẽ tự động dùng AI chuyển âm thanh thành văn bản.
+                            </label>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Drag & Drop Upload Zone -->
@@ -3149,8 +3197,193 @@
             }
         }
 
+        // ── YouTube STT Input Handlers ──
+        let currentSttInputMode = 'upload'; // 'upload' or 'youtube'
+        let currentYoutubeInfo = null;
+
+        function switchSttInputMode(mode) {
+            currentSttInputMode = mode;
+            const btnUpload = document.getElementById("btnModeUpload");
+            const btnYoutube = document.getElementById("btnModeYoutube");
+            const uploadDropzone = document.getElementById("uploadDropzone");
+            const fileInfoBox = document.getElementById("fileInfoBox");
+            const ytContainer = document.getElementById("youtubeInputContainer");
+
+            if (mode === 'youtube') {
+                btnUpload.classList.remove("active");
+                btnYoutube.classList.add("active");
+                uploadDropzone.style.display = "none";
+                fileInfoBox.style.display = "none";
+                ytContainer.style.display = "block";
+            } else {
+                btnYoutube.classList.remove("active");
+                btnUpload.classList.add("active");
+                ytContainer.style.display = "none";
+                uploadDropzone.style.display = "block";
+                if (selectedSttFile) fileInfoBox.style.display = "flex";
+            }
+        }
+
+        async function checkYoutubeVideo() {
+            const urlInput = document.getElementById("sttYoutubeUrl");
+            const url = urlInput ? urlInput.value.trim() : "";
+            if (!url) {
+                showToast("Vui lòng nhập đường link video YouTube!", "warning");
+                return;
+            }
+
+            const btn = document.getElementById("btnCheckYt");
+            const previewBox = document.getElementById("ytPreviewBox");
+            const thumbImg = document.getElementById("ytThumbImg");
+            const titleEl = document.getElementById("ytTitle");
+            const durationEl = document.getElementById("ytDuration");
+            const channelEl = document.getElementById("ytChannel");
+            const badgeEl = document.getElementById("ytSubBadge");
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra...';
+
+            try {
+                const resp = await fetch("/api/youtube_info", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await resp.json();
+                if (!resp.ok || data.status !== "success") {
+                    throw new Error(data.message || "Không thể lấy thông tin video");
+                }
+
+                currentYoutubeInfo = data.data;
+                thumbImg.src = currentYoutubeInfo.thumbnail;
+                titleEl.innerText = currentYoutubeInfo.title;
+                durationEl.innerText = currentYoutubeInfo.duration_str;
+                channelEl.innerText = currentYoutubeInfo.channel;
+
+                if (currentYoutubeInfo.has_subtitles) {
+                    badgeEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:6px;background:rgba(16,185,129,0.2);color:#34d399;font-weight:600;"><i class="fa-solid fa-bolt"></i> Có sẵn phụ đề gốc YouTube (~2s bóc tách)</span>';
+                } else {
+                    badgeEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:6px;background:rgba(59,130,246,0.2);color:#60a5fa;font-weight:600;"><i class="fa-solid fa-brain"></i> Sẵn sàng nhận diện giọng nói AI</span>';
+                }
+
+                previewBox.style.display = "flex";
+                showToast("Đã nhận diện video YouTube thành công!", "success");
+
+            } catch (err) {
+                showToast(err.message || "Lỗi kiểm tra link YouTube", "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Kiểm Tra Video';
+            }
+        }
+
         // ── Start Audio Transcription with 10MB Chunked Sequential Upload & Adaptive Queue ──
         async function startTranscription() {
+            if (currentSttInputMode === 'youtube') {
+                const ytUrlInput = document.getElementById("sttYoutubeUrl");
+                const ytUrl = ytUrlInput ? ytUrlInput.value.trim() : "";
+                if (!ytUrl) {
+                    alert("Vui lòng nhập hoặc dán đường link video YouTube!");
+                    return;
+                }
+
+                const btn = document.getElementById("btnTranscribe");
+                const progressCard = document.getElementById("sttProgressCard");
+                const resultCard = document.getElementById("sttResultCard");
+                const fillEl = document.getElementById("sttProgressFill");
+                const pctEl = document.getElementById("sttProgressPercentage");
+                const statusEl = document.getElementById("sttProgressStatus");
+                const language = document.getElementById("sttLanguage").value;
+                const preferCaptions = document.getElementById("ytPreferCaptions")?.checked ?? true;
+
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang khởi tạo...';
+                resultCard.style.display = "none";
+                progressCard.classList.add("show");
+                fillEl.style.width = "5%";
+                pctEl.innerText = "5%";
+                statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang kết nối tới máy chủ YouTube...';
+
+                try {
+                    const resp = await fetch("/api/transcribe_youtube", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            url: ytUrl,
+                            language: language,
+                            prefer_captions: preferCaptions
+                        })
+                    });
+
+                    const data = await resp.json();
+                    if (!resp.ok || data.status !== "success") {
+                        throw new Error(data.message || "Lỗi gửi yêu cầu chuyển đổi YouTube");
+                    }
+
+                    const jobId = data.job_id;
+
+                    let consecutiveErrors = 0;
+                    const pollInterval = setInterval(async () => {
+                        try {
+                            const sr = await fetch(`/api/transcribe_status/${jobId}`);
+                            if (!sr.ok) {
+                                consecutiveErrors++;
+                                if (consecutiveErrors > 60) {
+                                    clearInterval(pollInterval);
+                                    alert("Mất kết nối với máy chủ. Vui lòng thử lại!");
+                                    progressCard.classList.remove("show");
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                                }
+                                return;
+                            }
+
+                            consecutiveErrors = 0;
+                            const sd = await sr.json();
+
+                            if (sd.status === "processing" || sd.status === "queued") {
+                                const p = Math.max(10, sd.progress || 10);
+                                fillEl.style.width = p + "%";
+                                pctEl.innerText = p + "%";
+                                statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message || 'Đang bóc tách nội dung YouTube...');
+                            } else if (sd.status === "completed") {
+                                clearInterval(pollInterval);
+                                fillEl.style.width = "100%";
+                                pctEl.innerText = "100%";
+                                statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> ' + sd.message;
+
+                                setTimeout(() => {
+                                    renderSttSuccessResult(sd.result);
+                                }, 500);
+                            } else if (sd.status === "error") {
+                                clearInterval(pollInterval);
+                                alert("Lỗi: " + sd.message);
+                                progressCard.classList.remove("show");
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                            }
+                        } catch (err) {
+                            consecutiveErrors++;
+                            if (consecutiveErrors > 15) {
+                                clearInterval(pollInterval);
+                                progressCard.classList.remove("show");
+                                btn.disabled = false;
+                                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                            }
+                        }
+                    }, 800);
+
+                } catch (err) {
+                    console.error("YouTube STT error:", err);
+                    alert("Lỗi xử lý YouTube: " + (err.message || "Vui lòng thử lại!"));
+                    progressCard.classList.remove("show");
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                }
+                return;
+            }
+
             if (!selectedSttFile) {
                 alert("Vui lòng chọn hoặc kéo thả tệp âm thanh/video vào ô tải lên!");
                 return;

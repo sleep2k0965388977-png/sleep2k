@@ -10,3 +10,4 @@ waitress>=3.0.0
 yt-dlp
 curl-cffi
 imageio-ffmpeg
+youtube-transcript-api

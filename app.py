@@ -478,7 +478,9 @@ def api_protection():
         '/api/generate_job': 10,      # 10 per minute
         '/api/preview_voice': 30,     # 30 per minute
         '/api/batch_generate': 5,     # 5 per minute
-        '/api/transcribe_job': 10,    # 10 per minute
+        '/api/transcribe_job': 10,
+        '/api/youtube_info': 30,
+        '/api/transcribe_youtube': 15,    # 10 per minute
         '/api/translate_content': 10, # 10 per minute
         '/api/upload_chunk': 20,      # 20 per minute
         '/api/upload_custom_voice': 20,
@@ -1324,6 +1326,276 @@ def get_job_status(job_id):
             "message": "Tiến trình không tồn tại. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
         }), 404
     return jsonify(job)
+
+
+# ==============================================================================
+# YOUTUBE SPEECH-TO-TEXT & SUBTITLE EXTRACTION PIPELINE
+# ==============================================================================
+
+def clean_youtube_url(text):
+    if not text:
+        return ""
+    m = re.search(r'(https?://(?:www\.|m\.)?(?:youtube\.com/(?:watch\?v=|shorts/)|youtu\.be/)[A-Za-z0-9_-]{11}[^\s]*)', text)
+    if m:
+        return m.group(1)
+    if 'youtube.com' in text or 'youtu.be' in text:
+        m2 = re.search(r'(https?://[^\s]+)', text)
+        if m2:
+            return m2.group(1)
+    return text.strip()
+
+def extract_youtube_info_fast(url):
+    from yt_dlp import YoutubeDL
+    from yt_dlp.networking.impersonate import ImpersonateTarget
+    target = ImpersonateTarget.from_str('chrome')
+    clean_url = clean_youtube_url(url)
+    ydl_opts = {
+        'impersonate': target,
+        'skip_download': True,
+        'quiet': True,
+        'no_warnings': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'ios']}}
+    }
+    with YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(clean_url, download=False)
+        subs = info.get('subtitles', {})
+        auto_subs = info.get('automatic_captions', {})
+        all_langs = list(set(list(subs.keys()) + [k for k in auto_subs.keys() if len(k) <= 5]))
+        
+        duration = int(info.get('duration') or 0)
+        return {
+            'id': info.get('id'),
+            'title': info.get('title') or 'Video YouTube',
+            'thumbnail': info.get('thumbnail') or f"https://i.ytimg.com/vi/{info.get('id')}/hqdefault.jpg",
+            'duration': duration,
+            'duration_str': format_hms(duration),
+            'channel': info.get('channel') or info.get('uploader') or 'YouTube',
+            'has_subtitles': bool(subs or auto_subs),
+            'languages': all_langs[:15]
+        }
+
+def srt_time_to_seconds(time_str):
+    time_str = time_str.replace(',', '.')
+    parts = time_str.split(':')
+    if len(parts) == 3:
+        h, m, s = parts
+        return float(h) * 3600 + float(m) * 60 + float(s)
+    elif len(parts) == 2:
+        m, s = parts
+        return float(m) * 60 + float(s)
+    return 0.0
+
+def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_captions=True):
+    temp_dir = Path(tempfile.mkdtemp(prefix=f"yt_stt_{job_id}_"))
+    try:
+        from yt_dlp import YoutubeDL
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+        target = ImpersonateTarget.from_str('chrome')
+        clean_url = clean_youtube_url(url)
+        
+        JOBS[job_id]["progress"] = 10
+        JOBS[job_id]["message"] = "Đang phân tích video và kiểm tra phụ đề YouTube..."
+        save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "processing", "progress": 10, "message": "Đang phân tích video YouTube..."})
+
+        lang_short = language.split('-')[0].lower() if '-' in language else language.lower()
+
+        ydl_opts = {
+            'impersonate': target,
+            'skip_download': True,
+            'quiet': True,
+            'no_warnings': True,
+            'extractor_args': {'youtube': {'player_client': ['android', 'ios']}}
+        }
+
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(clean_url, download=False)
+
+        total_duration = float(info.get('duration') or 0.0)
+        extracted_captions = False
+
+        if prefer_captions:
+            subs = info.get('subtitles', {})
+            auto_subs = info.get('automatic_captions', {})
+            
+            target_subs = (
+                subs.get(lang_short) or 
+                subs.get(language) or 
+                auto_subs.get(lang_short) or 
+                auto_subs.get(language) or
+                (subs.get('en') if lang_short != 'en' else None) or
+                (auto_subs.get('en') if lang_short != 'en' else None)
+            )
+
+            if target_subs:
+                JOBS[job_id]["progress"] = 40
+                JOBS[job_id]["message"] = "Đang trích xuất phụ đề YouTube gốc siêu tốc..."
+                srt_entry = next((s for s in target_subs if s.get('ext') == 'srt'), None)
+                if not srt_entry:
+                    srt_entry = next((s for s in target_subs if s.get('ext') == 'vtt'), None)
+                if not srt_entry and target_subs:
+                    srt_entry = target_subs[0]
+
+                if srt_entry and srt_entry.get('url'):
+                    try:
+                        r = requests.get(srt_entry['url'], timeout=12)
+                        if r.status_code == 200 and r.text.strip():
+                            raw_srt = r.text
+                            blocks = re.split(r'\n\s*\n', raw_srt.strip())
+                            entries = []
+                            for b in blocks:
+                                m = re.search(r'(\d{2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,\.]\d{3})', b)
+                                if m:
+                                    st_sec = srt_time_to_seconds(m.group(1))
+                                    et_sec = srt_time_to_seconds(m.group(2))
+                                    lines = [l.strip() for l in b.splitlines() if l.strip()]
+                                    time_idx = next(i for i, l in enumerate(lines) if '-->' in l)
+                                    txt = ' '.join(lines[time_idx + 1:])
+                                    txt = re.sub(r'<[^>]+>', '', txt).strip()
+                                    if txt:
+                                        entries.append((st_sec, et_sec, txt))
+
+                            if entries:
+                                if total_duration <= 0:
+                                    total_duration = entries[-1][1]
+                                total_time_str = format_hms(total_duration)
+                                PART_SECONDS = 40 * 60.0
+                                total_parts = max(1, math.ceil(total_duration / PART_SECONDS))
+                                parts_data = []
+
+                                for p_idx in range(total_parts):
+                                    p_st = p_idx * PART_SECONDS
+                                    p_et = min((p_idx + 1) * PART_SECONDS, total_duration)
+                                    p_entries = [e for e in entries if e[0] >= p_st and e[0] < p_et]
+                                    p_texts = [e[2] for e in p_entries]
+                                    p_srt_lines = []
+                                    for s_i, e in enumerate(p_entries, 1):
+                                        p_srt_lines.append(f"{s_i}\n{format_timestamp_srt(e[0])} --> {format_timestamp_srt(e[1])}\n{e[2]}\n")
+                                    
+                                    p_full_txt = '\n\n'.join(p_texts)
+                                    p_words = [w for w in p_full_txt.split() if w]
+                                    parts_data.append({
+                                        'part_index': p_idx + 1,
+                                        'timeline': f"{format_timestamp_srt(p_st)} - {format_timestamp_srt(p_et)}",
+                                        'start_sec': p_st,
+                                        'end_sec': p_et,
+                                        'text': p_full_txt,
+                                        'srt': '\n'.join(p_srt_lines),
+                                        'word_count': len(p_words),
+                                        'char_count': len(p_full_txt)
+                                    })
+
+                                full_text = '\n\n'.join([e[2] for e in entries])
+                                full_srt = '\n'.join([f"{i}\n{format_timestamp_srt(e[0])} --> {format_timestamp_srt(e[1])}\n{e[2]}\n" for i, e in enumerate(entries, 1)])
+                                words = [w for w in full_text.split() if w]
+
+                                res = {
+                                    'text': full_text,
+                                    'srt': full_srt,
+                                    'duration': round(total_duration, 1),
+                                    'total_time': total_time_str,
+                                    'word_count': len(words),
+                                    'char_count': len(full_text),
+                                    'total_chunks': math.ceil(total_duration / 60.0),
+                                    'total_parts': total_parts,
+                                    'parts': parts_data
+                                }
+
+                                JOBS[job_id]["progress"] = 100
+                                JOBS[job_id]["status"] = "completed"
+                                JOBS[job_id]["message"] = f"Hoàn tất 100%! Bóc tách thành công phụ đề YouTube [{total_time_str}] ({len(words)} từ)."
+                                JOBS[job_id]["result"] = res
+                                save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "completed", "result": res})
+                                extracted_captions = True
+                    except Exception as e:
+                        logger.warning(f"Error extracting youtube subtitle stream: {e}")
+
+        if not extracted_captions:
+            JOBS[job_id]["progress"] = 15
+            JOBS[job_id]["message"] = "Đang tải luồng âm thanh YouTube chất lượng cao..."
+            save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "processing", "progress": 15, "message": "Đang tải luồng âm thanh YouTube..."})
+            
+            audio_out = UPLOAD_DIR / f"yt_audio_{job_id}.%(ext)s"
+            dl_opts = {
+                'impersonate': target,
+                'format': 'ba[ext=m4a]/ba/b',
+                'outtmpl': str(audio_out),
+                'quiet': True,
+                'no_warnings': True,
+                'extractor_args': {'youtube': {'player_client': ['android', 'ios']}}
+            }
+            with YoutubeDL(dl_opts) as ydl:
+                ydl.download([clean_url])
+
+            downloaded = list(UPLOAD_DIR.glob(f"yt_audio_{job_id}.*"))
+            if not downloaded:
+                raise Exception("Không thể trích xuất luồng âm thanh từ liên kết YouTube này!")
+
+            audio_file = downloaded[0]
+            run_stt_with_adaptive_queue(job_id, audio_file, language)
+
+    except Exception as e:
+        logger.error(f"Error in youtube transcribe job {job_id}: {e}")
+        JOBS[job_id]["status"] = "error"
+        JOBS[job_id]["message"] = f"Lỗi xử lý YouTube: {str(e)}"
+    finally:
+        try:
+            for f in temp_dir.glob("*"):
+                f.unlink(missing_ok=True)
+            temp_dir.rmdir()
+        except Exception:
+            pass
+
+@app.route("/api/youtube_info", methods=["POST"])
+def api_youtube_info():
+    try:
+        data = request.get_json(force=True) or {}
+        raw_url = data.get("url", "").strip()
+        if not raw_url:
+            return jsonify({"status": "error", "message": "Vui lòng nhập đường link video YouTube!"}), 400
+
+        info = extract_youtube_info_fast(raw_url)
+        return jsonify({"status": "success", "data": info})
+    except Exception as e:
+        logger.warning(f"Error fetching youtube info: {e}")
+        return jsonify({"status": "error", "message": f"Không thể lấy thông tin video YouTube: {str(e)}"}), 400
+
+@app.route("/api/transcribe_youtube", methods=["POST"])
+def api_transcribe_youtube():
+    try:
+        data = request.get_json(force=True) or {}
+        raw_url = data.get("url", "").strip()
+        if not raw_url:
+            return jsonify({"status": "error", "message": "Vui lòng nhập đường link video YouTube!"}), 400
+
+        language = data.get("language", "vi-VN")
+        prefer_captions = bool(data.get("prefer_captions", True))
+        job_id = uuid.uuid4().hex[:8]
+
+        JOBS[job_id] = {
+            "status": "processing",
+            "progress": 5,
+            "message": "Đang kết nối tới máy chủ YouTube...",
+            "result": None
+        }
+
+        save_atomic_checkpoint(job_id, {
+            "job_id": job_id,
+            "status": "processing",
+            "progress": 5,
+            "message": "Đang kết nối tới máy chủ YouTube...",
+            "total_segments": 1,
+            "segments": {}
+        })
+
+        t = threading.Thread(target=process_youtube_transcribe_job, args=(job_id, raw_url, language, prefer_captions))
+        t.daemon = True
+        t.start()
+
+        return jsonify({"status": "success", "job_id": job_id})
+    except Exception as e:
+        logger.error(f"Error starting youtube transcribe: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route("/api/preview_voice", methods=["POST"])
 def preview_voice():
