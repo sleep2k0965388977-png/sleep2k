@@ -2193,8 +2193,8 @@
                 <div style="margin-top: 10px; font-size: 11.5px; color: #cbd5e1;">
                     <div style="margin-bottom: 6px;">URL kết nối Worker (Ngrok / Cloudflared):</div>
                     <div style="display:flex; gap:6px;">
-                        <input type="text" id="cloneWorkerUrlInput" placeholder="VD: https://xxxx.ngrok-free.app" style="flex:1; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#fff; font-size:12px; outline:none;">
-                        <button type="button" onclick="saveWorkerUrlFromUI()" style="background:rgba(139,92,246,0.3); border:1px solid #8b5cf6; color:#fff; padding:0 12px; border-radius:6px; font-size:11px; cursor:pointer;">Lưu</button>
+                        <input type="text" id="cloneWorkerUrlInput" placeholder="Chỉ quản trị viên mới có quyền cấu hình URL Worker" style="flex:1; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:7px 10px; color:#cbd5e1; font-size:12px; outline:none; cursor:not-allowed;" readonly title="URL Worker được cố định bởi Quản trị viên">
+                        <!-- Nút Lưu bị khóa với người dùng thường để tránh bị đổi mất URL Worker -->
                     </div>
                     <div style="font-size: 10.5px; color: #94a3b8; margin-top: 6px; line-height: 1.4;">
                         💡 Model 8.5GB chạy trên Google Colab GPU T4 miễn phí. Khi bạn ở nhà, chỉ cần chạy cell Colab hoặc Local Worker rồi dán URL vào đây.

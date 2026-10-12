@@ -23,10 +23,6 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 from capcut_tts_api import CapCutClient, CapCutError
 
 def get_ffmpeg_exe():
-    import shutil
-    cmd = shutil.which("ffmpeg")
-    if cmd:
-        return cmd
     try:
         import imageio_ffmpeg
         exe = imageio_ffmpeg.get_ffmpeg_exe()
@@ -34,14 +30,13 @@ def get_ffmpeg_exe():
             return exe
     except Exception:
         pass
-    try:
-        import static_ffmpeg
-        static_ffmpeg.add_paths()
-        cmd = shutil.which("ffmpeg")
-        if cmd:
-            return cmd
-    except Exception:
-        pass
+    import shutil
+    cmd = shutil.which("ffmpeg")
+    if cmd:
+        return cmd
+    for p in ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/root/.nix-profile/bin/ffmpeg"]:
+        if Path(p).exists():
+            return p
     return "ffmpeg"
 
 FFMPEG_BIN = get_ffmpeg_exe()
