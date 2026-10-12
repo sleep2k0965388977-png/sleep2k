@@ -4333,37 +4333,22 @@
                 const input = document.getElementById('cloneWorkerUrlInput');
                 const badge = document.getElementById('workerStatusBadge');
 
-                // 1. Phục hồi ngay từ localStorage nếu server bị restart
-                const cachedUrl = localStorage.getItem('sleep2k_clone_worker_url') || '';
-                if (cachedUrl && input && !input.value) {
-                    input.value = cachedUrl;
-                    fetch('/api/set_clone_worker_url', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ worker_url: cachedUrl })
-                    }).catch(() => {});
-                }
-
-                const resp = await fetch('/api/clone_worker_status');
+                // Luôn hỏi server trạng thái thực tế mới nhất
+                const resp = await fetch('/api/clone_worker_status?t=' + Date.now());
                 const data = await resp.json();
                 
-                if (data.worker_url && input) {
-                    input.value = data.worker_url;
-                    localStorage.setItem('sleep2k_clone_worker_url', data.worker_url);
-                }
-
-                if (data.status === 'online') {
+                if (data.status === 'online' && data.worker_url) {
+                    if (input) input.value = data.worker_url;
                     badge.style.background = 'rgba(16,185,129,0.2)';
                     badge.style.color = '#10b981';
-                    badge.innerText = '🟢 Đã tự động kết nối (' + (data.gpu || 'Máy tính') + ')';
-                } else if (data.status === 'offline') {
-                    badge.style.background = 'rgba(239,68,68,0.2)';
-                    badge.style.color = '#ef4444';
-                    badge.innerText = '🔴 Worker chưa bật (Mở CHAY_AI_CLONE_GIONG.bat)';
+                    badge.innerText = '🟢 Đã kết nối tự động (' + (data.gpu || 'Máy tính') + ')';
                 } else {
-                    badge.style.background = 'rgba(100,116,139,0.2)';
-                    badge.style.color = '#94a3b8';
-                    badge.innerText = '⚪ Chưa kết nối (Mở CHAY_AI_CLONE_GIONG.bat)';
+                    // Nếu worker chưa bật hoặc URL cũ đã chết, xóa URL cũ để tránh nhầm lẫn
+                    if (input) input.value = '';
+                    localStorage.removeItem('sleep2k_clone_worker_url');
+                    badge.style.background = 'rgba(168,85,247,0.15)';
+                    badge.style.color = '#c084fc';
+                    badge.innerText = '⚡ Chờ mở CHAY_AI_CLONE_GIONG.bat trên Desktop';
                 }
             } catch (e) {
                 console.log('Worker status error:', e);

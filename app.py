@@ -538,12 +538,12 @@ def auto_clean_stale_custom_voices():
     except Exception:
         pass
 
-ACTIVE_WORKER_URL = ""
+ACTIVE_WORKER_URL = None
 
 def get_clone_worker_url():
     """Retrieve the AI Clone Worker URL from memory, environment or persistent config file."""
     global ACTIVE_WORKER_URL
-    if ACTIVE_WORKER_URL:
+    if ACTIVE_WORKER_URL is not None:
         return ACTIVE_WORKER_URL
     env_url = os.environ.get("CLONE_WORKER_URL", "").strip()
     if env_url:
@@ -559,6 +559,7 @@ def get_clone_worker_url():
                     return val
         except Exception:
             pass
+    ACTIVE_WORKER_URL = ""
     return ""
 
 def set_clone_worker_url(url):
