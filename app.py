@@ -1404,9 +1404,9 @@ def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_caption
     temp_dir = Path(tempfile.mkdtemp(prefix=f"yt_stt_{job_id}_"))
     try:
         clean_url = clean_youtube_url(url)
-        JOBS[job_id]["progress"] = 10
+        JOBS[job_id]["progress"] = 5
         JOBS[job_id]["message"] = "Đang phân tích video và kiểm tra phụ đề YouTube..."
-        save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "processing", "progress": 10, "message": "Đang phân tích video YouTube..."})
+        save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "processing", "progress": 5, "message": "Đang phân tích video YouTube..."})
 
         lang_short = language.split('-')[0].lower() if '-' in language else language.lower()
 
@@ -1429,6 +1429,7 @@ def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_caption
             info = ydl.extract_info(clean_url, download=False)
 
         total_duration = float(info.get('duration') or 0.0)
+        total_time_str = format_hms(total_duration) if total_duration > 0 else "N/A"
         extracted_captions = False
 
         if prefer_captions:
@@ -1445,7 +1446,7 @@ def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_caption
             )
 
             if target_subs:
-                JOBS[job_id]["progress"] = 40
+                JOBS[job_id]["progress"] = 30
                 JOBS[job_id]["message"] = "Đang trích xuất phụ đề YouTube gốc siêu tốc..."
                 srt_entry = next((s for s in target_subs if s.get('ext') == 'srt'), None)
                 if not srt_entry:
@@ -1527,56 +1528,225 @@ def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_caption
                     except Exception as e:
                         logger.warning(f"Error extracting youtube subtitle stream: {e}")
 
+        # NẾU KHÔNG CÓ PHỤ ĐỀ SẴN -> CHIA NHỎ CỨ 1 PHÚT 1 LẦN LẤY THEO ĐÚNG YÊU CẦU NGƯỜI DÙNG:
         if not extracted_captions:
-            JOBS[job_id]["progress"] = 15
-            JOBS[job_id]["message"] = "Đang trích xuất luồng âm thanh YouTube (cơ chế phân mảnh chống lag/chết server)..."
-            save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "processing", "progress": 15, "message": "Đang trích xuất âm thanh YouTube..."})
-            
+            if total_duration <= 0:
+                raise Exception("Không thể xác định thời lượng video YouTube này.")
+
+            total_chunks = max(1, math.ceil(total_duration / 60.0))
+            CHUNKS_PER_PART = 40
+            total_parts = max(1, math.ceil(total_chunks / CHUNKS_PER_PART))
+
+            JOBS[job_id]["progress"] = 8
+            JOBS[job_id]["message"] = f"Thời lượng video: [{total_time_str}] ({total_chunks} phút). Đang khởi động tiến trình phân mảnh 1 phút/lần..."
+            save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "processing", "progress": 8, "message": "Đang chuẩn bị luồng âm thanh..."})
+
+            def fetch_current_stream_url():
+                nonlocal clean_url
+                with YoutubeDL(ydl_opts) as ydl_inner:
+                    inf = ydl_inner.extract_info(clean_url, download=False)
+                    s_url = inf.get('url')
+                    if not s_url and 'formats' in inf:
+                        audio_fmts = [f for f in inf['formats'] if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
+                        if audio_fmts:
+                            s_url = audio_fmts[-1].get('url')
+                    return s_url
+
             stream_url = info.get('url') if info else None
-            # If no direct single URL in info, get from audio format
             if not stream_url and info and 'formats' in info:
                 audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
                 if audio_formats:
                     stream_url = audio_formats[-1].get('url')
+            if not stream_url:
+                stream_url = fetch_current_stream_url()
 
-            audio_file = None
-            if stream_url:
-                # Direct streaming slice via ffmpeg - 0MB VPS disk overload!
-                # If video > 40 minutes, slice first part (or max 40m) safely
-                target_sec = min(total_duration, 40 * 60.0) if total_duration > 0 else 40 * 60.0
-                out_wav = UPLOAD_DIR / f"yt_stream_{job_id}.wav"
-                cmd = [
-                    FFMPEG_BIN, "-y",
-                    "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
-                    "-ss", "0", "-t", str(target_sec),
-                    "-i", stream_url,
-                    "-ar", "16000", "-ac", "1",
-                    str(out_wav)
-                ]
-                res_ff = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
-                if out_wav.exists() and out_wav.stat().st_size > 1000:
-                    audio_file = out_wav
+            if not stream_url:
+                raise Exception("Không thể lấy luồng âm thanh phát trực tiếp từ YouTube.")
 
-            if not audio_file:
-                # Fallback: yt-dlp download audio
-                audio_out = UPLOAD_DIR / f"yt_audio_{job_id}.%(ext)s"
-                dl_opts = {
-                    'format': 'ba[ext=m4a]/ba/b',
-                    'outtmpl': str(audio_out),
-                    'quiet': True,
-                    'no_warnings': True,
-                    'extractor_args': {'youtube': {'player_client': ['android']}},
-                    'max_filesize': 150 * 1024 * 1024  # Limit to 150MB to prevent VPS memory crash
+            # Khởi tạo Checkpoint lưu trữ từng phút
+            chk = load_checkpoint(job_id)
+            if not chk or chk.get("total_chunks") != total_chunks:
+                chk = {
+                    "job_id": job_id,
+                    "url": clean_url,
+                    "language": language,
+                    "total_duration": total_duration,
+                    "total_chunks": total_chunks,
+                    "total_parts": total_parts,
+                    "total_time": total_time_str,
+                    "status": "processing",
+                    "segments": {}
                 }
-                with YoutubeDL(dl_opts) as ydl:
-                    ydl.download([clean_url])
+                save_atomic_checkpoint(job_id, chk)
 
-                downloaded = list(UPLOAD_DIR.glob(f"yt_audio_{job_id}.*"))
-                if not downloaded:
-                    raise Exception("Không thể trích xuất luồng âm thanh từ liên kết YouTube này!")
-                audio_file = downloaded[0]
+            # VÒNG LẶP CỨ 1 PHÚT 1 LẦN LẤY (ĐÁNH DẤU SỐ LẦN VÀ VỊ TRÍ PHÚT, XÓA NGAY ÂM THANH):
+            completed_minutes = sum(1 for s in chk.get("segments", {}).values() if s.get("status") == "completed")
 
-            run_stt_with_adaptive_queue(job_id, audio_file, language)
+            for idx in range(total_chunks):
+                idx_str = str(idx)
+                st_sec = idx * 60.0
+                et_sec = min((idx + 1) * 60.0, total_duration)
+                dur_sec = et_sec - st_sec
+                st_str = format_hms(st_sec)
+                et_str = format_hms(et_sec)
+                min_num = idx + 1
+                part_num = (idx // CHUNKS_PER_PART) + 1
+
+                # Đánh dấu kiểm tra: Bỏ qua nếu phút này đã hoàn thành trước đó (tránh lấy lặp lại)
+                if idx_str in chk.get("segments", {}) and chk["segments"][idx_str].get("status") == "completed":
+                    continue
+
+                prog = int(8 + (completed_minutes / total_chunks) * 90)
+                JOBS[job_id]["progress"] = prog
+                JOBS[job_id]["message"] = f"⏳ [Phần {part_num}/{total_parts}] Đang lấy & nhận diện Phút {min_num}/{total_chunks} [{st_str} - {et_str}] ({prog}%)..."
+
+                temp_slice = temp_dir / f"yt_min_{job_id}_{idx}.wav"
+                slice_ok = False
+
+                for attempt in range(2):
+                    cmd = [
+                        FFMPEG_BIN, "-y",
+                        "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5",
+                        "-ss", str(st_sec),
+                        "-i", stream_url,
+                        "-t", str(dur_sec),
+                        "-vn", "-c:a", "pcm_s16le", "-ar", "16000", "-ac", "1",
+                        str(temp_slice)
+                    ]
+                    try:
+                        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=40)
+                        if temp_slice.exists() and temp_slice.stat().st_size > 1000:
+                            slice_ok = True
+                            break
+                    except Exception:
+                        pass
+                    
+                    # Nếu đường truyền lỗi, tự động làm mới link stream YouTube
+                    try:
+                        refreshed_url = fetch_current_stream_url()
+                        if refreshed_url:
+                            stream_url = refreshed_url
+                    except Exception:
+                        pass
+
+                transcript = ""
+                if slice_ok and temp_slice.exists():
+                    try:
+                        _, transcript = transcribe_audio_chunk(idx, temp_slice, language=language, max_retries=2)
+                    except Exception as ex_stt:
+                        logger.warning(f"Error STT minute {min_num}: {ex_stt}")
+                    finally:
+                        # CHỈ CẦN LƯU LẠI TEXT, KHÔNG LƯU DỮ LIỆU ÂM THANH TRƯỚC ĐÓ -> XÓA NGAY!
+                        try:
+                            temp_slice.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+
+                # ĐÁNH DẤU SỐ LẦN VÀ VỊ TRÍ PHÚT VÀO DỮ LIỆU
+                chk["segments"][idx_str] = {
+                    "minute": min_num,
+                    "part_index": part_num,
+                    "timeline": f"{st_str} - {et_str}",
+                    "start_sec": st_sec,
+                    "end_sec": et_sec,
+                    "text": transcript.strip(),
+                    "status": "completed"
+                }
+                save_atomic_checkpoint(job_id, chk)
+                completed_minutes += 1
+
+                # Cập nhật kết quả Real-time (Live) để người dùng xem trực tiếp văn bản đang được thêm vào
+                live_texts = []
+                for i in range(idx + 1):
+                    seg = chk["segments"].get(str(i))
+                    if seg and seg.get("text"):
+                        live_texts.append(f"[Phút {seg['minute']}: {seg['timeline']}]\n{seg['text']}")
+                
+                prog = int(8 + (completed_minutes / total_chunks) * 90)
+                JOBS[job_id]["progress"] = prog
+                JOBS[job_id]["result"] = {
+                    "text": "\n\n".join(live_texts) if live_texts else "Đang nhận diện giọng nói...",
+                    "duration": round(et_sec, 1),
+                    "total_time": total_time_str,
+                    "processed_chunks": completed_minutes,
+                    "total_chunks": total_chunks,
+                    "total_parts": total_parts
+                }
+
+                # Nghỉ nhẹ 0.8s tránh rate limit
+                time.sleep(0.8)
+
+            # TỔNG HỢP TOÀN BỘ KẾT QUẢ KHI ĐÃ LẤY XONG TẤT CẢ CÁC PHÚT:
+            final_formatted_texts = []
+            final_srt_blocks = []
+            srt_idx = 1
+            parts_data = []
+
+            for p_idx in range(total_parts):
+                p_start_chunk = p_idx * CHUNKS_PER_PART
+                p_end_chunk = min((p_idx + 1) * CHUNKS_PER_PART, total_chunks)
+                p_st_sec = p_start_chunk * 60.0
+                p_et_sec = min(p_end_chunk * 60.0, total_duration)
+                p_timeline = f"{format_timestamp_srt(p_st_sec)} - {format_timestamp_srt(p_et_sec)}"
+
+                p_texts = []
+                p_srt_blocks = []
+                p_srt_idx = 1
+
+                for i in range(p_start_chunk, p_end_chunk):
+                    seg = chk.get("segments", {}).get(str(i), {})
+                    txt = (seg.get("text") or "").strip()
+                    if txt:
+                        p_texts.append(f"[Phút {seg.get('minute', i+1)}: {seg.get('timeline', '')}]\n{txt}")
+                        st = seg.get("start_sec", i * 60.0)
+                        et = seg.get("end_sec", min((i + 1) * 60.0, total_duration))
+                        p_srt_blocks.append(f"{p_srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n")
+                        p_srt_idx += 1
+
+                p_full_txt = "\n\n".join(p_texts)
+                p_words = [w for w in p_full_txt.split() if w]
+                parts_data.append({
+                    "part_index": p_idx + 1,
+                    "timeline": p_timeline,
+                    "start_sec": p_st_sec,
+                    "end_sec": p_et_sec,
+                    "text": p_full_txt,
+                    "srt": "\n".join(p_srt_blocks),
+                    "word_count": len(p_words),
+                    "char_count": len(p_full_txt)
+                })
+
+            for i in range(total_chunks):
+                seg = chk.get("segments", {}).get(str(i), {})
+                txt = (seg.get("text") or "").strip()
+                if txt:
+                    final_formatted_texts.append(f"[Phút {seg.get('minute', i+1)}: {seg.get('timeline', '')}]\n{txt}")
+                    st = seg.get("start_sec", i * 60.0)
+                    et = seg.get("end_sec", min((i + 1) * 60.0, total_duration))
+                    final_srt_blocks.append(f"{srt_idx}\n{format_timestamp_srt(st)} --> {format_timestamp_srt(et)}\n{txt}\n")
+                    srt_idx += 1
+
+            full_text = "\n\n".join(final_formatted_texts) if final_formatted_texts else "Không nhận diện được giọng nói trong video này."
+            full_srt = "\n".join(final_srt_blocks) if final_srt_blocks else ""
+            words = [w for w in full_text.split() if w]
+
+            final_res = {
+                "text": full_text,
+                "srt": full_srt,
+                "duration": round(total_duration, 1),
+                "total_time": total_time_str,
+                "word_count": len(words),
+                "char_count": len(full_text),
+                "total_chunks": total_chunks,
+                "total_parts": total_parts,
+                "parts": parts_data
+            }
+
+            JOBS[job_id]["progress"] = 100
+            JOBS[job_id]["status"] = "completed"
+            JOBS[job_id]["message"] = f"Hoàn tất 100%! Đã nhận diện toàn bộ {total_chunks} phút [{total_time_str}] thành công."
+            JOBS[job_id]["result"] = final_res
+            save_atomic_checkpoint(job_id, {"job_id": job_id, "status": "completed", "result": final_res})
 
     except Exception as e:
         logger.error(f"Error in youtube transcribe job {job_id}: {e}")
