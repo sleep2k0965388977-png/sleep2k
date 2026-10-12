@@ -3457,16 +3457,21 @@ def scan_channel():
         channel_name = ""
         
         for single_url in urls:
+            # Clean URL if user pasted raw share text containing descriptions or Chinese text
+            m_u = re.search(r'https?://[^\s,]+', single_url)
+            if m_u:
+                single_url = m_u.group(0)
+
             # Expand shortened v.douyin.com links to uncover full user or video URLs
             if "v.douyin.com" in single_url:
                 try:
                     s_tmp = requests.Session()
-                    s_tmp.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
-                    resp = s_tmp.get(single_url, allow_redirects=True, timeout=5)
+                    s_tmp.headers.update({"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"})
+                    resp = s_tmp.get(single_url, allow_redirects=True, timeout=8)
                     if resp.url:
                         single_url = resp.url
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logger.warning(f"Error expanding v.douyin.com link: {ex}")
 
             # 1. If URL contains a specific video ID (even inside user link modal), extract video directly
             has_vid_param = bool(re.search(r'(?:modal_id=|vid=|from_gid=|/video/|/note/)(\d{15,25})', single_url))
@@ -3480,8 +3485,8 @@ def scan_channel():
                 except Exception as ex:
                     logger.warning(f"Error extracting Douyin modal video: {ex}")
 
-            # 2. Handle Douyin Creator Channel Profile Link
-            m_sec = re.search(r'douyin\.com/user/([A-Za-z0-9_-]+)', single_url)
+            # 2. Handle Douyin Creator Channel Profile Link (desktop and mobile share profile)
+            m_sec = re.search(r'douyin\.com/(?:share/)?user/([A-Za-z0-9_-]+)', single_url)
             if m_sec:
                 sec_uid = m_sec.group(1)
                 try:
