@@ -556,7 +556,7 @@ def set_clone_worker_url(url):
         return False
 
 
-YOUTUBE_COOKIE_FILE = DATA_DIR / "youtube_cookies.txt"
+YOUTUBE_COOKIE_FILE = Path(__file__).parent / "youtube_cookies.txt"
 
 def get_youtube_cookies_path():
     """Retrieve path to valid YouTube Netscape cookies file."""
