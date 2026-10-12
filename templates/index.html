@@ -1764,6 +1764,9 @@
                             <button type="button" id="btnCheckYt" class="btn-preview" onclick="checkYoutubeVideo()" style="padding: 10px 20px; font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; cursor: pointer;">
                                 <i class="fa-solid fa-magnifying-glass"></i> Kiểm Tra Video
                             </button>
+                            <button type="button" onclick="openYoutubeCookieModal()" class="btn-preview" style="background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #fbbf24; padding: 10px 16px; font-size: 13px; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; cursor: pointer;" title="Cấu hình Cookie YouTube chống bot khi server chạy trên Cloud VPS">
+                                <i class="fa-solid fa-cookie-bite"></i> Cookie YouTube
+                            </button>
                         </div>
 
                         <!-- YouTube Video Preview Card -->
@@ -5250,5 +5253,36 @@ function renderVideoGrid() {
         });
 
     </script>
+
+    <!-- Modal Cau hinh Cookie YouTube -->
+    <div id="modalYoutubeCookie" style="display:none; position:fixed; z-index:99999; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:16px;">
+        <div style="background:#0f172a; border:1px solid rgba(245,158,11,0.4); border-radius:16px; max-width:580px; width:100%; padding:24px; box-shadow:0 20px 40px rgba(0,0,0,0.6); position:relative; color:#f8fafc;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:12px;">
+                <div style="font-size:16px; font-weight:700; color:#fbbf24; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-cookie-bite"></i> Cấu Hình Cookie YouTube (Vượt Chặn Bot VPS)
+                </div>
+                <button type="button" onclick="closeYoutubeCookieModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer;">&times;</button>
+            </div>
+            <div style="font-size:12.5px; color:#cbd5e1; line-height:1.6; margin-bottom:14px;">
+                Máy chủ Cloud (Railway Datacenter) thường bị YouTube yêu cầu xác minh bot. Dán Cookie tài khoản YouTube của bạn vào đây để vượt qua kiểm tra 100%:
+                <ol style="margin:8px 0 0 18px; padding:0; color:#94a3b8; font-size:12px;">
+                    <li>Cài tiện ích Chrome/Edge: <b>Get cookies.txt LOCALLY</b>.</li>
+                    <li>Mở trang <b>youtube.com</b> rồi bấm vào tiện ích &rarr; chọn <b>Export</b>.</li>
+                    <li>Dán toàn bộ nội dung file đó vào ô bên dưới rồi nhấn <b>Lưu Cookie</b>.</li>
+                </ol>
+            </div>
+            <textarea id="ytCookieContentInput" rows="7" placeholder="# Netscape HTTP Cookie File... Dán nội dung cookies.txt vào đây" style="width:100%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:11.5px; font-family:monospace; padding:10px; outline:none; resize:vertical; box-sizing:border-box; margin-bottom:14px;"></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <div id="ytCookieStatusLabel" style="font-size:12px; color:#94a3b8;">Đang kiểm tra trạng thái...</div>
+                <div style="display:flex; gap:10px;">
+                    <button type="button" onclick="closeYoutubeCookieModal()" style="background:rgba(255,255,255,0.1); border:none; color:#cbd5e1; padding:8px 16px; border-radius:8px; font-size:12.5px; cursor:pointer;">Đóng</button>
+                    <button type="button" onclick="saveYoutubeCookie()" style="background:linear-gradient(135deg,#f59e0b,#d97706); border:none; color:#fff; padding:8px 20px; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-floppy-disk"></i> Lưu Cookie
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

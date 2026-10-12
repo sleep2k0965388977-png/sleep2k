@@ -491,6 +491,7 @@ def api_protection():
         '/api/download_video_stream': 150,
         '/api/clone_worker_status': 30,
         '/api/set_clone_worker_url': 30,
+        '/api/youtube_cookies': 30,
     }
     max_req = rate_limits.get(path, 30)  # default 30/min
     if not _rate_check(path, max_req):
@@ -553,6 +554,36 @@ def set_clone_worker_url(url):
     except Exception as e:
         print(f"Error saving worker URL: {e}")
         return False
+
+
+YOUTUBE_COOKIE_FILE = DATA_DIR / "youtube_cookies.txt"
+
+def get_youtube_cookies_path():
+    """Retrieve path to valid YouTube Netscape cookies file."""
+    env_c = os.environ.get("YOUTUBE_COOKIES", "").strip()
+    if env_c:
+        try:
+            with open(YOUTUBE_COOKIE_FILE, "w", encoding="utf-8") as f:
+                f.write(env_c)
+            return str(YOUTUBE_COOKIE_FILE)
+        except Exception:
+            pass
+    if YOUTUBE_COOKIE_FILE.exists() and YOUTUBE_COOKIE_FILE.stat().st_size > 30:
+        return str(YOUTUBE_COOKIE_FILE)
+    root_c = Path("D:/sleep2k-deploy/cookies.txt") if Path("D:/sleep2k-deploy/cookies.txt").exists() else Path("cookies.txt")
+    if root_c.exists() and root_c.stat().st_size > 30:
+        return str(root_c)
+    return None
+
+def set_youtube_cookies(content):
+    try:
+        with open(YOUTUBE_COOKIE_FILE, "w", encoding="utf-8") as f:
+            f.write(content.strip())
+        return True
+    except Exception as e:
+        logger.error(f"Error saving youtube cookies: {e}")
+        return False
+
 
 def load_custom_voices(session_id=None):
     """Load temporary custom voices for the active browser session only."""
@@ -1343,10 +1374,10 @@ def clean_youtube_url(text):
 
 def get_youtube_audio_stream_url(clean_url):
     """
-    Extract direct audio stream URL using Smart TV Embedded client.
-    Smart TV clients do NOT require PO tokens and NEVER trigger bot checks on datacenter IPs!
+    Extract direct audio stream URL using Smart TV / Android client with Cookie injection.
     """
     from yt_dlp import YoutubeDL
+    cookie_p = get_youtube_cookies_path()
     client_candidates = [
         ['tv_embedded'],
         ['android_vr'],
@@ -1365,6 +1396,8 @@ def get_youtube_audio_stream_url(clean_url):
                     }
                 }
             }
+            if cookie_p:
+                ydl_opts['cookiefile'] = cookie_p
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(clean_url, download=False)
                 stream_url = info.get('url')
@@ -2084,6 +2117,23 @@ def clone_worker_status():
         "worker_url": url,
         "message": "Worker đang tắt hoặc URL Ngrok chưa kết nối."
     })
+
+
+@app.route("/api/youtube_cookies", methods=["GET", "POST"])
+def api_youtube_cookies():
+    if request.method == "POST":
+        data = request.json or {}
+        content = data.get("cookies", "").strip()
+        if not content:
+            return jsonify({"status": "error", "message": "Nội dung cookie trống."}), 400
+        ok = set_youtube_cookies(content)
+        if ok:
+            return jsonify({"status": "success", "message": "Đã lưu YouTube Cookies thành công!"})
+        return jsonify({"status": "error", "message": "Không thể lưu file cookie."}), 500
+    
+    cookie_p = get_youtube_cookies_path()
+    has_cookie = bool(cookie_p and Path(cookie_p).exists() and Path(cookie_p).stat().st_size > 30)
+    return jsonify({"status": "success", "has_cookies": has_cookie})
 
 @app.route("/api/set_clone_worker_url", methods=["POST"])
 def set_clone_worker():
