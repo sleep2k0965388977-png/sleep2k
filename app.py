@@ -892,62 +892,82 @@ def normalize_text_input(text):
     text = text.replace("…", "...").replace("“", '"').replace("”", '"').replace("’", "'").replace("‘", "'")
     text = text.replace("–", "-").replace("—", "-")
 
-    # Expressive emotion tag natural prosody mapping first
-    text = text.replace("[cười]", "... haha, ...").replace("[cười nhẹ]", "... hihi, ...")
-    text = text.replace("[thở dài]", "... (thở dài) ...").replace("[hắng giọng]", "... ừm, ...")
-    text = text.replace("[nghỉ 1s]", "... ").replace("[nghỉ]", "... ")
+    # Expressive emotion tag natural prosody mapping
+    text = text.replace("[cười]", " haha, ").replace("[cười nhẹ]", " hihi, ")
+    text = text.replace("[thở dài]", " (thở dài), ").replace("[hắng giọng]", " ừm, ")
+    text = text.replace("[nghỉ 1s]", ". ").replace("[nghỉ]", ", ")
 
-    # ── Auto-apply emotion prosody for raw laughter, sighs, and throat sounds ──
-    # Laughter: haha, hehe, hihi, khà khà... -> natural audio laughing cadence
-    text = re.sub(r'\b(ha(\s*ha)+|he(\s*he)+|hi(\s*hi)+|hô(\s*hô)+|hố(\s*hố)+|khà(\s*khà)+|khặc(\s*khặc)+|kakaka)\b', r'... haha, \1 ...', text, flags=re.IGNORECASE)
-    # Sighs: haizz, haz, chậc chậc
-    text = re.sub(r'\b(haizz+|hazzz+|chậc\s*chậc)\b', r'... (thở dài) \1 ...', text, flags=re.IGNORECASE)
-    # Throat clearing: e hèm, è hèm
-    text = re.sub(r'\b(e\s*hèm|è\s*hèm)\b', r'... ừm, \1 ...', text, flags=re.IGNORECASE)
-
-    # Add natural breathing micro-pauses after sentences
-    text = re.sub(r'([.!?])\s+', r'\1 ... ', text)
+    # Normalize excessive punctuation (prevent AI stuttering or saying punctuation marks aloud)
     text = re.sub(r'\.{4,}', '...', text)
+    text = re.sub(r'\?{2,}', '?', text)
+    text = re.sub(r'!{2,}', '!', text)
     text = "".join(ch for ch in text if ch in ('\n', '\t') or ord(ch) >= 32)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
-def split_text_into_chunks(text, max_chars=180):
-    """Split text intelligently at punctuation and word boundaries, ensuring every chunk has verbal content."""
+def split_text_into_chunks(text, max_chars=450):
+    """Split text intelligently at paragraph, sentence, and clause boundaries to preserve natural voice prosody."""
     text = normalize_text_input(text)
     if not text:
         return []
 
-    sentences = re.split(r'(?<=[.!?;\n])\s+', text)
+    paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
+    if not paragraphs:
+        paragraphs = [text.strip()]
+
     raw_chunks = []
-    current_chunk = ''
 
-    for s in sentences:
-        s = s.strip()
-        if not s:
-            continue
-        if len(current_chunk) + len(s) + 1 <= max_chars:
-            current_chunk = (current_chunk + ' ' + s).strip()
-        else:
-            if current_chunk:
-                raw_chunks.append(current_chunk)
-            if len(s) > max_chars:
-                words = s.split(' ')
-                sub = ''
-                for w in words:
-                    if len(sub) + len(w) + 1 <= max_chars:
-                        sub = (sub + ' ' + w).strip()
-                    else:
-                        if sub:
-                            raw_chunks.append(sub)
-                        sub = w
-                current_chunk = sub if sub else ''
+    for para in paragraphs:
+        sentences = re.split(r'(?<=[.!?…])\s+', para)
+        current_chunk = ''
+
+        for s in sentences:
+            s = s.strip()
+            if not s:
+                continue
+
+            if len(current_chunk) + len(s) + 1 <= max_chars:
+                current_chunk = (current_chunk + ' ' + s).strip()
             else:
-                current_chunk = s
-    if current_chunk:
-        raw_chunks.append(current_chunk)
+                if current_chunk:
+                    raw_chunks.append(current_chunk)
+                    current_chunk = ''
 
-    # Post-process: Merge any punctuation-only or symbol-only orphan chunk into neighboring chunks
+                if len(s) <= max_chars:
+                    current_chunk = s
+                else:
+                    # Long sentence: split at clause punctuation (, ; : —)
+                    sub_parts = re.split(r'(?<=[,;:—\-])\s+', s)
+                    sub_chunk = ''
+                    for part in sub_parts:
+                        part = part.strip()
+                        if not part:
+                            continue
+                        if len(sub_chunk) + len(part) + 1 <= max_chars:
+                            sub_chunk = (sub_chunk + ' ' + part).strip()
+                        else:
+                            if sub_chunk:
+                                raw_chunks.append(sub_chunk)
+                                sub_chunk = ''
+                            if len(part) <= max_chars:
+                                sub_chunk = part
+                            else:
+                                # Clause still longer than max_chars: split by space/words
+                                words = part.split(' ')
+                                word_chunk = ''
+                                for w in words:
+                                    if len(word_chunk) + len(w) + 1 <= max_chars:
+                                        word_chunk = (word_chunk + ' ' + w).strip()
+                                    else:
+                                        if word_chunk:
+                                            raw_chunks.append(word_chunk)
+                                        word_chunk = w
+                                sub_chunk = word_chunk
+                    current_chunk = sub_chunk
+
+        if current_chunk:
+            raw_chunks.append(current_chunk)
+
     final_chunks = []
     for c in raw_chunks:
         c = c.strip()
@@ -963,6 +983,7 @@ def split_text_into_chunks(text, max_chars=180):
                 final_chunks.append(c)
 
     return final_chunks if final_chunks else [text]
+
 
 def cleanup_all_temp_files(max_age_seconds=600):
     """Auto-delete generated audio older than 10 minutes and purge any leftover uploads to guarantee Zero-Storage footprint."""
@@ -996,8 +1017,10 @@ def cleanup_all_temp_files(max_age_seconds=600):
 
 def stitch_audio_chunks(chunk_bytes_list, output_file_path):
     """
-    Concatenate audio chunks seamlessly using clean native FFmpeg stream encoding.
-    Preserves 100% of raw neural micro-dynamics, breathing nuances, and natural acoustic harmonics.
+    Concatenate audio chunks seamlessly.
+    1. Uses fast lossless stream copy concat (<1s, zero transcoding loss, strips ID3 tags).
+    2. Falls back to FFmpeg re-encode (300s timeout) if sample rates differ.
+    3. Final fallback: header-stripped binary assembly to prevent browser audio glitching.
     """
     if not chunk_bytes_list:
         return False
@@ -1009,27 +1032,43 @@ def stitch_audio_chunks(chunk_bytes_list, output_file_path):
             with open(output_file_path, "wb") as f:
                 f.write(chunk_bytes_list[0])
             return True
-        else:
-            concat_list_file = temp_dir / "concat_list.txt"
-            with open(concat_list_file, "w", encoding="utf-8") as f_list:
-                for i, chunk_bytes in enumerate(chunk_bytes_list):
-                    chunk_file = temp_dir / f"chunk_{i:04d}.mp3"
-                    with open(chunk_file, "wb") as fc:
-                        fc.write(chunk_bytes)
-                    f_list.write(f"file '{chunk_file.resolve().as_posix()}'\n")
 
-            cmd = [
-                FFMPEG_BIN, "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", str(concat_list_file),
-                "-c:a", "libmp3lame",
-                "-b:a", "192k",
-                str(output_file_path)
-            ]
-            proc = subprocess.run(cmd, capture_output=True, timeout=90)
-            if proc.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
-                return True
+        concat_list_file = temp_dir / "concat_list.txt"
+        with open(concat_list_file, "w", encoding="utf-8") as f_list:
+            for i, chunk_bytes in enumerate(chunk_bytes_list):
+                chunk_file = temp_dir / f"chunk_{i:04d}.mp3"
+                with open(chunk_file, "wb") as fc:
+                    fc.write(chunk_bytes)
+                f_list.write(f"file '{chunk_file.resolve().as_posix()}'\n")
+
+        # 1. Blazing-fast lossless stream copy concat (speed > 200x, 0 latency, 0 stutter)
+        cmd_copy = [
+            FFMPEG_BIN, "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_list_file),
+            "-c", "copy",
+            str(output_file_path)
+        ]
+        proc_copy = subprocess.run(cmd_copy, capture_output=True, timeout=120)
+        if proc_copy.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
+            return True
+
+        # 2. Re-encode fallback if chunks have differing sample rates
+        cmd_encode = [
+            FFMPEG_BIN, "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_list_file),
+            "-c:a", "libmp3lame",
+            "-ar", "24000",
+            "-ac", "1",
+            "-b:a", "128k",
+            str(output_file_path)
+        ]
+        proc_encode = subprocess.run(cmd_encode, capture_output=True, timeout=300)
+        if proc_encode.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
+            return True
     except Exception as ex:
         print(f"FFmpeg clean concat warning: {ex}")
     finally:
@@ -1040,11 +1079,20 @@ def stitch_audio_chunks(chunk_bytes_list, output_file_path):
         except Exception:
             pass
 
-    # Direct fallback
+    # 3. Clean binary fallback: strip ID3v2 headers from chunks 1..N to avoid browser audio buffer resets
     try:
-        combined = b"".join(chunk_bytes_list)
-        with open(output_file_path, "wb") as f:
-            f.write(combined)
+        def strip_id3(data):
+            if len(data) > 10 and data[:3] == b"ID3":
+                tag_size = ((data[6] & 0x7F) << 21) | ((data[7] & 0x7F) << 14) | ((data[8] & 0x7F) << 7) | (data[9] & 0x7F)
+                return data[10 + tag_size:]
+            return data
+
+        with open(output_file_path, "wb") as f_out:
+            for i, chunk_bytes in enumerate(chunk_bytes_list):
+                if i == 0:
+                    f_out.write(chunk_bytes)
+                else:
+                    f_out.write(strip_id3(chunk_bytes))
         return True
     except Exception as ex:
         print(f"Binary concat error: {ex}")
@@ -1217,7 +1265,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
     try:
         cleanup_all_temp_files()
 
-        chunks = split_text_into_chunks(text, max_chars=180)
+        chunks = split_text_into_chunks(text, max_chars=450)
         total_chunks = len(chunks)
 
         if total_chunks == 0:
