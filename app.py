@@ -706,24 +706,18 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
                     headers={"X-API-Key": CLONE_API_KEY},
                     files={"audio": (ref_file.name, af, "audio/wav")},
                     data={"text": text_chunk, "rate": rate},
-                    timeout=45
+                    timeout=75
                 )
             if resp.status_code == 200 and len(resp.content) > 500:
                 return resp.content
+            else:
+                logger.warning(f"Worker clone returned HTTP {resp.status_code}: {resp.text[:100]}")
         except Exception as ex_w:
-            print(f"Worker offline/error ({ex_w}), falling back to Native On-Server AI Engine...")
+            logger.warning(f"Worker clone request error ({ex_w}), falling back to high-speed neural engine...")
 
-    # Chạy trực tiếp 100% ONLINE trên máy chủ VPS (Khi máy tính cá nhân đã tắt!)
-    print(f"👉 [SERVER NATIVE CLONE] Đang nhân bản giọng trực tiếp trên máy chủ VPS cho: '{text_chunk[:30]}...'")
-    tts = get_nano_tts()
-    if tts is not None:
-        try:
-            wav_data = tts.infer(text_chunk, ref_audio=str(ref_file), steps=8, speed=float(rate or 1.0))
-            return wav_to_mp3_bytes(wav_data, sample_rate=tts.sample_rate)
-        except Exception as ex_tts:
-            print(f"Server native clone error ({ex_tts}), falling back to Edge TTS...")
-    
-    # Neural fallback if VieNeu is busy or failing
+    # TUYỆT ĐỐI KHÔNG chạy VieNeu nặng trên VPS 512MB RAM để chống Linux OOM SIGKILL sập server!
+    # Tự động fallback sang giọng đọc Neural mượt mà không bao giờ bị đứng tiến trình
+    logger.info(f"Worker chưa kết nối hoặc quá tải, chuyển tiếp sang Neural Engine cho: '{text_chunk[:30]}...'")
     is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
     fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
     return edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=3)
@@ -1174,6 +1168,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         JOBS[job_id] = {
             "status": "processing",
             "progress": 5,
+            "started_at": time.time(),
             "message": f"Đang khởi tạo {total_chunks} đoạn văn bản song song...",
             "total_chunks": total_chunks,
             "completed_chunks": 0,
@@ -1411,6 +1406,15 @@ def get_job_status(job_id):
             "error_type": "job_not_found",
             "message": "Tiến trình không tồn tại. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
         }), 404
+
+    # Watchdog tự phục hồi: nếu tiến trình bị treo quá 150s, tự động trả lỗi thay vì đứng im ở 5%
+    if job.get("status") == "processing":
+        started = job.get("started_at")
+        if started and (time.time() - started > 150):
+            job["status"] = "error"
+            job["message"] = "Tiến trình bị quá thời gian chờ (Timeout). Hãy mở file CHAY_AI_CLONE_GIONG.bat trên Desktop máy tính rồi bấm thử lại!"
+            save_atomic_checkpoint(job_id, job)
+
     return jsonify(job)
 
 

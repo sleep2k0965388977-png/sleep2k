@@ -2947,6 +2947,8 @@
 
                 const jobId = data.job_id;
                 let consecutiveErrors = 0;
+                let lastProgress = -1;
+                let stalledTicks = 0;
                 const pollInterval = setInterval(async () => {
                     try {
                         const sr = await fetch(`/api/job_status/${jobId}`);
@@ -2957,7 +2959,7 @@
                                 progressCard.classList.remove("show");
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
-                                alert("Không thể kết nối hoặc tiến trình đã quá hạn. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
+                                alert("Không thể kết nối hoặc tiến trình đã quá hạn. Vui lòng kiểm tra file CHAY_AI_CLONE_GIONG.bat trên Desktop máy tính rồi bấm thử lại!");
                                 return;
                             }
                             return;
@@ -2967,6 +2969,22 @@
                         if (sd.status === "processing" || sd.status === "queued") {
                             const p = sd.progress||10; fillEl.style.width=p+"%"; pctEl.innerText=p+"%";
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message||'Đang xử lý...');
+                            
+                            // Watchdog chống đứng hình: Nếu tiến trình đứng im 1 chỗ quá 90s, tự động báo lỗi
+                            if (p === lastProgress) {
+                                stalledTicks++;
+                                if (stalledTicks >= 120) {
+                                    clearInterval(pollInterval);
+                                    progressCard.classList.remove("show");
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
+                                    alert("Tiến trình bị gián đoạn hoặc quá thời gian chờ (Timeout). Hãy kiểm tra file CHAY_AI_CLONE_GIONG.bat trên Desktop máy tính rồi bấm thử lại!");
+                                    return;
+                                }
+                            } else {
+                                lastProgress = p;
+                                stalledTicks = 0;
+                            }
                         } else if (sd.status === "completed") {
                             clearInterval(pollInterval); fillEl.style.width="100%"; pctEl.innerText="100%";
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> ' + sd.message;

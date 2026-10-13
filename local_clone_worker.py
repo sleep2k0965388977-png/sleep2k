@@ -75,7 +75,7 @@ def clone_voice():
         ], capture_output=True, check=True)
 
         t0 = time.time()
-        wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=16, speed=rate)
+        wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=8, speed=rate)
         print(f"Synthesized '{text[:30]}...' in {time.time()-t0:.2f}s")
 
         temp_synth_wav = temp_dir / "temp_synth.wav"
