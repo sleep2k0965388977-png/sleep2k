@@ -1133,19 +1133,35 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     # ── 2. Edge-TTS Neural voices with auto-retry and alternate voice fallback ──
     if is_edge_tts_voice(voice):
         try:
-            audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate, max_retries=4)
+            audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate, max_retries=3)
             if audio_bytes and len(audio_bytes) > 0:
                 est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
             print(f"Edge TTS error chunk {idx+1}: {ex}")
+
+        # Cloud IP Fallback: if Edge-TTS is blocked by Microsoft on Cloud IP, seamlessly fallback to CapCut
         try:
-            fb = "vi-VN-HoaiMyNeural" if "NamMinh" in str(voice) else "vi-VN-NamMinhNeural"
-            audio_bytes = edge_tts_synthesize_audio(text_chunk, fb, rate=rate, max_retries=2)
-            if audio_bytes and len(audio_bytes) > 0:
-                return idx, audio_bytes, int(len(text_chunk) / 16 * 1000)
-        except Exception:
-            pass
+            is_male = "NamMinh" in str(voice) or "male" in str(voice).lower()
+            cap_v = "BV422_vivn_streaming" if is_male else "BV421_vivn_streaming"
+            c_res = client.create_tts_task(texts=text_chunk, voice=cap_v, rate=rate)
+            tasks = (c_res.get("data") or {}).get("tasks") or []
+            if tasks:
+                t_id, t_tok = tasks[0]["id"], tasks[0]["token"]
+                for _ in range(12):
+                    time.sleep(0.4)
+                    q = client.query_tts_task(t_id, t_tok)
+                    q_tasks = (q.get("data") or {}).get("tasks") or []
+                    if q_tasks and q_tasks[0].get("status") in ("succeed", "success"):
+                        p_data = json.loads(q_tasks[0].get("payload", "{}"))
+                        subs = p_data.get("audio_subtitles", [])
+                        if subs and subs[0].get("speech_url"):
+                            r = requests.get(subs[0]["speech_url"], timeout=15)
+                            if r.status_code == 200 and len(r.content) > 500:
+                                return idx, r.content, subs[0].get("duration", int(len(text_chunk) / 16 * 1000))
+                        break
+        except Exception as ex_cap:
+            logger.warning(f"CapCut fallback error for Edge-TTS chunk {idx+1}: {ex_cap}")
 
         silence = generate_silent_mp3_bytes(300)
         return idx, silence, 300
@@ -1225,8 +1241,8 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         durations = [0] * total_chunks
         completed_count = 0
 
-        # Run chunk requests concurrently with safe thread pool (5 workers for high speed and stability)
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        # Run chunk requests concurrently with safe thread pool (3 workers for optimal stability)
+        with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [
                 executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate, lan)
                 for i, chunk_text in enumerate(chunks)
@@ -2034,7 +2050,7 @@ def preview_voice():
                 print(f"VieNeu preview warning: {ex}")
             return jsonify({"status": "error", "message": "Không tạo được giọng đọc thử."}), 500
 
-        # ── Edge-TTS Neural voices: preview via edge-tts ──
+        # ── Edge-TTS Neural voices: preview via edge-tts with CapCut fallback ──
         if is_edge_tts_voice(voice):
             try:
                 audio_bytes = edge_tts_synthesize_audio(sample_text, voice, rate="1.0")
@@ -2046,8 +2062,38 @@ def preview_voice():
                         "download_url": f"/output/previews/{preview_filename}"
                     })
             except Exception as ex:
-                return jsonify({"status": "error", "message": f"Lỗi Edge-TTS: {ex}"}), 500
-            return jsonify({"status": "error", "message": "Không tạo được giọng Edge-TTS."}), 500
+                logger.warning(f"Edge-TTS preview warning: {ex}")
+
+            # Smart Fallback if Edge-TTS is blocked by Microsoft on Cloud IP:
+            try:
+                is_male = "NamMinh" in str(voice) or "male" in str(voice).lower()
+                cap_v = "BV422_vivn_streaming" if is_male else "BV421_vivn_streaming"
+                create_res = client.create_tts_task(texts=sample_text, voice=cap_v, rate="1.0")
+                tasks = (create_res.get("data") or {}).get("tasks") or []
+                if tasks:
+                    task_id = tasks[0]["id"]
+                    token = tasks[0]["token"]
+                    for _ in range(12):
+                        time.sleep(0.4)
+                        q_res = client.query_tts_task(task_id, token)
+                        q_tasks = (q_res.get("data") or {}).get("tasks") or []
+                        if q_tasks and q_tasks[0].get("status") in ("succeed", "success"):
+                            p_data = json.loads(q_tasks[0].get("payload", "{}"))
+                            subs = p_data.get("audio_subtitles", [])
+                            if subs and subs[0].get("speech_url"):
+                                mp3_resp = requests.get(subs[0]["speech_url"], timeout=15)
+                                if mp3_resp.status_code == 200 and len(mp3_resp.content) > 500:
+                                    with open(preview_file_path, "wb") as f:
+                                        f.write(mp3_resp.content)
+                                    return jsonify({
+                                        "status": "success",
+                                        "download_url": f"/output/previews/{preview_filename}"
+                                    })
+                            break
+            except Exception as cap_err:
+                logger.warning(f"CapCut preview fallback error: {cap_err}")
+
+            return jsonify({"status": "error", "message": "Không tạo được giọng đọc thử lúc này. Vui lòng thử lại!"}), 500
 
         # ── Original CapCut voices with automatic fallback ──
         try:
