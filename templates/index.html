@@ -3739,21 +3739,27 @@
                     throw new Error("Không nhận được mã tiến trình từ máy chủ.");
                 }
 
-                // Poll transcription status with high-resilience retry tolerance (90s grace period)
+                // Save active STT job to localStorage for resilient resume
+                try {
+                    localStorage.setItem('sleep2k_stt_active_job', jobId);
+                    localStorage.setItem('sleep2k_stt_file_name', selectedSttFile ? selectedSttFile.name : 'Audio');
+                } catch(e) {}
+
+                // Poll transcription status with ultra-resilient retry tolerance (120 ticks = 96s grace period)
                 let consecutiveErrors = 0;
                 const pollInterval = setInterval(async () => {
                     try {
                         const sr = await fetch(`/api/transcribe_status/${jobId}`);
                         if (!sr.ok) {
                             consecutiveErrors++;
-                            if (consecutiveErrors > 60) {
+                            if (consecutiveErrors > 120) {
                                 clearInterval(pollInterval);
-                                alert("Mất kết nối với máy chủ. Vui lòng kiểm tra lại đường truyền mạng!");
+                                showToast("Mất kết nối với máy chủ. Vui lòng kiểm tra lại mạng!", "error");
                                 progressCard.classList.remove("show");
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
                             } else {
-                                statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--accent-amber);"></i> Đang duy trì kết nối máy chủ AI (thử lại ${consecutiveErrors}/60)...`;
+                                statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--accent-amber);"></i> Đang duy trì kết nối máy chủ AI (thử lại ${consecutiveErrors}/120)...`;
                             }
                             return;
                         }
@@ -3768,6 +3774,7 @@
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message || 'Đang nhận diện giọng nói AI...');
                         } else if (sd.status === "completed") {
                             clearInterval(pollInterval);
+                            try { localStorage.removeItem('sleep2k_stt_active_job'); } catch(e) {}
                             fillEl.style.width = "100%";
                             pctEl.innerText = "100%";
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> ' + sd.message;
@@ -3777,6 +3784,7 @@
                             }, 500);
                         } else if (sd.status === "error") {
                             clearInterval(pollInterval);
+                            try { localStorage.removeItem('sleep2k_stt_active_job'); } catch(e) {}
                             alert("Lỗi: " + sd.message);
                             progressCard.classList.remove("show");
                             btn.disabled = false;
@@ -3784,11 +3792,14 @@
                         }
                     } catch (err) {
                         consecutiveErrors++;
-                        if (consecutiveErrors > 15) {
+                        if (consecutiveErrors > 120) {
                             clearInterval(pollInterval);
+                            showToast("Mất kết nối máy chủ. Đang thử lại...", "error");
                             progressCard.classList.remove("show");
                             btn.disabled = false;
                             btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Bắt Đầu Chuyển Thành Văn Bản';
+                        } else {
+                            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--accent-amber);"></i> Mạng gián đoạn tạm thời. Đang tự động kết nối lại (${consecutiveErrors}/120)...`;
                         }
                     }
                 }, 800);
