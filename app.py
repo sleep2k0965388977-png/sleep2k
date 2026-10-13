@@ -464,6 +464,18 @@ def api_protection():
     # Only protect /api/* POST routes
     if not path.startswith('/api/'):
         return None
+
+    # Allow worker self-registration with API key (bypasses bot/same-origin check)
+    if path == '/api/set_clone_worker_url':
+        api_key = request.headers.get('X-API-Key')
+        if not api_key:
+            try:
+                api_key = (request.get_json(silent=True) or {}).get('api_key')
+            except Exception:
+                pass
+        if api_key == CLONE_API_KEY or _is_same_origin():
+            return None
+        return jsonify({'error': 'Unauthorized worker', 'message': 'Invalid API key'}), 401
     
     # Check 1: Bot detection
     if _is_bot_request():
