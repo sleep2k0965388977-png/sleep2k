@@ -1089,7 +1089,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
         try:
             audio_bytes = synthesize_clone_audio(text_chunk, voice, rate=rate)
             if audio_bytes and len(audio_bytes) > 0:
-                est_duration = int(len(text_chunk) / 150 * 1000)
+                est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
             print(f"Clone Voice synthesis chunk {idx+1} error: {ex}, applying high-speed fallback...")
@@ -1101,20 +1101,20 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
                 if c_res and c_res.get("audio_url"):
                     r_aud = requests.get(c_res["audio_url"], timeout=10)
                     if r_aud.status_code == 200 and len(r_aud.content) > 500:
-                        return idx, r_aud.content, int(len(text_chunk) / 150 * 1000)
+                        return idx, r_aud.content, int(len(text_chunk) / 16 * 1000)
             except Exception:
                 pass
             fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
             fb_bytes = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=2)
             if fb_bytes and len(fb_bytes) > 0:
-                return idx, fb_bytes, int(len(text_chunk) / 150 * 1000)
+                return idx, fb_bytes, int(len(text_chunk) / 16 * 1000)
 
     # 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
     if is_vieneu_voice(voice):
         try:
             audio_bytes = vieneu_synthesize_audio(text_chunk, voice, rate=rate)
             if audio_bytes and len(audio_bytes) > 0:
-                est_duration = int(len(text_chunk) / 150 * 1000)
+                est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
             print(f"VieNeu TTS error chunk {idx+1}: {ex}")
@@ -1123,7 +1123,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
             fb = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
             audio_bytes = edge_tts_synthesize_audio(text_chunk, fb, rate=rate, max_retries=3)
             if audio_bytes and len(audio_bytes) > 0:
-                return idx, audio_bytes, int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, int(len(text_chunk) / 16 * 1000)
         except Exception as ex_fb:
             print(f"VieNeu fallback error chunk {idx+1}: {ex_fb}")
         
@@ -1135,7 +1135,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
         try:
             audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate, max_retries=4)
             if audio_bytes and len(audio_bytes) > 0:
-                est_duration = int(len(text_chunk) / 150 * 1000)
+                est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
             print(f"Edge TTS error chunk {idx+1}: {ex}")
@@ -1143,7 +1143,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
             fb = "vi-VN-HoaiMyNeural" if "NamMinh" in str(voice) else "vi-VN-NamMinhNeural"
             audio_bytes = edge_tts_synthesize_audio(text_chunk, fb, rate=rate, max_retries=2)
             if audio_bytes and len(audio_bytes) > 0:
-                return idx, audio_bytes, int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, int(len(text_chunk) / 16 * 1000)
         except Exception:
             pass
 
@@ -1189,7 +1189,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
         fallback_voice = LANGUAGE_FALLBACK_VOICE.get(lan, "vi-VN-HoaiMyNeural")
         audio_bytes = edge_tts_synthesize_audio(text_chunk, fallback_voice, rate=rate, max_retries=3)
         if audio_bytes and len(audio_bytes) > 0:
-            est_duration = int(len(text_chunk) / 150 * 1000)
+            est_duration = int(len(text_chunk) / 16 * 1000)
             return idx, audio_bytes, est_duration
     except Exception as ex2:
         print(f"Fallback failed chunk {idx+1}: {ex2}")
