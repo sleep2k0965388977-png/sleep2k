@@ -2936,8 +2936,18 @@
         }
 
         function formatDuration(ms) {
-            const s = Math.round(ms/1000), m = Math.floor(s/60);
-            return m > 0 ? `${m} phút ${s%60} giây` : `${s} giây`;
+            if (!ms || ms <= 0) return "0 giây";
+            const totalSec = Math.round(ms / 1000);
+            const hours = Math.floor(totalSec / 3600);
+            const minutes = Math.floor((totalSec % 3600) / 60);
+            const seconds = totalSec % 60;
+            if (hours > 0) {
+                return `${hours} giờ ${minutes} phút ${seconds} giây`;
+            } else if (minutes > 0) {
+                return `${minutes} phút ${seconds} giây`;
+            } else {
+                return `${seconds} giây`;
+            }
         }
 
         async function startGeneration() {
@@ -2987,11 +2997,18 @@
                 const data = await resp.json();
                 if (data.status !== "success") { alert("Lỗi: " + (data.message||"")); progressCard.classList.remove("show"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3'; return; }
 
+                if (window._activeTtsInterval) {
+                    clearInterval(window._activeTtsInterval);
+                    window._activeTtsInterval = null;
+                }
+
                 const jobId = data.job_id;
                 let consecutiveErrors = 0;
                 let lastProgress = -1;
                 let lastMessage = "";
                 let stalledTicks = 0;
+                window._hasAlertedPollError = false;
+
                 const pollInterval = setInterval(async () => {
                     try {
                         const sr = await fetch(`/api/job_status/${jobId}`);
@@ -2999,10 +3016,14 @@
                             consecutiveErrors++;
                             if (consecutiveErrors >= 50) {
                                 clearInterval(pollInterval);
+                                window._activeTtsInterval = null;
                                 progressCard.classList.remove("show");
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
-                                alert("Không thể kết nối với máy chủ hoặc tiến trình đã quá hạn. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
+                                if (!window._hasAlertedPollError) {
+                                    window._hasAlertedPollError = true;
+                                    alert("Không thể kết nối với máy chủ hoặc tiến trình đã quá hạn. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
+                                }
                                 return;
                             }
                             return;
@@ -3019,10 +3040,14 @@
                                 stalledTicks++;
                                 if (stalledTicks >= 500) {
                                     clearInterval(pollInterval);
+                                    window._activeTtsInterval = null;
                                     progressCard.classList.remove("show");
                                     btn.disabled = false;
                                     btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
-                                    alert("Tiến trình bị gián đoạn do mất kết nối quá lâu. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
+                                    if (!window._hasAlertedPollError) {
+                                        window._hasAlertedPollError = true;
+                                        alert("Tiến trình bị gián đoạn do mất kết nối quá lâu. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
+                                    }
                                     return;
                                 }
                             } else {
@@ -3031,25 +3056,33 @@
                                 stalledTicks = 0;
                             }
                         } else if (sd.status === "completed") {
-                            clearInterval(pollInterval); fillEl.style.width="100%"; pctEl.innerText="100%";
+                            clearInterval(pollInterval);
+                            window._activeTtsInterval = null;
+                            fillEl.style.width="100%"; pctEl.innerText="100%";
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> ' + sd.message;
                             setTimeout(() => {
                                 progressCard.classList.remove("show");
                                 const res = sd.result;
-                                document.getElementById("audioPlayer").src = res.download_url;
+                                const player = document.getElementById("audioPlayer");
+                                player.src = res.download_url;
+                                player.muted = false;
+                                player.volume = 1.0;
                                 document.getElementById("downloadBtn").href = res.download_url;
                                 document.getElementById("downloadBtn").download = res.filename;
                                 document.getElementById("resultTime").innerText = 'Thời lượng: ' + formatDuration(res.duration_ms) + ' (' + res.text_length.toLocaleString() + ' ký tự)';
                                 playerCard.classList.add("show");
-                                document.getElementById("audioPlayer").play();
+                                player.play().catch(() => {});
                                 btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
                             }, 500);
                         } else if (sd.status === "error") {
-                            clearInterval(pollInterval); alert("Lỗi: " + sd.message);
+                            clearInterval(pollInterval);
+                            window._activeTtsInterval = null;
+                            alert("Lỗi: " + sd.message);
                             progressCard.classList.remove("show"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
                         }
                     } catch (err) { console.error("Poll error:", err); }
                 }, 600);
+                window._activeTtsInterval = pollInterval;
             } catch (e) {
                 alert("Lỗi kết nối: " + e.message); progressCard.classList.remove("show");
                 btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
