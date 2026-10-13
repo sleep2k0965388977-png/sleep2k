@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -2475,8 +2475,9 @@
             if (maxSpan) maxSpan.innerText = cloneCharLimit.toLocaleString();
 
             if (badge) {
-                badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giới hạn Clone: ${cloneCharLimit.toLocaleString()} ký tự`;
-                badge.style.color = charLen > cloneCharLimit ? '#ef4444' : '#ec4899';
+                const isOver = charLen > cloneCharLimit;
+                badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giới hạn Clone: ${charLen.toLocaleString()}/${cloneCharLimit.toLocaleString()} ký tự`;
+                badge.style.color = isOver ? '#ef4444' : '#ec4899';
                 badge.style.fontWeight = '700';
             }
 
@@ -2593,6 +2594,9 @@
             document.getElementById("charCount").innerText = text.length.toLocaleString();
             document.getElementById("wordCount").innerText = (text.trim() ? text.trim().split(/\s+/).length : 0).toLocaleString();
             document.getElementById("chunkCount").innerText = Math.ceil(text.length / 160);
+            if (typeof updateCloneLimitState === 'function') {
+                updateCloneLimitState();
+            }
         }
 
         function clearText() { document.getElementById("textInput").value = ""; updateTextStats(); }
@@ -2722,6 +2726,21 @@
                 const data = await resp.json();
                 if (data.status === "success") { 
                     allVoices = data.voices; 
+                    // Phục hồi giọng nhân bản cá nhân từ localStorage (chống mất khi Railway restart)
+                    try {
+                        const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
+                        for (const [vid, vinfo] of Object.entries(savedCustom)) {
+                            if (!allVoices.some(v => v.voice_type === vid)) {
+                                allVoices.unshift({
+                                    voice_type: vid,
+                                    display_name: vinfo.name || vid,
+                                    is_clone: true,
+                                    lan: 'vi',
+                                    resource_id: null
+                                });
+                            }
+                        }
+                    } catch (e_sc) {}
                     updateLangCounts();
                     applyFilters(); 
                 }
@@ -2941,23 +2960,49 @@
             statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang phân tích văn bản...';
 
             try {
-                const resp = await fetch("/api/generate_job", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({text, voice:selectedVoice, resource_id:selectedResourceId, rate, clone_max_chars: cloneCharLimit}) });
+                let customB64 = null;
+                let customName = null;
+                if (isCurrentVoiceClone()) {
+                    try {
+                        const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
+                        if (savedCustom[selectedVoice]) {
+                            customB64 = savedCustom[selectedVoice].base64;
+                            customName = savedCustom[selectedVoice].name;
+                        }
+                    } catch (e_g) {}
+                }
+                const resp = await fetch("/api/generate_job", { 
+                    method:"POST", 
+                    headers:{"Content-Type":"application/json"}, 
+                    body: JSON.stringify({
+                        text, 
+                        voice: selectedVoice, 
+                        resource_id: selectedResourceId, 
+                        rate, 
+                        clone_max_chars: cloneCharLimit,
+                        custom_audio_base64: customB64,
+                        voice_name: customName
+                    }) 
+                });
                 const data = await resp.json();
                 if (data.status !== "success") { alert("Lỗi: " + (data.message||"")); progressCard.classList.remove("show"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3'; return; }
 
                 const jobId = data.job_id;
                 let consecutiveErrors = 0;
+                let lastProgress = -1;
+                let lastMessage = "";
+                let stalledTicks = 0;
                 const pollInterval = setInterval(async () => {
                     try {
                         const sr = await fetch(`/api/job_status/${jobId}`);
                         if (!sr.ok) {
                             consecutiveErrors++;
-                            if (consecutiveErrors >= 20) {
+                            if (consecutiveErrors >= 50) {
                                 clearInterval(pollInterval);
                                 progressCard.classList.remove("show");
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
-                                alert("Không thể kết nối hoặc tiến trình đã quá hạn. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
+                                alert("Không thể kết nối với máy chủ hoặc tiến trình đã quá hạn. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
                                 return;
                             }
                             return;
@@ -2966,7 +3011,25 @@
                         const sd = await sr.json();
                         if (sd.status === "processing" || sd.status === "queued") {
                             const p = sd.progress||10; fillEl.style.width=p+"%"; pctEl.innerText=p+"%";
-                            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message||'Đang xử lý...');
+                            const currentMsg = sd.message || 'Đang xử lý...';
+                            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + currentMsg;
+                            
+                            // Watchdog chống đứng hình: Chỉ báo lỗi khi tiến trình thực sự bị đơ hoàn toàn (> 5 phút không thay đổi thông điệp & %)
+                            if (p === lastProgress && currentMsg === lastMessage) {
+                                stalledTicks++;
+                                if (stalledTicks >= 500) {
+                                    clearInterval(pollInterval);
+                                    progressCard.classList.remove("show");
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
+                                    alert("Tiến trình bị gián đoạn do mất kết nối quá lâu. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
+                                    return;
+                                }
+                            } else {
+                                lastProgress = p;
+                                lastMessage = currentMsg;
+                                stalledTicks = 0;
+                            }
                         } else if (sd.status === "completed") {
                             clearInterval(pollInterval); fillEl.style.width="100%"; pctEl.innerText="100%";
                             statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-emerald);"></i> ' + sd.message;
@@ -4303,6 +4366,24 @@
                 const resData = await resp.json();
 
                 if (resData.status === 'success') {
+                    // Lưu mẫu giọng vĩnh viễn vào localStorage để không bao giờ bị mất khi máy chủ deploy lại
+                    try {
+                        const reader = new FileReader();
+                        reader.onloadend = function() {
+                            try {
+                                const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
+                                savedCustom[resData.voice.voice_type] = {
+                                    voice_type: resData.voice.voice_type,
+                                    name: name,
+                                    base64: reader.result,
+                                    updated_at: Date.now()
+                                };
+                                localStorage.setItem('sleep2k_saved_custom_voices', JSON.stringify(savedCustom));
+                            } catch (e_ls) {}
+                        };
+                        reader.readAsDataURL(cloneAudioBlob);
+                    } catch (e_r) {}
+
                     closeCloneModal();
                     await fetchVoices();
                     filterByLang('custom', document.getElementById('tabCustom'));
@@ -4331,6 +4412,11 @@
                 const resp = await fetch('/api/delete_custom_voice/' + voiceType, { method: 'POST' });
                 const data = await resp.json();
                 if (data.status === 'success') {
+                    try {
+                        const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
+                        delete savedCustom[voiceType];
+                        localStorage.setItem('sleep2k_saved_custom_voices', JSON.stringify(savedCustom));
+                    } catch (e_del) {}
                     if (selectedVoice === voiceType) selectedVoice = 'BV421_vivn_streaming';
                     await fetchVoices();
                 } else {
@@ -5304,12 +5390,18 @@ function renderVideoGrid() {
                 </div>
                 <button type="button" onclick="closeYoutubeCookieModal()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer;">&times;</button>
             </div>
+            <div style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:12px; color:#34d399; line-height:1.5;">
+                <div style="font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px; font-size:12.5px;">
+                    <i class="fa-solid fa-bolt"></i> CÁCH 1 (NHANH NHẤT - KHÔNG CẦN NẠP COOKIE):
+                </div>
+                Chỉ cần mở file <b>CHAY_AI_CLONE_GIONG.bat</b> trên Desktop máy tính. Web sẽ tự động kết nối và dùng mạng máy tính cá nhân để trích xuất video YouTube 100% không bao giờ bị chặn bot!
+            </div>
             <div style="font-size:12.5px; color:#cbd5e1; line-height:1.6; margin-bottom:14px;">
-                Máy chủ Cloud (Railway Datacenter) thường bị YouTube yêu cầu xác minh bot. Dán Cookie tài khoản YouTube của bạn vào đây để vượt qua kiểm tra 100%:
-                <ol style="margin:8px 0 0 18px; padding:0; color:#94a3b8; font-size:12px;">
+                <div style="font-weight:600; color:#fbbf24; margin-bottom:4px;">CÁCH 2: Nạp Cookie YouTube (Chỉ cần làm 1 lần duy nhất):</div>
+                <ol style="margin:4px 0 0 18px; padding:0; color:#94a3b8; font-size:12px;">
                     <li>Cài tiện ích Chrome/Edge: <b>Get cookies.txt LOCALLY</b>.</li>
-                    <li>Mở trang <b>youtube.com</b> rồi bấm vào tiện ích &rarr; chọn <b>Export</b>.</li>
-                    <li>Dán toàn bộ nội dung file đó vào ô bên dưới rồi nhấn <b>Lưu Cookie</b>.</li>
+                    <li>Mở trang <b>youtube.com</b> trên trình duyệt rồi bấm vào tiện ích &rarr; chọn <b>Export</b>.</li>
+                    <li>Dán toàn bộ nội dung file vừa tải vào ô bên dưới rồi bấm <b>Lưu Cookie</b>.</li>
                 </ol>
             </div>
             <textarea id="ytCookieContentInput" rows="7" placeholder="# Netscape HTTP Cookie File... Dán nội dung cookies.txt vào đây" style="width:100%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:11.5px; font-family:monospace; padding:10px; outline:none; resize:vertical; box-sizing:border-box; margin-bottom:14px;"></textarea>

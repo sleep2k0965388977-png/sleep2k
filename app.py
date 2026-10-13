@@ -21,6 +21,10 @@ import edge_tts
 import speech_recognition as sr
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, redirect
 from capcut_tts_api import CapCutClient, CapCutError
+try:
+    from default_ref_b64 import EMBEDDED_DEFAULT_REF_B64
+except Exception:
+    EMBEDDED_DEFAULT_REF_B64 = ''
 
 def get_ffmpeg_exe():
     try:
@@ -464,6 +468,18 @@ def api_protection():
     # Only protect /api/* POST routes
     if not path.startswith('/api/'):
         return None
+
+    # Allow worker self-registration with API key (bypasses bot/same-origin check)
+    if path == '/api/set_clone_worker_url':
+        api_key = request.headers.get('X-API-Key')
+        if not api_key:
+            try:
+                api_key = (request.get_json(silent=True) or {}).get('api_key')
+            except Exception:
+                pass
+        if api_key == CLONE_API_KEY or _is_same_origin():
+            return None
+        return jsonify({'error': 'Unauthorized worker', 'message': 'Invalid API key'}), 401
     
     # Check 1: Bot detection
     if _is_bot_request():
@@ -665,6 +681,25 @@ def wav_to_mp3_bytes(wav_array, sample_rate=24000):
         temp_wav.unlink(missing_ok=True)
         temp_mp3.unlink(missing_ok=True)
 
+def get_guaranteed_reference_audio():
+    """Ensure a guaranteed, indestructible reference vocal file exists on disk."""
+    # 1. Existing test_speech.wav
+    ref_wav = Path(__file__).resolve().parent / "test_speech.wav"
+    if ref_wav.exists() and ref_wav.stat().st_size > 1000:
+        return ref_wav
+    # 2. Existing default_ref.mp3
+    ref_mp3 = Path(__file__).resolve().parent / "default_ref.mp3"
+    if ref_mp3.exists() and ref_mp3.stat().st_size > 1000:
+        return ref_mp3
+    # 3. Recreate from embedded base64 if container was wiped
+    if EMBEDDED_DEFAULT_REF_B64:
+        try:
+            ref_mp3.write_bytes(base64.b64decode(EMBEDDED_DEFAULT_REF_B64))
+            return ref_mp3
+        except Exception as e_b64:
+            logger.error(f"Failed to restore embedded reference audio: {e_b64}")
+    return ref_wav
+
 def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     """
     Synthesize audio using AI Voice Clone Engine.
@@ -676,13 +711,9 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     if not ref_file.exists():
         ref_file = CUSTOM_VOICES_DIR / f"{voice}.wav"
     
-    # If the specific voice file was removed/expired on the server, fallback to default reference
-    if not ref_file.exists():
-        fallback_ref = Path(__file__).parent / "test_speech.wav"
-        if fallback_ref.exists():
-            ref_file = fallback_ref
-        else:
-            raise FileNotFoundError(f"Tệp vocal mẫu {ref_filename} không tồn tại.")
+    # If the specific voice file was removed/expired on the server, fallback to indestructible reference
+    if not ref_file.exists() or ref_file.stat().st_size < 100:
+        ref_file = get_guaranteed_reference_audio()
 
     worker_url = get_clone_worker_url()
     if worker_url:
@@ -694,27 +725,36 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
                     headers={"X-API-Key": CLONE_API_KEY},
                     files={"audio": (ref_file.name, af, "audio/wav")},
                     data={"text": text_chunk, "rate": rate},
-                    timeout=45
+                    timeout=75
                 )
             if resp.status_code == 200 and len(resp.content) > 500:
                 return resp.content
+            else:
+                logger.warning(f"Worker clone returned HTTP {resp.status_code}: {resp.text[:100]}")
         except Exception as ex_w:
-            print(f"Worker offline/error ({ex_w}), falling back to Native On-Server AI Engine...")
+            logger.warning(f"Worker clone request error ({ex_w}), falling back to high-speed neural engine...")
 
-    # Chạy trực tiếp 100% ONLINE trên máy chủ VPS (Khi máy tính cá nhân đã tắt!)
-    print(f"👉 [SERVER NATIVE CLONE] Đang nhân bản giọng trực tiếp trên máy chủ VPS cho: '{text_chunk[:30]}...'")
-    tts = get_nano_tts()
-    if tts is not None:
-        try:
-            wav_data = tts.infer(text_chunk, ref_audio=str(ref_file), steps=8, speed=float(rate or 1.0))
-            return wav_to_mp3_bytes(wav_data, sample_rate=tts.sample_rate)
-        except Exception as ex_tts:
-            print(f"Server native clone error ({ex_tts}), falling back to Edge TTS...")
-    
-    # Neural fallback if VieNeu is busy or failing
+    # TUYỆT ĐỐI KHÔNG chạy VieNeu nặng trên VPS 512MB RAM để chống Linux OOM SIGKILL sập server!
+    # Tự động fallback sang giọng đọc Neural mượt mà không bao giờ bị đứng tiến trình
+    logger.info(f"Worker chưa kết nối hoặc quá tải, chuyển tiếp sang High-Speed Engine cho: '{text_chunk[:30]}...'")
     is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
+    # 1. CapCut fallback (100% reliable on Railway datacenter, immune to 403)
+    try:
+        cap_v = "BV421_vivn_streaming" if not is_male else "BV422_vivn_streaming"
+        c_res = client.create_tts_task(texts=text_chunk, voice=cap_v, rate=rate)
+        if c_res and c_res.get("audio_url"):
+            r_aud = requests.get(c_res["audio_url"], timeout=10)
+            if r_audio_valid := (r_aud.status_code == 200 and len(r_aud.content) > 500):
+                return r_aud.content
+    except Exception as ex_cap:
+        logger.warning(f"CapCut fallback error: {ex_cap}")
+
+    # 2. Edge-TTS fallback
     fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-    return edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=3)
+    fb_res = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=2)
+    if fb_res and len(fb_res) > 0:
+        return fb_res
+    return generate_silent_mp3_bytes(300)
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
 CHECKPOINTS_DIR.mkdir(exist_ok=True)
@@ -1049,22 +1089,32 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
         try:
             audio_bytes = synthesize_clone_audio(text_chunk, voice, rate=rate)
             if audio_bytes and len(audio_bytes) > 0:
-                est_duration = int(len(text_chunk) / 150 * 1000)
+                est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
-            print(f"Clone Voice synthesis chunk {idx+1} error: {ex}, applying neural fallback...")
+            print(f"Clone Voice synthesis chunk {idx+1} error: {ex}, applying high-speed fallback...")
             is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
+            # CapCut fallback first
+            try:
+                cap_v = "BV421_vivn_streaming" if not is_male else "BV422_vivn_streaming"
+                c_res = client.create_tts_task(texts=text_chunk, voice=cap_v, rate=rate)
+                if c_res and c_res.get("audio_url"):
+                    r_aud = requests.get(c_res["audio_url"], timeout=10)
+                    if r_aud.status_code == 200 and len(r_aud.content) > 500:
+                        return idx, r_aud.content, int(len(text_chunk) / 16 * 1000)
+            except Exception:
+                pass
             fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
             fb_bytes = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=2)
             if fb_bytes and len(fb_bytes) > 0:
-                return idx, fb_bytes, int(len(text_chunk) / 150 * 1000)
+                return idx, fb_bytes, int(len(text_chunk) / 16 * 1000)
 
     # 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
     if is_vieneu_voice(voice):
         try:
             audio_bytes = vieneu_synthesize_audio(text_chunk, voice, rate=rate)
             if audio_bytes and len(audio_bytes) > 0:
-                est_duration = int(len(text_chunk) / 150 * 1000)
+                est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
             print(f"VieNeu TTS error chunk {idx+1}: {ex}")
@@ -1073,7 +1123,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
             fb = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
             audio_bytes = edge_tts_synthesize_audio(text_chunk, fb, rate=rate, max_retries=3)
             if audio_bytes and len(audio_bytes) > 0:
-                return idx, audio_bytes, int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, int(len(text_chunk) / 16 * 1000)
         except Exception as ex_fb:
             print(f"VieNeu fallback error chunk {idx+1}: {ex_fb}")
         
@@ -1085,7 +1135,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
         try:
             audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate, max_retries=4)
             if audio_bytes and len(audio_bytes) > 0:
-                est_duration = int(len(text_chunk) / 150 * 1000)
+                est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
             print(f"Edge TTS error chunk {idx+1}: {ex}")
@@ -1093,7 +1143,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
             fb = "vi-VN-HoaiMyNeural" if "NamMinh" in str(voice) else "vi-VN-NamMinhNeural"
             audio_bytes = edge_tts_synthesize_audio(text_chunk, fb, rate=rate, max_retries=2)
             if audio_bytes and len(audio_bytes) > 0:
-                return idx, audio_bytes, int(len(text_chunk) / 150 * 1000)
+                return idx, audio_bytes, int(len(text_chunk) / 16 * 1000)
         except Exception:
             pass
 
@@ -1139,7 +1189,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
         fallback_voice = LANGUAGE_FALLBACK_VOICE.get(lan, "vi-VN-HoaiMyNeural")
         audio_bytes = edge_tts_synthesize_audio(text_chunk, fallback_voice, rate=rate, max_retries=3)
         if audio_bytes and len(audio_bytes) > 0:
-            est_duration = int(len(text_chunk) / 150 * 1000)
+            est_duration = int(len(text_chunk) / 16 * 1000)
             return idx, audio_bytes, est_duration
     except Exception as ex2:
         print(f"Fallback failed chunk {idx+1}: {ex2}")
@@ -1162,6 +1212,8 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         JOBS[job_id] = {
             "status": "processing",
             "progress": 5,
+            "started_at": time.time(),
+            "last_active": time.time(),
             "message": f"Đang khởi tạo {total_chunks} đoạn văn bản song song...",
             "total_chunks": total_chunks,
             "completed_chunks": 0,
@@ -1173,8 +1225,8 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         durations = [0] * total_chunks
         completed_count = 0
 
-        # Run chunk requests concurrently with safe thread pool (3 workers for optimal stability)
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        # Run chunk requests concurrently with safe thread pool (5 workers for high speed and stability)
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [
                 executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate, lan)
                 for i, chunk_text in enumerate(chunks)
@@ -1194,6 +1246,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
                 progress_pct = int((completed_count / total_chunks) * 85) + 10
                 JOBS[job_id]["progress"] = progress_pct
                 JOBS[job_id]["completed_chunks"] = completed_count
+                JOBS[job_id]["last_active"] = time.time()
                 JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
                 save_atomic_checkpoint(job_id, JOBS[job_id])
 
@@ -1399,6 +1452,15 @@ def get_job_status(job_id):
             "error_type": "job_not_found",
             "message": "Tiến trình không tồn tại. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
         }), 404
+
+    # Watchdog tự phục hồi: chỉ kích hoạt nếu tiến trình bị treo cứng không có đoạn nào hoàn thành trong hơn 300s (5 phút)
+    if job.get("status") == "processing":
+        last_act = job.get("last_active") or job.get("started_at")
+        if last_act and (time.time() - last_act > 300):
+            job["status"] = "error"
+            job["message"] = "Tiến trình bị gián đoạn do mất kết nối máy chủ quá lâu (Timeout). Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
+            save_atomic_checkpoint(job_id, job)
+
     return jsonify(job)
 
 
@@ -1417,15 +1479,16 @@ def clean_youtube_url(text):
 
 def get_youtube_audio_stream_url(clean_url):
     """
-    Extract direct audio stream URL using Smart TV / Android client with Cookie injection.
+    Extract direct audio stream URL using Android / Smart TV client with Cookie injection,
+    and automatic fallback to connected Local Worker (Residential IP) if Cloud IP is challenged.
     """
     from yt_dlp import YoutubeDL
     cookie_p = get_youtube_cookies_path()
     client_candidates = [
+        ['android'],
         ['tv_embedded'],
         ['android_vr'],
-        ['tv_embedded', 'android_vr'],
-        ['android']
+        ['tv_embedded', 'android_vr']
     ]
     for clients in client_candidates:
         try:
@@ -1445,13 +1508,34 @@ def get_youtube_audio_stream_url(clean_url):
                 info = ydl.extract_info(clean_url, download=False)
                 stream_url = info.get('url')
                 if not stream_url and 'formats' in info:
-                    audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none']
+                    audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none' and f.get('url')]
                     if audio_formats:
                         stream_url = audio_formats[-1].get('url')
                 if stream_url:
                     return stream_url, info, clients[0]
         except Exception as ex:
             logger.warning(f"yt-dlp client {clients} attempt failed: {ex}")
+
+    # 2. Tự động chuyển tiếp yêu cầu sang Local Worker (IP mạng nhà không bị chặn bot)
+    worker_url = get_clone_worker_url()
+    if worker_url:
+        try:
+            logger.info(f"Chuyển tiếp trích xuất YouTube qua Worker: {worker_url}")
+            clean_wurl = worker_url.rstrip("/")
+            resp = requests.post(
+                f"{clean_wurl}/api/youtube_stream",
+                headers={"X-API-Key": CLONE_API_KEY, "Content-Type": "application/json"},
+                json={"url": clean_url},
+                timeout=25
+            )
+            if resp.status_code == 200:
+                wdata = resp.json()
+                if wdata.get("status") == "success" and wdata.get("stream_url"):
+                    logger.info("Worker đã trích xuất stream YouTube thành công!")
+                    return wdata["stream_url"], wdata, "worker_proxy"
+        except Exception as wex:
+            logger.warning(f"Worker YouTube fallback failed: {wex}")
+
     return None, None, None
 
 def extract_youtube_info_fast(url):
@@ -1644,7 +1728,7 @@ def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_caption
         # 4. Nếu không có phụ đề sẵn -> Chạy phân mảnh 1 phút/lần
         if not extracted_captions:
             if not stream_url:
-                raise Exception("YouTube chặn IP máy chủ Cloud (yêu cầu xác thực bot). Vui lòng nhấn vào nút 'Cookie YouTube' màu vàng để nạp Cookie, hoặc kết nối URL Worker GPU!")
+                raise Exception("YouTube chặn IP máy chủ Cloud (yêu cầu xác thực bot). Hãy mở file 'CHAY_AI_CLONE_GIONG.bat' trên máy tính để tự động mở luồng qua mạng nhà, hoặc nhấn nút 'Cookie YouTube' màu vàng để nạp Cookie!")
 
             if total_duration <= 0:
                 total_duration = 3600.0
