@@ -1213,6 +1213,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
             "status": "processing",
             "progress": 5,
             "started_at": time.time(),
+            "last_active": time.time(),
             "message": f"Đang khởi tạo {total_chunks} đoạn văn bản song song...",
             "total_chunks": total_chunks,
             "completed_chunks": 0,
@@ -1224,8 +1225,8 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         durations = [0] * total_chunks
         completed_count = 0
 
-        # Run chunk requests concurrently with safe thread pool (3 workers for optimal stability)
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        # Run chunk requests concurrently with safe thread pool (5 workers for high speed and stability)
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [
                 executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate, lan)
                 for i, chunk_text in enumerate(chunks)
@@ -1245,6 +1246,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
                 progress_pct = int((completed_count / total_chunks) * 85) + 10
                 JOBS[job_id]["progress"] = progress_pct
                 JOBS[job_id]["completed_chunks"] = completed_count
+                JOBS[job_id]["last_active"] = time.time()
                 JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
                 save_atomic_checkpoint(job_id, JOBS[job_id])
 
@@ -1451,12 +1453,12 @@ def get_job_status(job_id):
             "message": "Tiến trình không tồn tại. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
         }), 404
 
-    # Watchdog tự phục hồi: nếu tiến trình bị treo quá 150s, tự động trả lỗi thay vì đứng im ở 5%
+    # Watchdog tự phục hồi: chỉ kích hoạt nếu tiến trình bị treo cứng không có đoạn nào hoàn thành trong hơn 300s (5 phút)
     if job.get("status") == "processing":
-        started = job.get("started_at")
-        if started and (time.time() - started > 150):
+        last_act = job.get("last_active") or job.get("started_at")
+        if last_act and (time.time() - last_act > 300):
             job["status"] = "error"
-            job["message"] = "Tiến trình bị quá thời gian chờ (Timeout). Hãy mở file CHAY_AI_CLONE_GIONG.bat trên Desktop máy tính rồi bấm thử lại!"
+            job["message"] = "Tiến trình bị gián đoạn do mất kết nối máy chủ quá lâu (Timeout). Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!"
             save_atomic_checkpoint(job_id, job)
 
     return jsonify(job)

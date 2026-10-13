@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -2990,18 +2990,19 @@
                 const jobId = data.job_id;
                 let consecutiveErrors = 0;
                 let lastProgress = -1;
+                let lastMessage = "";
                 let stalledTicks = 0;
                 const pollInterval = setInterval(async () => {
                     try {
                         const sr = await fetch(`/api/job_status/${jobId}`);
                         if (!sr.ok) {
                             consecutiveErrors++;
-                            if (consecutiveErrors >= 20) {
+                            if (consecutiveErrors >= 50) {
                                 clearInterval(pollInterval);
                                 progressCard.classList.remove("show");
                                 btn.disabled = false;
                                 btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
-                                alert("Không thể kết nối hoặc tiến trình đã quá hạn. Vui lòng kiểm tra file CHAY_AI_CLONE_GIONG.bat trên Desktop máy tính rồi bấm thử lại!");
+                                alert("Không thể kết nối với máy chủ hoặc tiến trình đã quá hạn. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
                                 return;
                             }
                             return;
@@ -3010,21 +3011,23 @@
                         const sd = await sr.json();
                         if (sd.status === "processing" || sd.status === "queued") {
                             const p = sd.progress||10; fillEl.style.width=p+"%"; pctEl.innerText=p+"%";
-                            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (sd.message||'Đang xử lý...');
+                            const currentMsg = sd.message || 'Đang xử lý...';
+                            statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + currentMsg;
                             
-                            // Watchdog chống đứng hình: Nếu tiến trình đứng im 1 chỗ quá 90s, tự động báo lỗi
-                            if (p === lastProgress) {
+                            // Watchdog chống đứng hình: Chỉ báo lỗi khi tiến trình thực sự bị đơ hoàn toàn (> 5 phút không thay đổi thông điệp & %)
+                            if (p === lastProgress && currentMsg === lastMessage) {
                                 stalledTicks++;
-                                if (stalledTicks >= 120) {
+                                if (stalledTicks >= 500) {
                                     clearInterval(pollInterval);
                                     progressCard.classList.remove("show");
                                     btn.disabled = false;
                                     btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
-                                    alert("Tiến trình bị gián đoạn hoặc quá thời gian chờ (Timeout). Hãy kiểm tra file CHAY_AI_CLONE_GIONG.bat trên Desktop máy tính rồi bấm thử lại!");
+                                    alert("Tiến trình bị gián đoạn do mất kết nối quá lâu. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
                                     return;
                                 }
                             } else {
                                 lastProgress = p;
+                                lastMessage = currentMsg;
                                 stalledTicks = 0;
                             }
                         } else if (sd.status === "completed") {
