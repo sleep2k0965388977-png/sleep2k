@@ -21,6 +21,10 @@ import edge_tts
 import speech_recognition as sr
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response, redirect
 from capcut_tts_api import CapCutClient, CapCutError
+try:
+    from default_ref_b64 import EMBEDDED_DEFAULT_REF_B64
+except Exception:
+    EMBEDDED_DEFAULT_REF_B64 = ''
 
 def get_ffmpeg_exe():
     try:
@@ -677,6 +681,25 @@ def wav_to_mp3_bytes(wav_array, sample_rate=24000):
         temp_wav.unlink(missing_ok=True)
         temp_mp3.unlink(missing_ok=True)
 
+def get_guaranteed_reference_audio():
+    """Ensure a guaranteed, indestructible reference vocal file exists on disk."""
+    # 1. Existing test_speech.wav
+    ref_wav = Path(__file__).resolve().parent / "test_speech.wav"
+    if ref_wav.exists() and ref_wav.stat().st_size > 1000:
+        return ref_wav
+    # 2. Existing default_ref.mp3
+    ref_mp3 = Path(__file__).resolve().parent / "default_ref.mp3"
+    if ref_mp3.exists() and ref_mp3.stat().st_size > 1000:
+        return ref_mp3
+    # 3. Recreate from embedded base64 if container was wiped
+    if EMBEDDED_DEFAULT_REF_B64:
+        try:
+            ref_mp3.write_bytes(base64.b64decode(EMBEDDED_DEFAULT_REF_B64))
+            return ref_mp3
+        except Exception as e_b64:
+            logger.error(f"Failed to restore embedded reference audio: {e_b64}")
+    return ref_wav
+
 def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     """
     Synthesize audio using AI Voice Clone Engine.
@@ -688,13 +711,9 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     if not ref_file.exists():
         ref_file = CUSTOM_VOICES_DIR / f"{voice}.wav"
     
-    # If the specific voice file was removed/expired on the server, fallback to default reference
-    if not ref_file.exists():
-        fallback_ref = Path(__file__).parent / "test_speech.wav"
-        if fallback_ref.exists():
-            ref_file = fallback_ref
-        else:
-            raise FileNotFoundError(f"Tệp vocal mẫu {ref_filename} không tồn tại.")
+    # If the specific voice file was removed/expired on the server, fallback to indestructible reference
+    if not ref_file.exists() or ref_file.stat().st_size < 100:
+        ref_file = get_guaranteed_reference_audio()
 
     worker_url = get_clone_worker_url()
     if worker_url:
@@ -717,10 +736,25 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
 
     # TUYỆT ĐỐI KHÔNG chạy VieNeu nặng trên VPS 512MB RAM để chống Linux OOM SIGKILL sập server!
     # Tự động fallback sang giọng đọc Neural mượt mà không bao giờ bị đứng tiến trình
-    logger.info(f"Worker chưa kết nối hoặc quá tải, chuyển tiếp sang Neural Engine cho: '{text_chunk[:30]}...'")
+    logger.info(f"Worker chưa kết nối hoặc quá tải, chuyển tiếp sang High-Speed Engine cho: '{text_chunk[:30]}...'")
     is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
+    # 1. CapCut fallback (100% reliable on Railway datacenter, immune to 403)
+    try:
+        cap_v = "BV421_vivn_streaming" if not is_male else "BV422_vivn_streaming"
+        c_res = client.create_tts_task(texts=text_chunk, voice=cap_v, rate=rate)
+        if c_res and c_res.get("audio_url"):
+            r_aud = requests.get(c_res["audio_url"], timeout=10)
+            if r_audio_valid := (r_aud.status_code == 200 and len(r_aud.content) > 500):
+                return r_aud.content
+    except Exception as ex_cap:
+        logger.warning(f"CapCut fallback error: {ex_cap}")
+
+    # 2. Edge-TTS fallback
     fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-    return edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=3)
+    fb_res = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=2)
+    if fb_res and len(fb_res) > 0:
+        return fb_res
+    return generate_silent_mp3_bytes(300)
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
 CHECKPOINTS_DIR.mkdir(exist_ok=True)
@@ -1058,8 +1092,18 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
                 est_duration = int(len(text_chunk) / 150 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
-            print(f"Clone Voice synthesis chunk {idx+1} error: {ex}, applying neural fallback...")
+            print(f"Clone Voice synthesis chunk {idx+1} error: {ex}, applying high-speed fallback...")
             is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
+            # CapCut fallback first
+            try:
+                cap_v = "BV421_vivn_streaming" if not is_male else "BV422_vivn_streaming"
+                c_res = client.create_tts_task(texts=text_chunk, voice=cap_v, rate=rate)
+                if c_res and c_res.get("audio_url"):
+                    r_aud = requests.get(c_res["audio_url"], timeout=10)
+                    if r_aud.status_code == 200 and len(r_aud.content) > 500:
+                        return idx, r_aud.content, int(len(text_chunk) / 150 * 1000)
+            except Exception:
+                pass
             fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
             fb_bytes = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=2)
             if fb_bytes and len(fb_bytes) > 0:

@@ -1,8 +1,7 @@
-﻿.vercel
+.vercel
 __pycache__/
 capcut_tts_api/__pycache__/
-*.mp3
-*.wav
 *.tmp
 uploads/
 checkpoints/
+default_ref.b64
