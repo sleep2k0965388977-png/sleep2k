@@ -2593,7 +2593,7 @@
             const text = document.getElementById("textInput").value;
             document.getElementById("charCount").innerText = text.length.toLocaleString();
             document.getElementById("wordCount").innerText = (text.trim() ? text.trim().split(/\s+/).length : 0).toLocaleString();
-            document.getElementById("chunkCount").innerText = Math.ceil(text.length / 160);
+            document.getElementById("chunkCount").innerText = Math.ceil(text.length / 400);
             if (typeof updateCloneLimitState === 'function') {
                 updateCloneLimitState();
             }
