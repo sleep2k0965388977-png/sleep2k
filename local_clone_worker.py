@@ -99,6 +99,56 @@ def clone_voice():
         except Exception:
             pass
 
+@app.route("/api/youtube_stream", methods=["POST"])
+def worker_youtube_stream():
+    key = request.headers.get("X-API-Key", "")
+    if key != CLONE_API_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.json or {}
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "URL is empty"}), 400
+
+    from yt_dlp import YoutubeDL
+    client_candidates = [
+        ['android'],
+        ['tv_embedded'],
+        ['android_vr']
+    ]
+    for clients in client_candidates:
+        try:
+            ydl_opts = {
+                'skip_download': True,
+                'quiet': True,
+                'no_warnings': True,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': clients
+                    }
+                }
+            }
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                stream_url = info.get('url')
+                if not stream_url and 'formats' in info:
+                    audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none' and f.get('url')]
+                    if audio_formats:
+                        stream_url = audio_formats[-1].get('url')
+                if stream_url:
+                    return jsonify({
+                        "status": "success",
+                        "stream_url": stream_url,
+                        "duration": info.get("duration", 0),
+                        "title": info.get("title", ""),
+                        "subtitles": info.get("subtitles", {}),
+                        "automatic_captions": info.get("automatic_captions", {})
+                    }), 200
+        except Exception as ex:
+            print(f"Worker yt-dlp client {clients} error: {ex}")
+
+    return jsonify({"status": "error", "message": "Could not extract stream on worker"}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5005))
     print(f"🚀 Worker đang lắng nghe tại cổng {port}...")

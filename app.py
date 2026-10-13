@@ -1417,15 +1417,16 @@ def clean_youtube_url(text):
 
 def get_youtube_audio_stream_url(clean_url):
     """
-    Extract direct audio stream URL using Smart TV / Android client with Cookie injection.
+    Extract direct audio stream URL using Android / Smart TV client with Cookie injection,
+    and automatic fallback to connected Local Worker (Residential IP) if Cloud IP is challenged.
     """
     from yt_dlp import YoutubeDL
     cookie_p = get_youtube_cookies_path()
     client_candidates = [
+        ['android'],
         ['tv_embedded'],
         ['android_vr'],
-        ['tv_embedded', 'android_vr'],
-        ['android']
+        ['tv_embedded', 'android_vr']
     ]
     for clients in client_candidates:
         try:
@@ -1445,13 +1446,34 @@ def get_youtube_audio_stream_url(clean_url):
                 info = ydl.extract_info(clean_url, download=False)
                 stream_url = info.get('url')
                 if not stream_url and 'formats' in info:
-                    audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none']
+                    audio_formats = [f for f in info['formats'] if f.get('acodec') != 'none' and f.get('url')]
                     if audio_formats:
                         stream_url = audio_formats[-1].get('url')
                 if stream_url:
                     return stream_url, info, clients[0]
         except Exception as ex:
             logger.warning(f"yt-dlp client {clients} attempt failed: {ex}")
+
+    # 2. Tự động chuyển tiếp yêu cầu sang Local Worker (IP mạng nhà không bị chặn bot)
+    worker_url = get_clone_worker_url()
+    if worker_url:
+        try:
+            logger.info(f"Chuyển tiếp trích xuất YouTube qua Worker: {worker_url}")
+            clean_wurl = worker_url.rstrip("/")
+            resp = requests.post(
+                f"{clean_wurl}/api/youtube_stream",
+                headers={"X-API-Key": CLONE_API_KEY, "Content-Type": "application/json"},
+                json={"url": clean_url},
+                timeout=25
+            )
+            if resp.status_code == 200:
+                wdata = resp.json()
+                if wdata.get("status") == "success" and wdata.get("stream_url"):
+                    logger.info("Worker đã trích xuất stream YouTube thành công!")
+                    return wdata["stream_url"], wdata, "worker_proxy"
+        except Exception as wex:
+            logger.warning(f"Worker YouTube fallback failed: {wex}")
+
     return None, None, None
 
 def extract_youtube_info_fast(url):
@@ -1644,7 +1666,7 @@ def process_youtube_transcribe_job(job_id, url, language="vi-VN", prefer_caption
         # 4. Nếu không có phụ đề sẵn -> Chạy phân mảnh 1 phút/lần
         if not extracted_captions:
             if not stream_url:
-                raise Exception("YouTube chặn IP máy chủ Cloud (yêu cầu xác thực bot). Vui lòng nhấn vào nút 'Cookie YouTube' màu vàng để nạp Cookie, hoặc kết nối URL Worker GPU!")
+                raise Exception("YouTube chặn IP máy chủ Cloud (yêu cầu xác thực bot). Hãy mở file 'CHAY_AI_CLONE_GIONG.bat' trên máy tính để tự động mở luồng qua mạng nhà, hoặc nhấn nút 'Cookie YouTube' màu vàng để nạp Cookie!")
 
             if total_duration <= 0:
                 total_duration = 3600.0
