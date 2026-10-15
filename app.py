@@ -4374,7 +4374,7 @@ def download_video_stream():
         }
         try:
             stream_session = requests.Session()
-            req = stream_session.get(direct_url, headers=headers_stream, stream=True, allow_redirects=True, timeout=(10, 90))
+            req = stream_session.get(direct_url, headers=headers_stream, stream=True, allow_redirects=True, timeout=(15, 600))
             if req.status_code == 200:
                 import urllib.parse
                 raw_name = custom_title or "douyin_video"
@@ -4393,7 +4393,7 @@ def download_video_stream():
 
                 def generate_douyin_stream():
                     try:
-                        for chunk in req.iter_content(chunk_size=131072):
+                        for chunk in req.iter_content(chunk_size=262144): # 256KB buffer for high throughput
                             if chunk:
                                 yield chunk
                     finally:
@@ -4451,7 +4451,7 @@ def download_video_stream():
             try:
                 with open(real_file, "rb") as f:
                     while True:
-                        chunk = f.read(65536) # 64KB chunk
+                        chunk = f.read(131072) # 128KB chunk
                         if not chunk:
                             break
                         yield chunk
@@ -4486,6 +4486,6 @@ if __name__ == "__main__":
     print(f"SLEEP2K Production Server (Waitress Multi-Threaded) running on port {port}")
     try:
         from waitress import serve
-        serve(app, host="0.0.0.0", port=port, threads=8, channel_timeout=180)
+        serve(app, host="0.0.0.0", port=port, threads=8, channel_timeout=1800)
     except ImportError:
         app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

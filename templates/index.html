@@ -2063,6 +2063,16 @@
                         <div id="dlCurrentBar" class="dl-progress-bar-fill" style="width:0%; background:linear-gradient(90deg, #10b981, #06b6d4);"></div>
                     </div>
                 </div>
+
+                <!-- Thông báo hướng dẫn lưu file và cấp quyền tải nhiều tệp -->
+                <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:10px; padding:10px 14px; margin-top:14px; font-size:12.5px; color:#cbd5e1; line-height:1.6; display:flex; align-items:flex-start; gap:10px;">
+                    <i class="fa-solid fa-circle-info" style="color:#60a5fa; font-size:16px; margin-top:2px;"></i>
+                    <div>
+                        <strong style="color:#93c5fd;">Cơ chế tải về máy tính:</strong> Trình duyệt sẽ tải từng video (hiển thị % trên thanh tiến độ). Khi video đạt 100%, trình duyệt sẽ <strong>tự động lưu vào thư mục Downloads</strong> của máy tính.
+                        <br>
+                        <span style="color:#fcd34d;">⚠️ <strong>Lưu ý:</strong> Nếu trình duyệt Chrome / Edge hỏi <strong>"Cho phép tải nhiều tệp" (Allow multiple downloads)</strong>, bạn hãy bấm <strong>"Cho phép" (Allow)</strong> để máy tự động lưu video liên tục mà không bị chặn!</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Khu Vực Danh Sách Video Quét Được -->
@@ -5039,9 +5049,14 @@ function renderVideoGrid() {
                             <span><i class="fa-regular fa-user"></i> ${escapeHtml(v.author || 'TikTok')}</span>
                             <span>ID: ${v.id.substring(0, 8)}...</span>
                         </div>
-                        <button class="dl-card-btn ${isDownloaded ? 'downloaded' : ''}" id="dl-btn-single-${v.id}" onclick="downloadSingleVideo('${v.id}')">
-                            ${isDownloaded ? '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy' : '<i class="fa-solid fa-arrow-down"></i> Tải Video Này'}
-                        </button>
+                        <div style="display:flex; gap:6px; margin-top:6px;">
+                            <button class="dl-card-btn ${isDownloaded ? 'downloaded' : ''}" id="dl-btn-single-${v.id}" onclick="downloadSingleVideo('${v.id}')" style="flex:1;">
+                                ${isDownloaded ? '<i class="fa-solid fa-check-double"></i> Đã Tải Về Máy' : '<i class="fa-solid fa-arrow-down"></i> Tải Video Này'}
+                            </button>
+                            <a href="/api/download_video_stream?url=${encodeURIComponent(v.url)}&title=${encodeURIComponent(v.title)}" target="_blank" download class="dl-card-btn" style="width:38px; padding:0; display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.08); text-decoration:none;" title="Tải trực tiếp bằng trình duyệt (Chrome Native Stream)">
+                                <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:12px;"></i>
+                            </a>
+                        </div>
                     </div>
                 `;
                 container.appendChild(card);
@@ -5158,13 +5173,27 @@ function renderVideoGrid() {
             }
         }
 
+        // Hàm tải trực tiếp qua native browser download manager (Stream thẳng ra ổ đĩa máy tính, 0 MB RAM)
+        function triggerNativeBrowserDownload(url, filename) {
+            const a = document.createElement("a");
+            a.href = url;
+            if (filename) a.download = filename;
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                try { if (a.parentNode) document.body.removeChild(a); } catch(e){}
+            }, 10000);
+        }
+
         // Hàm lõi: Tải video stream qua browser ReadableStream và lưu đĩa
         let currentDownloadAbortController = null;
 
-        // Hàm lõi: Tải video stream qua browser ReadableStream và lưu đĩa
         async function downloadVideoDirect(v, progressCb) {
             currentDownloadAbortController = new AbortController();
             const streamUrl = `/api/download_video_stream?url=${encodeURIComponent(v.url)}&title=${encodeURIComponent(v.title)}`;
+            const safeTitle = (v.title || "video").replace(/[\/*?:"<>|]/g, "").trim().substring(0, 60) || "video";
+            const filename = `${safeTitle}.mp4`;
             
             try {
                 const response = await fetch(streamUrl, { signal: currentDownloadAbortController.signal });
@@ -5203,17 +5232,28 @@ function renderVideoGrid() {
                     return false;
                 }
 
+                if (progressCb && totalBytes > 0) {
+                    const totalMb = (totalBytes / (1024 * 1024)).toFixed(1);
+                    progressCb(100, totalMb, totalMb, "Đang lưu tệp vào máy tính...");
+                }
+
                 const blob = new Blob(chunks, { type: "video/mp4" });
-                const safeTitle = (v.title || "video").replace(/[\/*?:"<>|]/g, "").trim().substring(0, 60) || "video";
-                const filename = `${safeTitle}.mp4`;
+                const blobUrl = URL.createObjectURL(blob);
 
                 const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
+                a.href = blobUrl;
                 a.download = filename;
                 document.body.appendChild(a);
                 a.click();
-                document.body.removeChild(a);
-                setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+                
+                setTimeout(() => {
+                    try { if (a.parentNode) document.body.removeChild(a); } catch(e){}
+                }, 2000);
+
+                // Giữ blob URL sống trong 2 phút để trình duyệt có đủ thời gian ghi file lớn (1GB+) ra ổ đĩa
+                setTimeout(() => {
+                    try { URL.revokeObjectURL(blobUrl); } catch(e){}
+                }, 120000);
 
                 return true;
             } catch (err) {
@@ -5221,7 +5261,11 @@ function renderVideoGrid() {
                     console.log("Đã hủy tải bởi người dùng");
                     return false;
                 }
-                throw err;
+                // Nếu fetch vào RAM gặp lỗi (ví dụ file quá lớn > 1GB làm tràn RAM tab hoặc gián đoạn mạng), tự động chuyển sang tải trực tiếp qua trình duyệt!
+                console.warn(`Lỗi fetch blob (${err.message}), tự động chuyển sang Native Browser Download...`);
+                triggerNativeBrowserDownload(streamUrl, filename);
+                showToast(`Đang tải trực tiếp bằng trình duyệt: "${safeTitle}"`, "info");
+                return true;
             } finally {
                 currentDownloadAbortController = null;
             }
@@ -5305,8 +5349,8 @@ function renderVideoGrid() {
                 document.getElementById("dlCurrentBar").style.width = "0%";
 
                 try {
-                    await downloadVideoDirect(v, (pct, loadedMb, totalMb) => {
-                        document.getElementById("dlCurrentVideoStats").innerText = `${loadedMb} MB / ${totalMb} MB (${pct.toFixed(1)}%)`;
+                    await downloadVideoDirect(v, (pct, loadedMb, totalMb, customStatus) => {
+                        document.getElementById("dlCurrentVideoStats").innerText = customStatus || `${loadedMb} MB / ${totalMb} MB (${pct.toFixed(1)}%)`;
                         document.getElementById("dlCurrentBar").style.width = `${pct}%`;
                     });
 
