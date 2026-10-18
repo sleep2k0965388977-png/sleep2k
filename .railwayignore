@@ -1,0 +1,16 @@
+output_audio/
+__pycache__/
+*.pyc
+.cache/
+venv_clone/
+local_test_clone/
+models/
+GPT_SoVITS/
+test_ab_cloning/
+pyTranscriber_app/
+uploads/
+checkpoints/
+.git/
+*.png
+*.mp3
+*.wav

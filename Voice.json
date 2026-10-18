@@ -2,6 +2,198 @@
   {
     "lan": "vi",
     "lang": "vi-VN",
+    "voice_type": "BV421_vivn_streaming",
+    "display_name": "Nhỏ Ngọt Ngào",
+    "resource_id": "7252594014782755330",
+    "captured_at": "2026-04-16T16:54:58.535653"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vi_female_huong",
+    "display_name": "Giọng Nữ Phổ Thông",
+    "resource_id": "7264854897953083905",
+    "captured_at": "2026-04-16T16:58:05.941432"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "BV074_streaming",
+    "display_name": "Cô Gái Hoạt Ngôn",
+    "resource_id": "7102355709945188865",
+    "captured_at": "2026-04-16T16:59:13.750474"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "BV074_streaming_dsp",
+    "display_name": "Giọng Bé",
+    "resource_id": "7550087831092251920",
+    "captured_at": "2026-04-16T16:59:13.750474"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "BV075_streaming_vibrato_dsp",
+    "display_name": "Việt Méo",
+    "resource_id": "7569450639810465040",
+    "captured_at": "2026-04-16T17:01:05.535801"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vi-VN-HoaiMyNeural",
+    "display_name": "Hoai My",
+    "resource_id": "7371666434650280464",
+    "captured_at": "2026-04-16T17:00:10.719561"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "vi-VN-NamMinhNeural",
+    "display_name": "Nam Minh",
+    "resource_id": "7371666524727153168",
+    "captured_at": "2026-04-16T17:00:10.719561"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "BV562_streaming",
+    "display_name": "Mai",
+    "resource_id": "7483736254694035984",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_yangguangnv_uranus_bigtts",
+    "display_name": "Ban Mai",
+    "resource_id": "7637456432522218773",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_richgirl_uranus_bigtts",
+    "display_name": "Review Phim new",
+    "resource_id": "7637460351541447956",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_quanweinv_uranus_bigtts",
+    "display_name": "Bản Tin 1",
+    "resource_id": "7637458743197732117",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_stokie_uranus_bigtts",
+    "display_name": "Review Phim 4",
+    "resource_id": "7637456729696996628",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_sisi_uranus_bigtts",
+    "display_name": "Bản Tin nữ",
+    "resource_id": "7637455857285860629",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_daqi_uranus_bigtts",
+    "display_name": "Review Phim 3",
+    "resource_id": "7637451983389019409",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_xyf04auto_uranus_bigtts",
+    "display_name": "Review Phim 2",
+    "resource_id": "7637458743197732117",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_kiwi_uranus_bigtts",
+    "display_name": "Sunny Idol",
+    "resource_id": "7637457995882089749",
+    "captured_at": "2026-04-16T17:03:08.196640"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "BV075_streaming_demon_dsp",
+    "display_name": "Kenny Đại Đế",
+    "resource_id": "7569442422665661712",
+    "captured_at": "2026-04-16T17:07:53.599467"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "BV075_streaming_robot_dsp",
+    "display_name": "Robot VN",
+    "resource_id": "7538698409633516816",
+    "captured_at": "2026-04-16T19:18:27.829029"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_male_felipe_uranus_bigtts",
+    "display_name": "Giọng Nam Trầm ",
+    "resource_id": "7637456729696996628",
+    "captured_at": "2026-04-16T19:18:27.829029"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_peiqi_uranus_bigtts",
+    "display_name": "Giọng Gái Mới Lớn",
+    "resource_id": "7637458789033151751",
+    "captured_at": "2026-04-16T19:18:27.829029"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_xinwenjieshuo_uranus_bigtts",
+    "display_name": "Nam bản tin",
+    "resource_id": "7637455039719640327",
+    "captured_at": "2026-04-16T19:18:27.829029"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "multi_female_tianmeijieshuo_uranus_bigtts",
+    "display_name": "Quên Tên Tự Test",
+    "resource_id": "7637460417295469832",
+    "captured_at": "2026-04-16T19:18:27.829029"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "BV075_streaming",
+    "display_name": "Thanh Niên Tự Tin",
+    "resource_id": "7102355803792740865",
+    "captured_at": "2026-04-16T19:18:27.829029"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
+    "voice_type": "BV560_streaming",
+    "display_name": "Alex Đại Đế",
+    "resource_id": "7483736167565758992",
+    "captured_at": "2026-04-16T20:26:32.733998"
+  },
+  {
+    "lan": "vi",
+    "lang": "vi-VN",
     "voice_type": "vieneu_truc_ly",
     "display_name": "Trúc Ly (Nữ Bắc - Tự nhiên)",
     "resource_id": "vieneu_v3_truc_ly",
@@ -178,142 +370,6 @@
     "resource_id": "vieneu_v3_quang_son",
     "engine": "vieneu",
     "captured_at": "2026-08-22T20:45:00.000000"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV421_vivn_streaming",
-    "display_name": "Nhỏ Ngọt Ngào",
-    "resource_id": "7252594014782755330",
-    "captured_at": "2026-04-16T16:54:58.535653"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vi_female_huong",
-    "display_name": "Giọng Nữ Phổ Thông",
-    "resource_id": "7264854897953083905",
-    "captured_at": "2026-04-16T16:58:05.941432"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV074_streaming_dsp",
-    "display_name": "Giọng Bé",
-    "resource_id": "7550087831092251920",
-    "captured_at": "2026-04-16T16:59:13.750474"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV074_streaming",
-    "display_name": "Cô Gái Hoạt Ngôn",
-    "resource_id": "7102355709945188865",
-    "captured_at": "2026-04-16T16:59:13.750474"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vi-VN-HoaiMyNeural",
-    "display_name": "Hoai My",
-    "resource_id": "7371666434650280464",
-    "captured_at": "2026-04-16T17:00:10.719561"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "vi-VN-NamMinhNeural",
-    "display_name": "Nam Minh",
-    "resource_id": "7371666524727153168",
-    "captured_at": "2026-04-16T17:00:10.719561"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV075_streaming_vibrato_dsp",
-    "display_name": "Việt Méo",
-    "resource_id": "7569450639810465040",
-    "captured_at": "2026-04-16T17:01:05.535801"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV562_streaming",
-    "display_name": "Mai",
-    "resource_id": "7483736254694035984",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_yangguangnv_uranus_bigtts",
-    "display_name": "Ban Mai",
-    "resource_id": "7637456432522218773",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_richgirl_uranus_bigtts",
-    "display_name": "Review Phim new",
-    "resource_id": "7637460351541447956",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_quanweinv_uranus_bigtts",
-    "display_name": "Bản Tin 1",
-    "resource_id": "7637458743197732117",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_stokie_uranus_bigtts",
-    "display_name": "Review Phim 4",
-    "resource_id": "7637456729696996628",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_sisi_uranus_bigtts",
-    "display_name": "Bản Tin nữ",
-    "resource_id": "7637455857285860629",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_daqi_uranus_bigtts",
-    "display_name": "Review Phim 3",
-    "resource_id": "7637451983389019409",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_xyf04auto_uranus_bigtts",
-    "display_name": "Review Phim 2",
-    "resource_id": "7637458743197732117",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_kiwi_uranus_bigtts",
-    "display_name": "Sunny Idol",
-    "resource_id": "7637457995882089749",
-    "captured_at": "2026-04-16T17:03:08.196640"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV075_streaming_demon_dsp",
-    "display_name": "Kenny Đại Đế",
-    "resource_id": "7569442422665661712",
-    "captured_at": "2026-04-16T17:07:53.599467"
   },
   {
     "lan": "th",
@@ -788,60 +844,12 @@
     "captured_at": "2026-04-16T19:18:27.829029"
   },
   {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV075_streaming_robot_dsp",
-    "display_name": "Robot VN",
-    "resource_id": "7538698409633516816",
-    "captured_at": "2026-04-16T19:18:27.829029"
-  },
-  {
     "lan": "id",
     "lang": "id-ID",
     "voice_type": "id_female_icha_uranus_bigtts",
     "display_name": "Nữ Cao",
     "resource_id": "7587328219989249296",
     "captured_at": "2026-04-16T17:16:15.390713"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_male_felipe_uranus_bigtts",
-    "display_name": "Giọng Nam Trầm ",
-    "resource_id": "7637456729696996628",
-    "captured_at": "2026-04-16T19:18:27.829029"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_peiqi_uranus_bigtts",
-    "display_name": "Giọng Gái Mới Lớn",
-    "resource_id": "7637458789033151751",
-    "captured_at": "2026-04-16T19:18:27.829029"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_xinwenjieshuo_uranus_bigtts",
-    "display_name": "Nam bản tin",
-    "resource_id": "7637455039719640327",
-    "captured_at": "2026-04-16T19:18:27.829029"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "multi_female_tianmeijieshuo_uranus_bigtts",
-    "display_name": "Quên Tên Tự Test",
-    "resource_id": "7637460417295469832",
-    "captured_at": "2026-04-16T19:18:27.829029"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV075_streaming",
-    "display_name": "Thanh Niên Tự Tin",
-    "resource_id": "7102355803792740865",
-    "captured_at": "2026-04-16T19:18:27.829029"
   },
   {
     "lan": "pt",
@@ -1202,13 +1210,5 @@
     "display_name": "Uranus",
     "resource_id": "7587328479071309073",
     "captured_at": "2026-04-16T20:24:40.652003"
-  },
-  {
-    "lan": "vi",
-    "lang": "vi-VN",
-    "voice_type": "BV560_streaming",
-    "display_name": "Alex Đại Đế",
-    "resource_id": "7483736167565758992",
-    "captured_at": "2026-04-16T20:26:32.733998"
   }
 ]
