@@ -3331,6 +3331,7 @@ def api_dubbing_start():
 
     def run_dubbing_thread():
         try:
+            import shutil
             from video_dubbing_engine import VideoDubbingPipeline
 
             def on_progress(prog, msg, extra=None):
