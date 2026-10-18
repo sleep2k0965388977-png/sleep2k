@@ -1,6 +1,7 @@
 import logging
 logger = logging.getLogger("sleep2k")
 import os
+import shutil
 import re
 import math
 import json
