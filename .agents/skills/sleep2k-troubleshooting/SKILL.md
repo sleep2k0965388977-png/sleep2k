@@ -67,3 +67,16 @@ python .agents/skills/sleep2k-troubleshooting/scripts/diagnose.py
   - Track `window._activeTtsInterval` as a singleton in `startGeneration()`.
   - Use `window._hasAlertedPollError` latch to prevent duplicate alerts.
   - Unmute `audioPlayer.muted = false` and set volume to 1.0 when generation completes.
+
+---
+
+### 6. Video Downloader Network Lag / Weak Wi-Fi Drops ("Không truy cập được trang" / Flooding Chrome Downloads)
+* **Root Cause:**
+  - Weak Wi-Fi or packet loss causes temporary network stalls during large (1GB+) video downloads.
+  - If `/api/download_video_stream` does not support HTTP Range requests (`Range: bytes=...`, returning `206 Partial Content`), Chrome's "Tiếp tục" (Resume) button fails with "Không truy cập được trang".
+  - If frontend `downloadVideoDirect` catches errors and returns `true`, `startBulkDownload` mistakenly assumes the video finished and launches the next video, flooding Chrome with 40+ concurrent downloads that crash the user's network.
+* **Correct Fix:**
+  - In `app.py`: Support `Range: bytes=start-end` in `/api/download_video_stream` and forward it to upstream CDN with HTTP 206 response headers (`Content-Range`, `Accept-Ranges: bytes`).
+  - Add self-healing stream generator (`generate_resilient_douyin_stream`) that auto-reconnects with Range up to 5 times on connection drops without closing the client socket.
+  - In `templates/index.html`: Implement resumable Range-based fetch retry loop in `downloadVideoDirect` (up to 8 retries) preserving all previously buffered chunks.
+  - Never return `true` on download failure in `downloadVideoDirect` to prevent bulk download queue flood.

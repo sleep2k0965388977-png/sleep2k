@@ -78,6 +78,19 @@ if INDEX_HTML.exists():
         issues_found.append("[WARNING] formatDuration does not handle hours properly")
     else:
         print("✅ formatDuration formats hours/minutes/seconds properly")
+
+    # Check 4: Video downloader Range & retry resilience
+    if "download_video_stream" in txt:
+        if "Range" not in txt or "206" not in txt:
+            issues_found.append("[CRITICAL] app.py download_video_stream lacks HTTP Range 206 support (will fail resumes on weak networks)")
+        else:
+            print("✅ app.py download_video_stream supports HTTP Range (206 Partial Content)")
+
+    if "downloadVideoDirect" in html_txt:
+        if "maxRetries" not in html_txt or "fetchHeaders['Range']" not in html_txt:
+            issues_found.append("[CRITICAL] index.html downloadVideoDirect lacks resumable Range retry loop on network stalls")
+        else:
+            print("✅ index.html downloadVideoDirect has resumable Range retry loop")
 else:
     issues_found.append("[ERROR] templates/index.html not found")
 

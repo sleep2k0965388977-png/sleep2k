@@ -21,3 +21,7 @@
 
 5. **Self-Healing Diagnostics:**
    - Run `python .agents/skills/sleep2k-troubleshooting/scripts/diagnose.py` before and after making codebase edits to verify there are no watchdog or concurrency regressions.
+
+6. **Resilient Video Streaming & Weak Network Resumption:**
+   - Always support HTTP Range requests (`Range: bytes=start-end`, returning `206 Partial Content`) in `/api/download_video_stream` so browser pause/resume and weak networks never fail.
+   - In `templates/index.html`, never return `true` on download failure in `downloadVideoDirect`, and use resumable Range retries (up to 8 times) on network drops to prevent multi-download flooding.

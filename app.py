@@ -4348,17 +4348,20 @@ def scan_channel():
 @app.route("/api/download_video_stream", methods=["GET"])
 def download_video_stream():
     """
-    Downloads a single video via yt-dlp, streams it to client,
-    and immediately deletes the temp file on the server.
+    Downloads a single video via yt-dlp or direct stream, streams it to client,
+    supports HTTP Range (206 Partial Content) for resilient pause/resume on weak networks,
+    and immediately deletes any temp files on the server.
     Ensures 0 MB persistent storage on VPS!
     """
-    import tempfile, shutil, re
-    from flask import Response
+    import tempfile, shutil, re, urllib.parse
+    from flask import Response, stream_with_context
 
     target_url = request.args.get("url", "").strip()
     custom_title = request.args.get("title", "").strip()
     if not target_url:
         return jsonify({"error": "Thiếu URL video"}), 400
+
+    range_header = request.headers.get("Range")
 
     # Fast direct streaming for Douyin (0 VPS disk usage, pure streaming)
     if any(k in target_url for k in ["snssdk.com", "douyin.com", "zjcdn.com", "byteoversea.com"]):
@@ -4372,11 +4375,13 @@ def download_video_stream():
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
             "Referer": "https://www.douyin.com/"
         }
+        if range_header:
+            headers_stream["Range"] = range_header
+
         try:
             stream_session = requests.Session()
             req = stream_session.get(direct_url, headers=headers_stream, stream=True, allow_redirects=True, timeout=(15, 600))
-            if req.status_code == 200:
-                import urllib.parse
+            if req.status_code in [200, 206]:
                 raw_name = custom_title or "douyin_video"
                 clean_name = re.sub(r'[\/*?:"<>|]', "", raw_name).strip()[:80] or "douyin_video"
                 filename = f"{clean_name}.mp4"
@@ -4390,21 +4395,65 @@ def download_video_stream():
                 }
                 if req.headers.get("Content-Length"):
                     resp_headers["Content-Length"] = req.headers.get("Content-Length")
+                if req.headers.get("Content-Range"):
+                    resp_headers["Content-Range"] = req.headers.get("Content-Range")
 
-                def generate_douyin_stream():
+                range_start = 0
+                if range_header and range_header.startswith("bytes="):
                     try:
-                        for chunk in req.iter_content(chunk_size=262144): # 256KB buffer for high throughput
-                            if chunk:
-                                yield chunk
-                    finally:
-                        try:
-                            req.close()
-                            stream_session.close()
-                        except Exception:
-                            pass
+                        range_start = int(range_header.replace("bytes=", "").split("-")[0])
+                    except Exception:
+                        range_start = 0
 
-                from flask import stream_with_context, Response
-                return Response(stream_with_context(generate_douyin_stream()), headers=resp_headers)
+                def generate_resilient_douyin_stream():
+                    nonlocal req, stream_session
+                    bytes_sent = 0
+                    max_reconnects = 5
+                    reconnect_count = 0
+
+                    while True:
+                        try:
+                            for chunk in req.iter_content(chunk_size=262144): # 256KB buffer
+                                if chunk:
+                                    bytes_sent += len(chunk)
+                                    yield chunk
+                            break
+                        except Exception as e:
+                            reconnect_count += 1
+                            if reconnect_count > max_reconnects:
+                                logger.warning(f"Douyin stream failed after {max_reconnects} reconnects: {e}")
+                                break
+                            current_offset = range_start + bytes_sent
+                            logger.info(f"Douyin stream interrupted at byte {current_offset}. Auto-reconnecting ({reconnect_count}/{max_reconnects})...")
+                            import time
+                            time.sleep(1.0)
+                            try:
+                                req.close()
+                                stream_session.close()
+                            except Exception:
+                                pass
+                            try:
+                                stream_session = requests.Session()
+                                retry_headers = dict(headers_stream)
+                                retry_headers["Range"] = f"bytes={current_offset}-"
+                                req = stream_session.get(direct_url, headers=retry_headers, stream=True, allow_redirects=True, timeout=(15, 600))
+                                if req.status_code not in [200, 206]:
+                                    logger.warning(f"Douyin reconnect status: {req.status_code}")
+                                    break
+                            except Exception as re_err:
+                                logger.warning(f"Douyin reconnect error: {re_err}")
+                                break
+                    try:
+                        req.close()
+                        stream_session.close()
+                    except Exception:
+                        pass
+
+                return Response(
+                    stream_with_context(generate_resilient_douyin_stream()),
+                    status=req.status_code,
+                    headers=resp_headers
+                )
         except Exception as e:
             logger.warning(f"Douyin direct stream error: {e}")
 
@@ -4447,13 +4496,34 @@ def download_video_stream():
         clean_name = re.sub(r'[\\/*?:"<>|]', "", raw_name).strip()[:80] or "video"
         filename = f"{clean_name}.mp4"
 
+        # Check Range header for local file
+        range_start = 0
+        range_end = file_size - 1
+        status_code = 200
+        if range_header and range_header.startswith("bytes="):
+            try:
+                parts = range_header.replace("bytes=", "").split("-")
+                range_start = int(parts[0]) if parts[0] else 0
+                if len(parts) > 1 and parts[1]:
+                    range_end = min(int(parts[1]), file_size - 1)
+                status_code = 206
+            except Exception:
+                range_start = 0
+
+        content_length = range_end - range_start + 1
+
         def generate_and_cleanup():
             try:
                 with open(real_file, "rb") as f:
-                    while True:
-                        chunk = f.read(131072) # 128KB chunk
+                    if range_start > 0:
+                        f.seek(range_start)
+                    remaining = content_length
+                    while remaining > 0:
+                        chunk_size = min(131072, remaining)
+                        chunk = f.read(chunk_size)
                         if not chunk:
                             break
+                        remaining -= len(chunk)
                         yield chunk
             finally:
                 try:
@@ -4461,15 +4531,17 @@ def download_video_stream():
                 except Exception:
                     pass
 
-        import urllib.parse
         encoded_filename = urllib.parse.quote(filename)
         headers = {
             "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
-            "Content-Length": str(file_size),
+            "Content-Length": str(content_length),
             "Content-Type": "video/mp4",
+            "Accept-Ranges": "bytes",
             "Cache-Control": "no-cache"
         }
-        return Response(generate_and_cleanup(), headers=headers)
+        if status_code == 206:
+            headers["Content-Range"] = f"bytes {range_start}-{range_end}/{file_size}"
+        return Response(generate_and_cleanup(), status=status_code, headers=headers)
 
     except Exception as e:
         shutil.rmtree(temp_dir, ignore_errors=True)
