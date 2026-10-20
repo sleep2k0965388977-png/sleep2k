@@ -9,3 +9,4 @@ SpeechRecognition>=3.10.0
 waitress>=3.0.0
 yt-dlp
 curl-cffi
+faster-whisper>=1.0.0

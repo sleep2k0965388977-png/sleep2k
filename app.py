@@ -1011,8 +1011,12 @@ def cleanup_all_temp_files(max_age_seconds=600):
             pass
     for p in UPLOAD_DIR.glob("*"):
         try:
-            if now - p.stat().st_mtime > 300:
-                p.unlink(missing_ok=True)
+            if p.is_file():
+                if p.name.startswith("upload_dub_"):
+                    if now - p.stat().st_mtime > 3600:
+                        p.unlink(missing_ok=True)
+                elif now - p.stat().st_mtime > 300:
+                    p.unlink(missing_ok=True)
         except Exception:
             pass
     for p in OUTPUT_DIR.glob("temp_*"):
@@ -1029,6 +1033,15 @@ def cleanup_all_temp_files(max_age_seconds=600):
                 p.unlink(missing_ok=True)
         except Exception:
             pass
+    # Purge old video dubbing temp working directories older than 1 hour
+    temp_dub_dir = Path(os.getcwd()) / "temp_dubbing"
+    if temp_dub_dir.exists():
+        for job_p in temp_dub_dir.glob("job_*"):
+            try:
+                if job_p.is_dir() and now - job_p.stat().st_mtime > 3600:
+                    shutil.rmtree(job_p, ignore_errors=True)
+            except Exception:
+                pass
 
 def stitch_audio_chunks(chunk_bytes_list, output_file_path):
     """
@@ -3259,7 +3272,7 @@ def api_dubbing_start():
     source_lang = request.form.get("source_lang", "zh")
     target_lang = request.form.get("target_lang", "vi")
     voice = request.form.get("voice", "vi-VN-HoaiMyNeural")
-    mode = request.form.get("mode", "ducking")
+    mode = request.form.get("mode", "replace")
     whisper_model = request.form.get("whisper_model", "base")
     video_url = (request.form.get("video_url") or "").strip()
 
@@ -3326,6 +3339,11 @@ def api_dubbing_start():
         "message": "Đang bắt đầu phân tích video...",
         "video_url": None,
         "srt_url": None,
+        "audio_url": None,
+        "mode": mode,
+        "saved_video_path": str(saved_video_path),
+        "master_wav": None,
+        "raw_audio": None,
         "segments": []
     }
 
@@ -3358,11 +3376,25 @@ def api_dubbing_start():
             if res.get("srt_file") and Path(res["srt_file"]).exists():
                 shutil.copy2(res["srt_file"], srt_dest)
 
+            audio_name = f"dubbed_{job_id}.mp3"
+            audio_dest = dubbed_dir / audio_name
+            if res.get("master_mp3") and Path(res["master_mp3"]).exists():
+                shutil.copy2(res["master_mp3"], audio_dest)
+            elif res.get("master_wav") and Path(res["master_wav"]).exists():
+                try:
+                    subprocess.run(["ffmpeg", "-y", "-i", str(res["master_wav"]), "-b:a", "192k", str(audio_dest)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+
             DUBBING_JOBS[job_id]["status"] = "completed"
             DUBBING_JOBS[job_id]["progress"] = 100
             DUBBING_JOBS[job_id]["message"] = "Hoàn tất! Video đã được dịch và lồng tiếng Việt thành công."
             DUBBING_JOBS[job_id]["video_url"] = f"/output/dubbed/{out_video_name}"
             DUBBING_JOBS[job_id]["srt_url"] = f"/output/dubbed/{srt_name}"
+            DUBBING_JOBS[job_id]["audio_url"] = f"/output/dubbed/{audio_name}" if audio_dest.exists() else None
+            DUBBING_JOBS[job_id]["mode"] = mode
+            DUBBING_JOBS[job_id]["master_wav"] = str(res.get("master_wav", ""))
+            DUBBING_JOBS[job_id]["raw_audio"] = str(res.get("raw_audio", ""))
             DUBBING_JOBS[job_id]["segments"] = res.get("segments", [])
             DUBBING_JOBS[job_id]["total_duration"] = res.get("total_duration", 0)
         except Exception as ex:
@@ -3381,8 +3413,97 @@ def api_dubbing_start():
 def api_dubbing_status(job_id):
     job = DUBBING_JOBS.get(job_id)
     if not job:
+        # Fallback: check if completed video exists on disk
+        dubbed_dir = OUTPUT_DIR / "dubbed"
+        out_video = dubbed_dir / f"dubbed_{job_id}.mp4"
+        if out_video.exists():
+            srt_f = dubbed_dir / f"dubbed_{job_id}.srt"
+            mp3_f = dubbed_dir / f"dubbed_{job_id}.mp3"
+            return jsonify({
+                "job_id": job_id,
+                "status": "completed",
+                "progress": 100,
+                "message": "Hoàn tất! Video đã được dịch và lồng tiếng Việt thành công.",
+                "video_url": f"/output/dubbed/dubbed_{job_id}.mp4",
+                "srt_url": f"/output/dubbed/dubbed_{job_id}.srt" if srt_f.exists() else None,
+                "audio_url": f"/output/dubbed/dubbed_{job_id}.mp3" if mp3_f.exists() else None,
+                "mode": "replace",
+                "segments": []
+            })
         return jsonify({"status": "error", "message": "Không tìm thấy tiến trình lồng tiếng."}), 404
     return jsonify(job)
+
+@app.route("/api/dubbing/remux", methods=["POST"])
+def api_dubbing_remux():
+    job_id = (request.form.get("job_id") or "").strip()
+    new_mode = request.form.get("mode", "replace") # "replace", "smart_mute", "ducking"
+    
+    dubbed_dir = OUTPUT_DIR / "dubbed"
+    out_video_name = f"dubbed_{job_id}.mp4"
+    out_video_path = dubbed_dir / out_video_name
+
+    job = DUBBING_JOBS.get(job_id)
+    saved_video = None
+    master_wav = None
+    raw_audio = None
+    segments = []
+
+    if job:
+        saved_video = job.get("saved_video_path")
+        master_wav = job.get("master_wav")
+        raw_audio = job.get("raw_audio")
+        segments = job.get("segments", [])
+
+    # Fallback to disk scan if not in memory
+    if not saved_video or not Path(saved_video).exists():
+        for cand in [UPLOAD_DIR / f"upload_dub_{job_id}.mp4", UPLOAD_DIR / f"upload_dub_{job_id}.mkv"]:
+            if cand.exists():
+                saved_video = str(cand)
+                break
+
+    if not master_wav or not Path(master_wav).exists():
+        temp_dir = UPLOAD_DIR / "dubbing_temp"
+        if temp_dir.exists():
+            for sub in temp_dir.iterdir():
+                if sub.is_dir() and (sub / "master_vietnamese_dub.wav").exists():
+                    master_wav = str(sub / "master_vietnamese_dub.wav")
+                    if (sub / "raw_audio.wav").exists():
+                        raw_audio = str(sub / "raw_audio.wav")
+                    break
+
+    if not saved_video or not master_wav or not Path(saved_video).exists() or not Path(master_wav).exists():
+        return jsonify({"status": "error", "message": "Không tìm thấy dữ liệu gốc để chuyển đổi chế độ hòa trộn."}), 404
+
+    try:
+        from video_dubbing_engine import remux_dubbed_audio
+        remux_dubbed_audio(
+            video_input_path=saved_video,
+            master_wav_path=master_wav,
+            output_video_path=out_video_path,
+            mode=new_mode,
+            detected_segments=segments,
+            raw_audio_path=raw_audio
+        )
+
+        v_url = f"/output/dubbed/{out_video_name}?t={int(time.time())}"
+        if job:
+            job["mode"] = new_mode
+            job["video_url"] = v_url
+
+        mode_name_map = {
+            "replace": "Xóa sạch giọng gốc (100% tiếng Việt)",
+            "smart_mute": "Tắt giọng gốc khi nói (Giữ nhạc lúc nghỉ)",
+            "ducking": "Thuyết minh (Giữ tiếng gốc 15%)"
+        }
+        return jsonify({
+            "status": "success",
+            "mode": new_mode,
+            "video_url": v_url,
+            "message": f"Đã chuyển đổi sang chế độ '{mode_name_map.get(new_mode, new_mode)}' thành công!"
+        })
+    except Exception as ex:
+        logger.error(f"Remux error for {job_id}: {ex}", exc_info=True)
+        return jsonify({"status": "error", "message": f"Lỗi hòa trộn: {str(ex)}"}), 500
 
 # ── 3-Pass Neural Contextual Translation Engine (Ultralight, Zero-Overload) ──
 
