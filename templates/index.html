@@ -1436,6 +1436,11 @@
                 <span>Tải Video TikTok / Douyin</span>
                 <span class="mode-badge-new" style="background:linear-gradient(135deg,#fe2c55,#25f4ee); color:#000; font-weight:800;">HOT</span>
             </button>
+            <button class="mode-btn" id="btnModeDubbing" onclick="switchMode('dubbing')">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color:#a855f7;"></i>
+                <span>Dịch & Lồng Tiếng Video</span>
+                <span class="mode-badge-new" style="background:linear-gradient(135deg,#a855f7,#6366f1); color:#fff; font-weight:800;">AI PRO</span>
+            </button>
         </div>
 
         <!-- TTS Mode Section -->
@@ -2104,6 +2109,143 @@
             </div>
         </div>
         <!-- End Section Downloader -->
+
+        <!-- Section Video Dubbing (Dịch & Lồng Tiếng Video Trung - Việt) -->
+        <div id="sectionDubbing" style="display: none;">
+            <div class="dl-card" style="margin-bottom: 20px;">
+                <div class="dl-title-row">
+                    <div>
+                        <div class="dl-title" style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-wand-magic-sparkles" style="color: #a855f7; font-size: 22px;"></i>
+                            <span>Dịch & Lồng Tiếng Video Tự Động (AI Video Dubbing)</span>
+                        </div>
+                        <p style="color: var(--text-muted); font-size: 13.5px; margin-top: 6px; line-height: 1.5;">
+                            Tự động phát hiện âm thanh tiếng Trung &rarr; Bóc tách câu thoại theo từng giây (Faster-Whisper) &rarr; Dịch sang tiếng Việt &rarr; Lồng tiếng AI (Edge-TTS) co giãn tốc độ khớp chuẩn thời lượng &rarr; Xuất video hoàn chỉnh.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Input Methods: File Upload OR Link -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px;" id="dubbingInputGrid">
+                    <!-- Option 1: File Upload -->
+                    <div id="dubDropZone" style="border: 2px dashed rgba(168, 85, 247, 0.4); border-radius: 12px; padding: 24px; text-align: center; background: rgba(168, 85, 247, 0.04); cursor: pointer; transition: all 0.25s ease;"
+                         onclick="document.getElementById('dubFileInput').click()"
+                         ondragover="event.preventDefault(); this.style.borderColor='#a855f7';"
+                         ondragleave="this.style.borderColor='rgba(168, 85, 247, 0.4)';"
+                         ondrop="handleDubDrop(event)">
+                        <input type="file" id="dubFileInput" accept="video/*" style="display: none;" onchange="handleDubFileSelect(event)">
+                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 36px; color: #a855f7; margin-bottom: 10px;"></i>
+                        <div style="font-weight: 600; font-size: 15px; color: #f3f4f6;" id="dubFileLabel">Tải Lên Video Từ Máy Tính</div>
+                        <div style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">Kéo thả hoặc nhấp để chọn tệp (MP4, MKV, MOV, WebM)</div>
+                    </div>
+
+                    <!-- Option 2: URL Input -->
+                    <div style="border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 20px; background: rgba(15, 23, 42, 0.6); display: flex; flex-direction: column; justify-content: center;">
+                        <label style="font-weight: 600; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-link" style="color: #38bdf8;"></i> Hoặc Dán Link Video (Douyin / TikTok / YouTube):
+                        </label>
+                        <input type="text" id="dubUrlInput" placeholder="https://www.douyin.com/video/... hoặc link TikTok" 
+                               style="width: 100%; padding: 12px 14px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px; outline: none;">
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">Hệ thống sẽ tự động tải video gốc về máy chủ để xử lý.</div>
+                    </div>
+                </div>
+
+                <!-- Settings Row -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.08);">
+                    <div>
+                        <label style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; display: block;">Ngôn ngữ gốc trong video:</label>
+                        <select id="dubSourceLang" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px;">
+                            <option value="zh" selected>🇨🇳 Tiếng Trung Quốc (Mặc định)</option>
+                            <option value="en">🇬🇧 Tiếng Anh</option>
+                            <option value="auto">🌐 Tự Động Nhận Diện</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; display: block;">Giọng đọc tiếng Việt (TTS):</label>
+                        <select id="dubVoice" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px;">
+                            <option value="vi-VN-HoaiMyNeural" selected>👩 Nữ - Hoài My (Ngọt ngào, truyền cảm)</option>
+                            <option value="vi-VN-NamMinhNeural">👨 Nam - Nam Minh (Trầm ấm, thời sự)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; display: block;">Chế độ âm thanh xuất ra:</label>
+                        <select id="dubMode" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px;">
+                            <option value="ducking" selected>🎬 Thuyết minh (Giữ nhạc nền 15% + Lồng tiếng)</option>
+                            <option value="replace">🔇 Thay thế hoàn toàn (Chỉ giữ tiếng Việt)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; display: block;">Độ chính xác AI (Whisper):</label>
+                        <select id="dubWhisperModel" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px;">
+                            <option value="base" selected>⚡ Base (Nhanh & chuẩn - Khuyên dùng)</option>
+                            <option value="small">🎯 Small (Chính xác cao hơn)</option>
+                            <option value="tiny">🚀 Tiny (Siêu tốc độ)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div style="margin-top: 22px; text-align: center;">
+                    <button id="btnStartDubbing" onclick="startDubbingProcess()" 
+                            style="background: linear-gradient(135deg, #a855f7, #6366f1); color: #fff; border: none; padding: 14px 36px; border-radius: 30px; font-weight: 700; font-size: 15px; cursor: pointer; box-shadow: 0 4px 20px rgba(168, 85, 247, 0.4); display: inline-flex; align-items: center; gap: 10px; transition: all 0.25s ease;">
+                        <i class="fa-solid fa-play"></i> BẮT ĐẦU DỊCH & LỒNG TIẾNG VIDEO
+                    </button>
+                </div>
+            </div>
+
+            <!-- Progress Card -->
+            <div id="dubProgressCard" class="dl-card" style="display: none; margin-bottom: 20px; border-color: rgba(168,85,247,0.3);">
+                <div class="dl-title-row">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <i class="fa-solid fa-spinner fa-spin" id="dubSpinner" style="color: #a855f7; font-size: 20px;"></i>
+                        <span id="dubProgressMsg" style="font-weight: 600; font-size: 14.5px;">Đang chuẩn bị tiến trình...</span>
+                    </div>
+                    <span id="dubProgressPercent" style="font-weight: 800; font-size: 16px; color: #a855f7;">0%</span>
+                </div>
+                <div class="dl-progress-bar-track" style="margin-top: 14px; height: 10px; background: rgba(255,255,255,0.08); border-radius: 5px; overflow: hidden;">
+                    <div id="dubProgressBar" class="dl-progress-bar-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #a855f7, #6366f1); transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+
+            <!-- Result Card -->
+            <div id="dubResultCard" class="dl-card" style="display: none;">
+                <div class="dl-title-row" style="margin-bottom: 16px;">
+                    <div class="dl-title" style="display: flex; align-items: center; gap: 10px; color: #34d399;">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span>Video Đã Lồng Tiếng Việt Thành Công!</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <a id="dubDownloadVideoBtn" href="#" download class="social-btn" style="background: rgba(16,185,129,0.2); color: #6ee7b7; border-color: rgba(16,185,129,0.4); text-decoration: none;">
+                            <i class="fa-solid fa-download"></i> Tải Video MP4
+                        </a>
+                        <a id="dubDownloadSrtBtn" href="#" download class="social-btn" style="background: rgba(59,130,246,0.2); color: #93c5fd; border-color: rgba(59,130,246,0.4); text-decoration: none;">
+                            <i class="fa-solid fa-closed-captioning"></i> Tải Phụ Đề SRT
+                        </a>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                    <div style="background: #000; border-radius: 12px; overflow: hidden; max-height: 480px; display: flex; justify-content: center; align-items: center;">
+                        <video id="dubVideoPlayer" controls style="max-height: 480px; width: 100%; outline: none;"></video>
+                    </div>
+
+                    <!-- Subtitle Segments Timeline Table -->
+                    <div>
+                        <h4 style="font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-list-check" style="color: #a855f7;"></i>
+                            <span>Chi Tiết Bóc Tách & Lồng Tiếng Theo Từng Giây (<span id="dubSegCount">0</span> câu thoại):</span>
+                        </h4>
+                        <div id="dubSegmentsList" style="max-height: 320px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); padding: 10px;">
+                            <!-- Segments dynamically rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- End Section Video Dubbing -->
 
         <!-- Support & Contact Footer -->
         <footer class="app-footer" style="display: none !important;">
@@ -3131,12 +3273,14 @@
             const btnTTS = document.getElementById("btnModeTTS");
             const btnSTT = document.getElementById("btnModeSTT");
             const btnDownloader = document.getElementById("btnModeDownloader");
+            const btnDubbing = document.getElementById("btnModeDubbing");
             const secTTS = document.getElementById("sectionTTS");
             const secSTT = document.getElementById("sectionSTT");
             const secDownloader = document.getElementById("sectionDownloader");
+            const secDubbing = document.getElementById("sectionDubbing");
 
-            [btnTTS, btnSTT, btnDownloader].forEach(b => b && b.classList.remove("active"));
-            [secTTS, secSTT, secDownloader].forEach(s => s && (s.style.display = "none"));
+            [btnTTS, btnSTT, btnDownloader, btnDubbing].forEach(b => b && b.classList.remove("active"));
+            [secTTS, secSTT, secDownloader, secDubbing].forEach(s => s && (s.style.display = "none"));
 
             if (mode === "tts") {
                 if (btnTTS) btnTTS.classList.add("active");
@@ -3147,6 +3291,9 @@
             } else if (mode === "downloader") {
                 if (btnDownloader) btnDownloader.classList.add("active");
                 if (secDownloader) secDownloader.style.display = "block";
+            } else if (mode === "dubbing") {
+                if (btnDubbing) btnDubbing.classList.add("active");
+                if (secDubbing) secDubbing.style.display = "block";
             }
         }
 
@@ -5511,6 +5658,191 @@ function renderVideoGrid() {
             document.getElementById("dlCurrentVideoStats").innerText = "Đã dừng tiến trình tải";
             document.getElementById("dlCurrentBar").style.width = "0%";
             showToast("Đã dừng và hủy tiến trình tải tuần tự!", "info");
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // 🎬 AI VIDEO DUBBING LOGIC (Dịch & Lồng Tiếng Video Khớp Từng Giây)
+        // ══════════════════════════════════════════════════════════════
+        let selectedDubFile = null;
+        let dubbingInterval = null;
+
+        function handleDubFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            setDubFile(file);
+        }
+
+        function handleDubDrop(e) {
+            e.preventDefault();
+            document.getElementById("dubDropZone").style.borderColor = "rgba(168, 85, 247, 0.4)";
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                setDubFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function setDubFile(file) {
+            selectedDubFile = file;
+            const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+            document.getElementById("dubFileLabel").innerHTML = `<i class="fa-solid fa-file-video" style="color:#34d399;"></i> ${file.name} <span style="color:#a855f7; font-weight:normal;">(${sizeMb} MB)</span>`;
+            document.getElementById("dubUrlInput").value = "";
+        }
+
+        async function startDubbingProcess() {
+            let urlInput = (document.getElementById("dubUrlInput").value || "").trim();
+            // Tự động bóc tách link sạch từ đoạn văn bản chia sẻ Douyin / TikTok
+            const urlMatch = urlInput.match(/https?:\/\/[^\s,]+/);
+            if (urlMatch) {
+                urlInput = urlMatch[0];
+                document.getElementById("dubUrlInput").value = urlInput;
+            }
+
+            if (!selectedDubFile && !urlInput) {
+                showToast("Vui lòng chọn tệp video từ máy tính hoặc dán link video Douyin/TikTok!", "error");
+                return;
+            }
+
+            const sourceLang = document.getElementById("dubSourceLang").value;
+            const voice = document.getElementById("dubVoice").value;
+            const mode = document.getElementById("dubMode").value;
+            const whisperModel = document.getElementById("dubWhisperModel").value;
+
+            const btn = document.getElementById("btnStartDubbing");
+            btn.disabled = true;
+            btn.style.opacity = "0.6";
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang Xử Lý Video...`;
+
+            document.getElementById("dubProgressCard").style.display = "block";
+            document.getElementById("dubResultCard").style.display = "none";
+            document.getElementById("dubProgressBar").style.width = "5%";
+            document.getElementById("dubProgressPercent").innerText = "5%";
+            document.getElementById("dubProgressMsg").innerText = "Đang gửi yêu cầu và chuẩn bị môi trường AI...";
+
+            const formData = new FormData();
+            if (selectedDubFile) {
+                formData.append("file", selectedDubFile);
+            }
+            if (urlInput) {
+                formData.append("video_url", urlInput);
+            }
+            formData.append("source_lang", sourceLang);
+            formData.append("target_lang", "vi");
+            formData.append("voice", voice);
+            formData.append("mode", mode);
+            formData.append("whisper_model", whisperModel);
+
+            try {
+                const resp = await fetch("/api/dubbing/start", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await resp.json();
+                if (!resp.ok || data.status !== "success") {
+                    throw new Error(data.message || "Không thể khởi tạo tiến trình lồng tiếng!");
+                }
+
+                const jobId = data.job_id;
+                pollDubbingStatus(jobId);
+            } catch (err) {
+                showToast("Lỗi: " + err.message, "error");
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                btn.innerHTML = `<i class="fa-solid fa-play"></i> BẮT ĐẦU DỊCH & LỒNG TIẾNG VIDEO`;
+                document.getElementById("dubProgressCard").style.display = "none";
+            }
+        }
+
+        function pollDubbingStatus(jobId) {
+            if (dubbingInterval) clearInterval(dubbingInterval);
+
+            dubbingInterval = setInterval(async () => {
+                try {
+                    const resp = await fetch(`/api/dubbing/status/${jobId}`);
+                    if (!resp.ok) return;
+                    const data = await resp.json();
+
+                    const prog = Math.min(100, Math.max(0, data.progress || 0));
+                    document.getElementById("dubProgressBar").style.width = prog + "%";
+                    document.getElementById("dubProgressPercent").innerText = prog + "%";
+                    if (data.message) {
+                        document.getElementById("dubProgressMsg").innerText = data.message;
+                    }
+
+                    if (data.status === "completed") {
+                        clearInterval(dubbingInterval);
+                        onDubbingCompleted(data);
+                    } else if (data.status === "error") {
+                        clearInterval(dubbingInterval);
+                        showToast("Lỗi lồng tiếng: " + (data.message || "Thất bại"), "error");
+                        const btn = document.getElementById("btnStartDubbing");
+                        btn.disabled = false;
+                        btn.style.opacity = "1";
+                        btn.innerHTML = `<i class="fa-solid fa-play"></i> BẮT ĐẦU DỊCH & LỒNG TIẾNG VIDEO`;
+                    }
+                } catch (e) {
+                    console.warn("Poll status error:", e);
+                }
+            }, 1800);
+        }
+
+        function onDubbingCompleted(data) {
+            const btn = document.getElementById("btnStartDubbing");
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> ĐÃ HOÀN TẤT - TIẾP TỤC VIDEO KHÁC`;
+
+            document.getElementById("dubProgressCard").style.display = "none";
+            document.getElementById("dubResultCard").style.display = "block";
+
+            // Set video player
+            const player = document.getElementById("dubVideoPlayer");
+            if (data.video_url) {
+                player.src = data.video_url;
+                player.load();
+            }
+
+            document.getElementById("dubDownloadVideoBtn").href = data.video_url || "#";
+            document.getElementById("dubDownloadSrtBtn").href = data.srt_url || "#";
+
+            // Render segments
+            const segments = data.segments || [];
+            document.getElementById("dubSegCount").innerText = segments.length;
+            const listEl = document.getElementById("dubSegmentsList");
+            listEl.innerHTML = "";
+
+            if (segments.length === 0) {
+                listEl.innerHTML = `<div style="color:var(--text-muted); font-size:13px; text-align:center; padding:12px;">Không có đoạn hội thoại riêng lẻ.</div>`;
+            } else {
+                segments.forEach((s) => {
+                    const row = document.createElement("div");
+                    row.style.cssText = "display:grid; grid-template-columns: 120px 1fr 1fr; gap:10px; padding:8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:12.5px; align-items:center;";
+                    row.innerHTML = `
+                        <div style="color:#a855f7; font-weight:700; font-family:monospace;">
+                            <i class="fa-regular fa-clock"></i> ${formatSecondsToHms(s.start)} - ${formatSecondsToHms(s.end)}
+                        </div>
+                        <div style="color:#94a3b8; font-style:italic;">
+                            ${escapeHtml(s.text || "")}
+                        </div>
+                        <div style="color:#34d399; font-weight:600;">
+                            ${escapeHtml(s.translated_text || "")}
+                        </div>
+                    `;
+                    listEl.appendChild(row);
+                });
+            }
+
+            showToast("Đã dịch và lồng tiếng video thành công!", "success");
+        }
+
+        function formatSecondsToHms(sec) {
+            sec = Math.max(0, parseFloat(sec) || 0);
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            const ms = Math.floor((sec - Math.floor(sec)) * 10);
+            return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}.${ms}`;
+        }
+
+        function escapeHtml(str) {
+            return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
 
         // Tự động khởi tạo số lượng đã tải khi mở trang

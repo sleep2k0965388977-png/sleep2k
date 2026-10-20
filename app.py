@@ -1,6 +1,7 @@
 import logging
 logger = logging.getLogger("sleep2k")
 import os
+import shutil
 import re
 import math
 import json
@@ -508,6 +509,7 @@ def api_protection():
         '/api/clone_worker_status': 30,
         '/api/set_clone_worker_url': 30,
         '/api/youtube_cookies': 30,
+        '/api/dubbing/start': 15,
     }
     max_req = rate_limits.get(path, 30)  # default 30/min
     if not _rate_check(path, max_req):
@@ -525,6 +527,9 @@ PREVIEW_DIR.mkdir(exist_ok=True)
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+DUBBED_DIR = OUTPUT_DIR / "dubbed"
+DUBBED_DIR.mkdir(parents=True, exist_ok=True)
+DUBBING_JOBS = {}
 
 CUSTOM_VOICES_DIR = UPLOAD_DIR / "custom_voices"
 CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
@@ -1413,6 +1418,15 @@ def index_downloader():
         page_canonical="https://sleep2k.up.railway.app/tai-video-tiktok-douyin"
     )
 
+@app.route("/dich-va-long-tieng-video")
+def index_dubbing():
+    return render_template("index.html", 
+        mode="dubbing",
+        page_title="Dịch & Lồng Tiếng Video Trung - Việt Khớp Từng Giây - SLEEP2K",
+        page_desc="Công cụ AI tự động bóc tách giọng nói tiếng Trung theo từng giây, dịch thuật và lồng tiếng Việt Nam đồng bộ thời lượng chuẩn xác.",
+        page_canonical="https://sleep2k.up.railway.app/dich-va-long-tieng-video"
+    )
+
 
 @app.route("/favicon.ico")
 def favicon():
@@ -2229,6 +2243,11 @@ def serve_audio(filename):
 @app.route("/output/previews/<filename>")
 def serve_preview_audio(filename):
     return send_from_directory(PREVIEW_DIR, filename)
+
+@app.route("/output/dubbed/<path:filename>")
+def serve_dubbed_video(filename):
+    dubbed_dir = OUTPUT_DIR / "dubbed"
+    return send_from_directory(str(dubbed_dir), filename)
 
 @app.route("/uploads/custom_voices/<filename>")
 def serve_custom_voice(filename):
@@ -3231,6 +3250,138 @@ def api_transcribe_status(job_id):
 
         return jsonify({"status": "error", "message": "Không tìm thấy tiến trình chuyển đổi."}), 404
 
+    return jsonify(job)
+
+# ── AI Video Dubbing (Dịch & Lồng Tiếng Video Đồng Bộ Từng Giây) ──
+
+@app.route("/api/dubbing/start", methods=["POST"])
+def api_dubbing_start():
+    source_lang = request.form.get("source_lang", "zh")
+    target_lang = request.form.get("target_lang", "vi")
+    voice = request.form.get("voice", "vi-VN-HoaiMyNeural")
+    mode = request.form.get("mode", "ducking")
+    whisper_model = request.form.get("whisper_model", "base")
+    video_url = (request.form.get("video_url") or "").strip()
+
+    job_id = uuid.uuid4().hex[:8]
+    dubbed_dir = OUTPUT_DIR / "dubbed"
+    dubbed_dir.mkdir(parents=True, exist_ok=True)
+    out_video_name = f"dubbed_{job_id}.mp4"
+    out_video_path = dubbed_dir / out_video_name
+
+    saved_video_path = None
+
+    if "file" in request.files and request.files["file"].filename:
+        file = request.files["file"]
+        ext = Path(file.filename).suffix.lower() or ".mp4"
+        saved_video_path = UPLOAD_DIR / f"upload_dub_{job_id}{ext}"
+        file.save(str(saved_video_path))
+    elif video_url:
+        saved_video_path = UPLOAD_DIR / f"upload_dub_{job_id}.mp4"
+        # 1. Clean and extract URL from share snippets (e.g. Douyin / TikTok copy-paste text)
+        m_u = re.search(r'https?://[^\s,]+', video_url)
+        clean_url = m_u.group(0).strip() if m_u else video_url.strip()
+
+        downloaded = False
+        # 2. Native Douyin no-watermark high-speed extractor
+        if any(d in clean_url for d in ["douyin.com", "iesdouyin.com"]):
+            try:
+                dy_info = extract_douyin_info(clean_url)
+                if dy_info and dy_info.get("url"):
+                    direct_url = dy_info["url"]
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+                        "Referer": "https://www.douyin.com/"
+                    }
+                    r = requests.get(direct_url, headers=headers, stream=True, timeout=30)
+                    if r.status_code in [200, 206]:
+                        with open(str(saved_video_path), "wb") as f:
+                            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                                f.write(chunk)
+                        downloaded = True
+            except Exception as dy_err:
+                logger.warning(f"Douyin direct extraction failed, falling back to yt-dlp: {dy_err}")
+
+        # 3. Fallback to yt-dlp for TikTok, YouTube, or other sources
+        if not downloaded:
+            ydl_opts = {
+                'outtmpl': str(saved_video_path),
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'quiet': True,
+                'no_warnings': True
+            }
+            try:
+                from yt_dlp import YoutubeDL
+                with YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([clean_url])
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Không thể tải video từ URL: {e}"}), 400
+    else:
+        return jsonify({"status": "error", "message": "Vui lòng chọn tệp video hoặc dán link video!"}), 400
+
+    DUBBING_JOBS[job_id] = {
+        "job_id": job_id,
+        "status": "processing",
+        "progress": 5,
+        "message": "Đang bắt đầu phân tích video...",
+        "video_url": None,
+        "srt_url": None,
+        "segments": []
+    }
+
+    def run_dubbing_thread():
+        try:
+            import shutil
+            from video_dubbing_engine import VideoDubbingPipeline
+
+            def on_progress(prog, msg, extra=None):
+                if job_id in DUBBING_JOBS:
+                    DUBBING_JOBS[job_id]["progress"] = prog
+                    DUBBING_JOBS[job_id]["message"] = msg
+                    if extra and "segments" in extra:
+                        DUBBING_JOBS[job_id]["segments"] = extra["segments"]
+
+            pipe = VideoDubbingPipeline(work_dir=UPLOAD_DIR / "dubbing_temp")
+            res = pipe.process(
+                video_input_path=saved_video_path,
+                output_video_path=out_video_path,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                voice=voice,
+                mode=mode,
+                whisper_model_size=whisper_model,
+                progress_callback=on_progress
+            )
+
+            srt_name = f"dubbed_{job_id}.srt"
+            srt_dest = dubbed_dir / srt_name
+            if res.get("srt_file") and Path(res["srt_file"]).exists():
+                shutil.copy2(res["srt_file"], srt_dest)
+
+            DUBBING_JOBS[job_id]["status"] = "completed"
+            DUBBING_JOBS[job_id]["progress"] = 100
+            DUBBING_JOBS[job_id]["message"] = "Hoàn tất! Video đã được dịch và lồng tiếng Việt thành công."
+            DUBBING_JOBS[job_id]["video_url"] = f"/output/dubbed/{out_video_name}"
+            DUBBING_JOBS[job_id]["srt_url"] = f"/output/dubbed/{srt_name}"
+            DUBBING_JOBS[job_id]["segments"] = res.get("segments", [])
+            DUBBING_JOBS[job_id]["total_duration"] = res.get("total_duration", 0)
+        except Exception as ex:
+            logger.error(f"Dubbing job {job_id} error: {ex}", exc_info=True)
+            if job_id in DUBBING_JOBS:
+                DUBBING_JOBS[job_id]["status"] = "error"
+                DUBBING_JOBS[job_id]["message"] = f"Lỗi xử lý: {str(ex)}"
+
+    t = threading.Thread(target=run_dubbing_thread)
+    t.daemon = True
+    t.start()
+
+    return jsonify({"status": "success", "job_id": job_id})
+
+@app.route("/api/dubbing/status/<job_id>", methods=["GET"])
+def api_dubbing_status(job_id):
+    job = DUBBING_JOBS.get(job_id)
+    if not job:
+        return jsonify({"status": "error", "message": "Không tìm thấy tiến trình lồng tiếng."}), 404
     return jsonify(job)
 
 # ── 3-Pass Neural Contextual Translation Engine (Ultralight, Zero-Overload) ──
