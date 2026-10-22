@@ -23,4 +23,4 @@ RUN mkdir -p output_audio/previews uploads checkpoints
 
 EXPOSE 7860
 
-CMD ["gunicorn", "--workers", "1", "--threads", "8", "--bind", "0.0.0.0:7860", "--timeout", "1800", "app:app"]
+CMD ["sh", "-c", "exec gunicorn --workers 1 --threads 8 --bind 0.0.0.0:${PORT:-7860} --timeout 1800 app:app"]
