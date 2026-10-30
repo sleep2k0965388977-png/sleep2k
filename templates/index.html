@@ -1552,75 +1552,61 @@
             </div>
 
             
-            <!-- Cảnh Báo & Chọn Chế Độ Giới Hạn Ký Tự (CHỈ HIỂN THỊ KHI CHỌN GIỌNG CLONE) -->
+            <!-- Chọn Chế Độ Tự Động Chia Đoạn Clone AI (KHÔNG GIỚI HẠN KÝ TỰ) -->
             <div id="cloneLimitBanner" style="display:none; margin-bottom:14px; background:linear-gradient(135deg, rgba(168,85,247,0.12), rgba(236,72,153,0.08)); border:1.5px solid rgba(168,85,247,0.45); border-radius:14px; padding:16px; backdrop-filter:blur(8px); box-shadow:0 8px 24px rgba(168,85,247,0.15);">
                 <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
                     <div style="display:flex; align-items:center; gap:8px; color:#f3e8ff; font-weight:700; font-size:13.5px;">
-                        <i class="fa-solid fa-triangle-exclamation" style="color:#f59e0b; font-size:17px;"></i>
-                        <span>CẢNH BÁO GIỚI HẠN KÝ TỰ (GIỌNG CLONE AI)</span>
-                        <span style="font-size:11px; background:rgba(236,72,153,0.22); color:#f472b6; padding:2px 8px; border-radius:12px; font-weight:700; border:1px solid rgba(236,72,153,0.45);">
-                            Mô hình Neural AI
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color:#c084fc; font-size:17px;"></i>
+                        <span>TỰ ĐỘNG CHIA ĐOẠN AI CLONE (KHÔNG GIỚI HẠN KÝ TỰ)</span>
+                        <span style="font-size:11px; background:rgba(168,85,247,0.22); color:#d8b4fe; padding:2px 8px; border-radius:12px; font-weight:700; border:1px solid rgba(168,85,247,0.45);">
+                            Tự ngắt câu chuẩn
                         </span>
                     </div>
                     <div id="cloneCharCounterBadge" style="font-size:12px; font-weight:700; color:#cbd5e1; background:rgba(0,0,0,0.35); padding:5px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.12);">
-                        Đang nhập: <span id="cloneCurrentChars" style="color:#a78bfa;">0</span> / <span id="cloneMaxChars">2,000</span> ký tự
+                        Đang nhập: <span id="cloneCurrentChars" style="color:#a78bfa;">0</span> ký tự <span id="cloneEstimatedChunks" style="color:#34d399; margin-left:4px;">(~0 đoạn)</span>
                     </div>
                 </div>
 
                 <div style="font-size:12px; color:#cbd5e1; margin-bottom:12px; line-height:1.5;">
-                    Mô hình AI Clone cần tính toán sóng âm chi tiết theo âm sắc thật của bạn. Vui lòng chọn <strong>1 trong 2 chế độ ký tự</strong> dưới đây để giọng đọc mượt mà và chuẩn xác nhất:
+                    Văn bản dài (10.000, 20.000 ký tự hay không giới hạn) sẽ được <strong>tự động chia nhỏ theo dấu chấm (. ! ?)</strong> theo nguyên lý 1.000 – 2.000 ký tự để giọng đọc mượt mà nhất, sau đó tự động ghép thành 1 file MP3 hoàn chỉnh.
                 </div>
 
-                <!-- 2 Chế độ lựa chọn -->
+                <!-- 2 Chế độ lựa chọn kích thước đoạn -->
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap:12px; margin-bottom:8px;">
-                    <!-- Chế độ 1: 2000 ký tự -->
+                    <!-- Chế độ 1: 1.000 - 2.000 ký tự -->
                     <div id="modeCard2k" onclick="setCloneCharMode(2000)" class="clone-mode-card active">
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                             <div style="font-weight:700; color:#fff; font-size:13.5px; display:flex; align-items:center; gap:8px;">
                                 <input type="radio" name="clone_mode_radio" id="radio2k" checked style="accent-color:#a855f7; cursor:pointer; width:15px; height:15px;">
-                                <span>1.000 – 2.000 Ký Tự</span>
+                                <span>Chia đoạn 1.000 – 2.000 Ký Tự</span>
                             </div>
                             <span style="font-size:11px; background:rgba(52,211,153,0.15); color:#34d399; padding:2px 8px; border-radius:6px; font-weight:700; border:1px solid rgba(52,211,153,0.3);">
-                                ⚡ Siêu tốc 2–5s
+                                ⚡ Khuyên dùng (Mượt nhất)
                             </span>
                         </div>
                         <div style="font-size:11.5px; color:#a1a1aa; line-height:1.45;">
-                            Thời lượng 1–2 phút (Chuẩn video ngắn <strong>TikTok / Reels / Shorts</strong>). 🟢 <em>Mượt nhất tuyệt đối, bấm phát có ngay.</em>
+                            Ngắt chuẩn theo từng câu (dấu chấm <strong>. ! ?</strong>). 🟢 <em>Âm sắc tự nhiên, phát âm rõ ràng, không giật cục.</em>
                         </div>
                     </div>
 
-                    <!-- Chế độ 2: 5000 ký tự -->
+                    <!-- Chế độ 2: 3.000 - 5.000 ký tự -->
                     <div id="modeCard5k" onclick="setCloneCharMode(5000)" class="clone-mode-card">
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                             <div style="font-weight:700; color:#e4e4e7; font-size:13.5px; display:flex; align-items:center; gap:8px;">
                                 <input type="radio" name="clone_mode_radio" id="radio5k" style="accent-color:#a855f7; cursor:pointer; width:15px; height:15px;">
-                                <span>3.000 – 5.000 Ký Tự</span>
+                                <span>Chia đoạn 3.000 – 5.000 Ký Tự</span>
                             </div>
                             <span style="font-size:11px; background:rgba(96,165,250,0.15); color:#60a5fa; padding:2px 8px; border-radius:6px; font-weight:700; border:1px solid rgba(96,165,250,0.3);">
-                                🎯 Tạo xong 8–15s
+                                🎯 Đoạn dài / Review phim
                             </span>
                         </div>
                         <div style="font-size:11.5px; color:#a1a1aa; line-height:1.45;">
-                            Thời lượng 3–5 phút (Chuẩn <strong>Review phim / Tin tức dài</strong>). 🟢 <em>Giọng ổn định, ngữ điệu tự nhiên, an toàn 100%.</em>
+                            Dành cho văn bản ít dấu câu ngắn. 🟢 <em>Tạo ít đoạn hơn, tiết kiệm thời gian tổng hợp.</em>
                         </div>
                     </div>
                 </div>
 
-                <!-- Hộp Cảnh báo khi vượt quá ký tự -->
-                <div id="cloneLimitAlertBox" style="display:none; margin-top:10px; background:rgba(239,68,68,0.14); border:1px solid rgba(239,68,68,0.4); border-radius:10px; padding:10px 14px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-                    <div style="font-size:12px; color:#fca5a5; display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-circle-xmark" style="color:#ef4444; font-size:15px;"></i>
-                        <span>Văn bản dài <strong><span id="alertOverCount">0</span></strong> ký tự, đã vượt quá mức tối đa <strong><span id="alertMaxLimit">2,000</span></strong> ký tự!</span>
-                    </div>
-                    <div style="display:flex; gap:8px;">
-                        <button onclick="trimCloneTextToLimit()" type="button" style="background:#ef4444; border:none; color:#fff; font-size:11.5px; font-weight:700; padding:5px 12px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
-                            <i class="fa-solid fa-scissors"></i> Cắt vừa đủ mốc này
-                        </button>
-                        <button onclick="splitCurrentTextToChapters()" type="button" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25); color:#fff; font-size:11.5px; font-weight:600; padding:5px 12px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
-                            <i class="fa-solid fa-layer-group"></i> Chia thành các tập nhỏ
-                        </button>
-                    </div>
-                </div>
+                <div id="cloneLimitAlertBox" style="display:none !important;"></div>
             </div>
 
             <div class="textarea-container">
@@ -2570,30 +2556,21 @@
 
         function setCloneCharMode(limit) {
             cloneCharLimit = limit;
-            const card2k = document.getElementById("modeCard2k");
-            const card5k = document.getElementById("modeCard5k");
             const r2k = document.getElementById("radio2k");
             const r5k = document.getElementById("radio5k");
-            if (!card2k || !card5k) return;
+            const c2k = document.getElementById("modeCard2k");
+            const c5k = document.getElementById("modeCard5k");
 
             if (limit === 2000) {
-                card2k.classList.add("active");
                 if (r2k) r2k.checked = true;
-                card5k.classList.remove("active");
                 if (r5k) r5k.checked = false;
+                if (c2k) c2k.classList.add("active");
+                if (c5k) c5k.classList.remove("active");
             } else {
-                card5k.classList.add("active");
-                if (r5k) r5k.checked = true;
-                card2k.classList.remove("active");
                 if (r2k) r2k.checked = false;
-            }
-
-            const ta = document.getElementById("textInput");
-            const textLen = (ta ? ta.value.length : 0);
-            if (textLen > limit) {
-                showToast(`⚠️ VĂN BẢN VƯỢT QUÁ MỐC: Bạn vừa chọn mốc ${limit.toLocaleString()} ký tự, nhưng nội dung hiện tại dài ${textLen.toLocaleString()} ký tự. Vui lòng cắt bớt hoặc dùng Tách chương!`, 'warning', 35000);
-            } else {
-                showToast(`✅ Đã chọn mốc ${limit.toLocaleString()} ký tự (${limit === 2000 ? 'Siêu tốc 2–5s video ngắn' : 'Review / Tin tức dài 8–15s'}).`, 'info', 15000);
+                if (r5k) r5k.checked = true;
+                if (c2k) c2k.classList.remove("active");
+                if (c5k) c5k.classList.add("active");
             }
 
             updateCloneLimitState();
@@ -2621,40 +2598,27 @@
             const text = (ta ? ta.value : "") || "";
             const charLen = text.length;
 
+            const chunkSize = cloneCharLimit === 2000 ? 1600 : 4000;
+            const estChunks = charLen > 0 ? Math.ceil(charLen / chunkSize) : 0;
+
             const curSpan = document.getElementById("cloneCurrentChars");
-            const maxSpan = document.getElementById("cloneMaxChars");
+            const estChunksEl = document.getElementById("cloneEstimatedChunks");
             if (curSpan) curSpan.innerText = charLen.toLocaleString();
-            if (maxSpan) maxSpan.innerText = cloneCharLimit.toLocaleString();
+            if (estChunksEl) estChunksEl.innerText = `(~${estChunks} đoạn)`;
 
             if (badge) {
-                const isOver = charLen > cloneCharLimit;
-                badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giới hạn Clone: ${charLen.toLocaleString()}/${cloneCharLimit.toLocaleString()} ký tự`;
-                badge.style.color = isOver ? '#ef4444' : '#ec4899';
+                if (charLen === 0) {
+                    badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giọng Clone: 0 ký tự (~0 đoạn)`;
+                } else {
+                    badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giọng Clone: ${charLen.toLocaleString()} ký tự (~${estChunks} đoạn x ${cloneCharLimit === 2000 ? '1.600' : '4.000'})`;
+                }
+                badge.style.color = '#c084fc';
                 badge.style.fontWeight = '700';
             }
 
+            if (ta) ta.classList.remove("clone-textarea-over");
             const alertBox = document.getElementById("cloneLimitAlertBox");
-            if (charLen > cloneCharLimit) {
-                if (alertBox) alertBox.style.display = "flex";
-                const overEl = document.getElementById("alertOverCount");
-                const maxEl = document.getElementById("alertMaxLimit");
-                if (overEl) overEl.innerText = charLen.toLocaleString();
-                if (maxEl) maxEl.innerText = cloneCharLimit.toLocaleString();
-                if (curSpan) curSpan.style.color = "#ef4444";
-                if (ta) ta.classList.add("clone-textarea-over");
-
-                // Cảnh báo ở góc màn hình khi văn bản vượt quá mốc yêu cầu
-                const now = Date.now();
-                if (typeof window._lastLimitToastTime === 'undefined') window._lastLimitToastTime = 0;
-                if (now - window._lastLimitToastTime > 12000) {
-                    window._lastLimitToastTime = now;
-                    showToast(`⚠️ CẢNH BÁO VƯỢT MỐC: Văn bản đang dài ${charLen.toLocaleString()} ký tự, đã vượt quá mốc ${cloneCharLimit.toLocaleString()} ký tự của giọng Clone! Bạn hãy bấm 'Cắt vừa đủ' hoặc 'Chia thành các tập nhỏ'.`, 'warning', 35000);
-                }
-            } else {
-                if (alertBox) alertBox.style.display = "none";
-                if (curSpan) curSpan.style.color = "#a78bfa";
-                if (ta) ta.classList.remove("clone-textarea-over");
-            }
+            if (alertBox) alertBox.style.display = "none";
         }
 
         function trimCloneTextToLimit() {
@@ -3105,12 +3069,7 @@
         async function startGeneration() {
             const text = document.getElementById("textInput").value.trim();
             if (!text) { alert("Vui lòng nhập văn bản!"); return; }
-            if (isCurrentVoiceClone()) {
-                if (text.length > cloneCharLimit) {
-                    alert(`⚠️ GIỌNG CLONE BẢN THÂN:\nVăn bản hiện tại dài ${text.length.toLocaleString()} ký tự, vượt quá chế độ giới hạn ${cloneCharLimit.toLocaleString()} ký tự bạn đã chọn.\n\nVui lòng bấm 'Cắt vừa đủ mốc này' hoặc sử dụng công cụ 'Chia thành các tập nhỏ' để tạo giọng mượt và không bị nghẽn!`);
-                    return;
-                }
-            }
+            // Cho phép văn bản dài không giới hạn - tự động chia đoạn & ghép file
 
             const btn = document.getElementById("btnGenerate"), rate = document.getElementById("rateSelect").value;
             const progressCard = document.getElementById("progressCard"), playerCard = document.getElementById("playerCard");

@@ -1276,11 +1276,13 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     silence = generate_silent_mp3_bytes(300)
     return idx, silence, 300
 
-def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
+def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_size=1600):
     try:
         cleanup_all_temp_files()
 
-        chunks = split_text_into_chunks(text, max_chars=450)
+        is_clone = is_clone_voice(voice)
+        chunk_max_chars = clone_chunk_size if is_clone else 450
+        chunks = split_text_into_chunks(text, max_chars=chunk_max_chars)
         total_chunks = len(chunks)
 
         if total_chunks == 0:
@@ -1304,8 +1306,9 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
         durations = [0] * total_chunks
         completed_count = 0
 
-        # Run chunk requests concurrently with safe thread pool (3 workers for optimal stability)
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        # Run chunk requests: 1 worker at a time for Clone voices (GPU/CPU stability), 3 workers for cloud voices
+        pool_workers = 1 if is_clone else 3
+        with ThreadPoolExecutor(max_workers=pool_workers) as executor:
             futures = [
                 executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate, lan)
                 for i, chunk_text in enumerate(chunks)
@@ -1326,7 +1329,10 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi"):
                 JOBS[job_id]["progress"] = progress_pct
                 JOBS[job_id]["completed_chunks"] = completed_count
                 JOBS[job_id]["last_active"] = time.time()
-                JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
+                if is_clone:
+                    JOBS[job_id]["message"] = f"Đang tạo giọng đọc Clone AI: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
+                else:
+                    JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
                 save_atomic_checkpoint(job_id, JOBS[job_id])
 
         JOBS[job_id]["progress"] = 96
@@ -1491,15 +1497,10 @@ def generate_job():
         if not text:
             return jsonify({"status": "error", "message": "Vui lòng nhập văn bản cần đọc."}), 400
 
+        clone_chunk_limit = 1600
         if is_clone_voice(voice):
-            max_clone_limit = int(data.get("clone_max_chars", 5000))
-            if max_clone_limit not in (2000, 5000):
-                max_clone_limit = 5000
-            if len(text) > (max_clone_limit + 100):
-                return jsonify({
-                    "status": "error",
-                    "message": "Văn bản dài " + str(len(text)) + " ký tự, vượt quá giới hạn " + str(max_clone_limit) + " ký tự của chế độ giọng Clone đã chọn. Vui lòng rút gọn hoặc dùng tính năng Tách chương tự động!"
-                }), 400
+            user_choice = int(data.get("clone_max_chars", 2000))
+            clone_chunk_limit = 4000 if user_choice == 5000 else 1600
 
         vinfo = find_voice_info(voice)
         if vinfo and not resource_id:
@@ -1517,7 +1518,7 @@ def generate_job():
 
         t = threading.Thread(
             target=run_with_queue,
-            args=(job_id, run_tts_job, text, voice, resource_id, rate, lan),
+            args=(job_id, run_tts_job, text, voice, resource_id, rate, lan, clone_chunk_limit),
             daemon=True
         )
         t.start()
