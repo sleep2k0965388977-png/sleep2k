@@ -3075,6 +3075,16 @@
             const progressCard = document.getElementById("progressCard"), playerCard = document.getElementById("playerCard");
             const fillEl = document.getElementById("progressFill"), pctEl = document.getElementById("progressPercentage"), statusEl = document.getElementById("progressStatus");
 
+            if (isCurrentVoiceClone()) {
+                try {
+                    const c_stat = await fetch('/api/clone_worker_status').then(r => r.json());
+                    if (c_stat.status !== 'online') {
+                        alert('⚠️ AI Clone trên máy tính của bạn hiện đang TẮT (Offline)!\n\n👉 Bạn hãy click đúp vào file CHAY_AI_CLONE_GIONG.bat trên màn hình máy tính để kết nối trước khi bấm tạo giọng clone nhé.');
+                        return;
+                    }
+                } catch(e_chk) {}
+            }
+
             btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
             playerCard.classList.remove("show"); progressCard.classList.add("show");
             fillEl.style.width = "5%"; pctEl.innerText = "5%";

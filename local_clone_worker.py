@@ -18,8 +18,13 @@ CLONE_API_KEY = os.environ.get("CLONE_API_KEY", "sleep2k_clone_2024")
 print("⏳ Đang tải bộ máy AI VieNeu Voice Cloning...")
 from vieneu import Vieneu
 try:
-    tts = Vieneu(mode="v3nano")
-    print("✅ Đã khởi động thành công bộ máy VieNeu v3 Nano (24kHz Studio Quality)!")
+    try:
+        tts = Vieneu(mode="v3turbo")
+        print("✅ Đã khởi động thành công bộ máy VieNeu v3 Turbo (48kHz Ultra Studio Quality)!")
+    except Exception as e_turbo:
+        print(f"v3turbo khởi động không thành công ({e_turbo}), chuyển sang v3nano...")
+        tts = Vieneu(mode="v3nano")
+        print("✅ Đã khởi động bộ máy VieNeu v3 Nano (24kHz)!")
 except Exception as e:
     print(f"Lỗi khởi động Vieneu: {e}")
     sys.exit(1)
@@ -41,7 +46,15 @@ FFMPEG = get_ffmpeg_exe()
 @app.route("/", methods=["GET"])
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "online", "service": "sleep2k_ai_clone_worker", "device": "local"}), 200
+    mode_name = "v3turbo" if "V3Turbo" in str(type(tts)) else "v3nano"
+    sr = getattr(tts, "sample_rate", 48000)
+    return jsonify({
+        "status": "online",
+        "service": "sleep2k_ai_clone_worker",
+        "device": "local",
+        "engine": f"VieNeu {mode_name} ({sr}Hz)",
+        "sample_rate": sr
+    }), 200
 
 @app.route("/api/clone", methods=["POST"])
 def clone_voice():
@@ -68,21 +81,25 @@ def clone_voice():
     try:
         audio_file.save(str(raw_path))
 
+        target_sr = getattr(tts, "sample_rate", 48000)
         subprocess.run([
             FFMPEG, "-y", "-i", str(raw_path),
-            "-ar", "24000", "-ac", "1",
+            "-ar", str(target_sr), "-ac", "1",
             str(clean_wav)
         ], capture_output=True, check=True)
 
         t0 = time.time()
-        wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=8, speed=rate)
-        print(f"Synthesized '{text[:30]}...' in {time.time()-t0:.2f}s")
+        if hasattr(tts, "default_steps") and getattr(tts, "backend", "") == "onnx":
+            wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=16, speed=rate)
+        else:
+            wav_data = tts.infer(text, ref_audio=str(clean_wav), speed=rate, denoise=True)
+        print(f"Synthesized '{text[:30]}...' in {time.time()-t0:.2f}s (SR: {target_sr})")
 
         temp_synth_wav = temp_dir / "temp_synth.wav"
         sf.write(str(temp_synth_wav), wav_data, tts.sample_rate)
         subprocess.run([
             FFMPEG, "-y", "-i", str(temp_synth_wav),
-            "-codec:a", "libmp3lame", "-b:a", "192k",
+            "-codec:a", "libmp3lame", "-b:a", "256k",
             str(out_mp3)
         ], capture_output=True, check=True)
 

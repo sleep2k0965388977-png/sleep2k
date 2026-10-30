@@ -721,44 +721,28 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
         ref_file = get_guaranteed_reference_audio()
 
     worker_url = get_clone_worker_url()
-    if worker_url:
-        try:
-            clean_url = worker_url.rstrip("/")
-            with open(ref_file, "rb") as af:
-                resp = requests.post(
-                    f"{clean_url}/api/clone",
-                    headers={"X-API-Key": CLONE_API_KEY},
-                    files={"audio": (ref_file.name, af, "audio/wav")},
-                    data={"text": text_chunk, "rate": rate},
-                    timeout=75
-                )
-            if resp.status_code == 200 and len(resp.content) > 500:
-                return resp.content
-            else:
-                logger.warning(f"Worker clone returned HTTP {resp.status_code}: {resp.text[:100]}")
-        except Exception as ex_w:
-            logger.warning(f"Worker clone request error ({ex_w}), falling back to high-speed neural engine...")
+    if not worker_url:
+        logger.error(f"Worker clone chưa kết nối! Không thể nhân bản giọng '{voice}'")
+        raise RuntimeError("Worker AI Clone trên máy tính chưa được bật (Hãy chạy file CHAY_AI_CLONE_GIONG.bat trên máy tính để kết nối và tạo giọng thật 100%!).")
 
-    # TUYỆT ĐỐI KHÔNG chạy VieNeu nặng trên VPS 512MB RAM để chống Linux OOM SIGKILL sập server!
-    # Tự động fallback sang giọng đọc Neural mượt mà không bao giờ bị đứng tiến trình
-    logger.info(f"Worker chưa kết nối hoặc quá tải, chuyển tiếp sang High-Speed Engine cho: '{text_chunk[:30]}...'")
-    is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
-    # 1. CapCut fallback (100% reliable on Railway datacenter, immune to 403)
     try:
-        cap_v = "BV421_vivn_streaming" if not is_male else "BV422_vivn_streaming"
-        c_res = client.create_tts_task(texts=text_chunk, voice=cap_v, rate=rate)
-        if c_res and c_res.get("audio_url"):
-            r_aud = requests.get(c_res["audio_url"], timeout=10)
-            if r_audio_valid := (r_aud.status_code == 200 and len(r_aud.content) > 500):
-                return r_aud.content
-    except Exception as ex_cap:
-        logger.warning(f"CapCut fallback error: {ex_cap}")
-
-    # 2. Edge-TTS fallback
-    fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-    fb_res = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=2)
-    if fb_res and len(fb_res) > 0:
-        return fb_res
+        clean_url = worker_url.rstrip("/")
+        with open(ref_file, "rb") as af:
+            resp = requests.post(
+                f"{clean_url}/api/clone",
+                headers={"X-API-Key": CLONE_API_KEY},
+                files={"audio": (ref_file.name, af, "audio/wav")},
+                data={"text": text_chunk, "rate": rate},
+                timeout=120
+            )
+        if resp.status_code == 200 and len(resp.content) > 500:
+            return resp.content
+        else:
+            err_msg = resp.text[:120] if resp.text else f"Mã HTTP {resp.status_code}"
+            raise RuntimeError(f"Worker AI Clone trả lời lỗi: {err_msg}")
+    except requests.exceptions.RequestException as ex_req:
+        logger.error(f"Worker clone request error: {ex_req}")
+        raise RuntimeError(f"Không thể kết nối đến Worker AI Clone trên máy tính ({ex_req}). Hãy kiểm tra xem file CHAY_AI_CLONE_GIONG.bat có đang chạy không.")
     return generate_silent_mp3_bytes(300)
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
@@ -1149,28 +1133,11 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
 
         # 🌟 0. AI Voice Clone Engine (Google Colab / Local GPU Worker / Native On-Server) 🌟
     if is_clone_voice(voice):
-        try:
-            audio_bytes = synthesize_clone_audio(text_chunk, voice, rate=rate)
-            if audio_bytes and len(audio_bytes) > 0:
-                est_duration = int(len(text_chunk) / 16 * 1000)
-                return idx, audio_bytes, est_duration
-        except Exception as ex:
-            print(f"Clone Voice synthesis chunk {idx+1} error: {ex}, applying high-speed fallback...")
-            is_male = any(m in str(voice).lower() for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam"])
-            # CapCut fallback first
-            try:
-                cap_v = "BV421_vivn_streaming" if not is_male else "BV422_vivn_streaming"
-                c_res = client.create_tts_task(texts=text_chunk, voice=cap_v, rate=rate)
-                if c_res and c_res.get("audio_url"):
-                    r_aud = requests.get(c_res["audio_url"], timeout=10)
-                    if r_aud.status_code == 200 and len(r_aud.content) > 500:
-                        return idx, r_aud.content, int(len(text_chunk) / 16 * 1000)
-            except Exception:
-                pass
-            fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-            fb_bytes = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, max_retries=2)
-            if fb_bytes and len(fb_bytes) > 0:
-                return idx, fb_bytes, int(len(text_chunk) / 16 * 1000)
+        # Nhân bản giọng thật 100% qua AI Worker cục bộ
+        audio_bytes = synthesize_clone_audio(text_chunk, voice, rate=rate)
+        if audio_bytes and len(audio_bytes) > 0:
+            est_duration = int(len(text_chunk) / 16 * 1000)
+            return idx, audio_bytes, est_duration
 
     # 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
     if is_vieneu_voice(voice):
@@ -1501,6 +1468,47 @@ def generate_job():
         if is_clone_voice(voice):
             user_choice = int(data.get("clone_max_chars", 2000))
             clone_chunk_limit = 4000 if user_choice == 5000 else 1600
+
+            # Phục hồi file âm thanh vocal gốc từ base64 của trình duyệt (chống mất file khi Railway deploy/restart)
+            custom_audio_base64 = data.get("custom_audio_base64")
+            voice_name = data.get("voice_name")
+            if custom_audio_base64:
+                try:
+                    clean_wav_path = CUSTOM_VOICES_DIR / f"{voice}.wav"
+                    clean_mp3_path = CUSTOM_VOICES_DIR / f"{voice}.mp3"
+                    if not clean_wav_path.exists() or clean_wav_path.stat().st_size < 500:
+                        raw_b64 = custom_audio_base64
+                        if "," in raw_b64:
+                            raw_b64 = raw_b64.split(",", 1)[1]
+                        raw_bytes = base64.b64decode(raw_b64)
+                        temp_p = CUSTOM_VOICES_DIR / f"temp_{voice}.bin"
+                        temp_p.write_bytes(raw_bytes)
+                        subprocess.run([
+                            FFMPEG_BIN, "-y", "-i", str(temp_p),
+                            "-ar", "48000", "-ac", "1",
+                            str(clean_wav_path)
+                        ], capture_output=True, check=True)
+                        subprocess.run([
+                            FFMPEG_BIN, "-y", "-i", str(clean_wav_path),
+                            "-codec:a", "libmp3lame", "-b:a", "128k",
+                            str(clean_mp3_path)
+                        ], capture_output=True, check=True)
+                        temp_p.unlink(missing_ok=True)
+                        logger.info(f"Đã phục hồi hoàn hảo file vocal gốc cho {voice}")
+
+                    voice_entry = {
+                        "voice_type": voice,
+                        "display_name": voice_name or "Giọng Bản Thân",
+                        "lan": "vi",
+                        "category": "custom",
+                        "is_clone": True,
+                        "ref_audio": f"{voice}.wav",
+                        "preview_url": f"/uploads/custom_voices/{voice}.mp3",
+                        "created_at": int(time.time())
+                    }
+                    save_custom_voice_entry(voice_entry)
+                except Exception as e_rst:
+                    logger.error(f"Lỗi phục hồi file vocal từ base64: {e_rst}")
 
         vinfo = find_voice_info(voice)
         if vinfo and not resource_id:
