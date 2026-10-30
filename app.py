@@ -2273,6 +2273,80 @@ def get_custom_voices():
         "worker_connected": bool(worker_url)
     })
 
+@app.route("/api/analyze_vocal", methods=["POST"])
+def api_analyze_vocal():
+    """Proxy phân tích chuyên sâu 8 chiều âm học vocal tới Local Worker."""
+    worker_url = get_clone_worker_url()
+    if not worker_url:
+        return jsonify({
+            "status": "error",
+            "message": "AI Worker trên máy tính đang Offline. Vui lòng mở file CHAY_AI_CLONE_GIONG.bat trên máy tính để thực hiện phân tích chuyên sâu 8 chiều âm học!"
+        }), 400
+
+    clean_url = worker_url.rstrip("/")
+    try:
+        # Nếu gửi file audio multipart
+        if "audio" in request.files:
+            af = request.files["audio"]
+            files = {"audio": (af.filename or "vocal.wav", af.stream, af.mimetype or "audio/wav")}
+            resp = requests.post(
+                f"{clean_url}/api/analyze_vocal",
+                headers={"X-API-Key": CLONE_API_KEY},
+                files=files,
+                timeout=30
+            )
+            return (resp.content, resp.status_code, {"Content-Type": "application/json"})
+
+        # Nếu gửi JSON kèm base64 hoặc voice_type
+        data = request.json or {}
+        b64 = data.get("audio_base64")
+        voice_id = data.get("voice_id")
+        
+        target_path = None
+        temp_created = False
+        if b64:
+            if "," in b64:
+                b64 = b64.split(",", 1)[1]
+            raw_bytes = base64.b64decode(b64)
+            temp_p = CUSTOM_VOICES_DIR / f"analyze_b64_{uuid.uuid4().hex[:8]}.wav"
+            temp_p.write_bytes(raw_bytes)
+            target_path = temp_p
+            temp_created = True
+        elif voice_id:
+            v_p = CUSTOM_VOICES_DIR / f"{voice_id}.wav"
+            if v_p.exists():
+                target_path = v_p
+            else:
+                v_mp3 = CUSTOM_VOICES_DIR / f"{voice_id}.mp3"
+                if v_mp3.exists():
+                    target_path = v_mp3
+
+        if not target_path or not target_path.exists():
+            return jsonify({"status": "error", "message": "Không tìm thấy file vocal để phân tích."}), 400
+
+        try:
+            with open(target_path, "rb") as f_in:
+                files = {"audio": (target_path.name, f_in, "audio/wav")}
+                resp = requests.post(
+                    f"{clean_url}/api/analyze_vocal",
+                    headers={"X-API-Key": CLONE_API_KEY},
+                    files=files,
+                    timeout=30
+                )
+            return (resp.content, resp.status_code, {"Content-Type": "application/json"})
+        finally:
+            if temp_created and target_path:
+                target_path.unlink(missing_ok=True)
+
+    except requests.exceptions.RequestException as e_req:
+        return jsonify({
+            "status": "error",
+            "message": f"Không thể kết nối tới Worker trên máy tính ({e_req}). Hãy kiểm tra xem file CHAY_AI_CLONE_GIONG.bat có đang chạy không."
+        }), 502
+    except Exception as ex:
+        logger.error(f"Error in api_analyze_vocal: {ex}")
+        return jsonify({"status": "error", "message": str(ex)}), 500
+
 @app.route("/api/upload_custom_voice", methods=["POST"])
 def upload_custom_voice():
     try:

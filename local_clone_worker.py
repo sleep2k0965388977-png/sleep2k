@@ -56,6 +56,43 @@ def health():
         "sample_rate": sr
     }), 200
 
+@app.route("/api/analyze_vocal", methods=["POST"])
+def worker_analyze_vocal():
+    key = request.headers.get("X-API-Key", "")
+    if key != CLONE_API_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if "audio" not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
+
+    audio_file = request.files["audio"]
+    temp_dir = Path(tempfile.gettempdir()) / f"analyze_{uuid.uuid4().hex[:8]}"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    clean_wav = temp_dir / "clean_vocal.wav"
+    raw_path = temp_dir / f"raw_{audio_file.filename}"
+
+    try:
+        audio_file.save(str(raw_path))
+        subprocess.run([
+            FFMPEG, "-y", "-i", str(raw_path),
+            "-ar", "16000", "-ac", "1",
+            str(clean_wav)
+        ], capture_output=True, check=True)
+
+        from vocal_analyzer import analyzer_instance
+        report = analyzer_instance.analyze(str(clean_wav))
+        return jsonify(report), 200
+    except Exception as ex:
+        print(f"Worker analyze error: {ex}")
+        return jsonify({"error": str(ex)}), 500
+    finally:
+        try:
+            for p in temp_dir.glob("*"):
+                p.unlink(missing_ok=True)
+            temp_dir.rmdir()
+        except Exception:
+            pass
+
 @app.route("/api/clone", methods=["POST"])
 def clone_voice():
     key = request.headers.get("X-API-Key", "")
