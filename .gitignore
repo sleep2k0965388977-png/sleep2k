@@ -6,3 +6,6 @@ venv_clone/
 local_test_clone/
 .env
 *.log
+web_public_url.txt
+checkpoints/
+uploads/
