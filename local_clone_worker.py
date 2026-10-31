@@ -9,6 +9,45 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 import os, time, uuid, subprocess, tempfile
 from pathlib import Path
+
+# ── AUTO-FIX: onnxruntime >= 1.18 blocks vieneu external data path ──────────
+# vieneu dùng external ONNX data files → bị chặn bởi onnxruntime >= 1.18.0
+# Fix: tự động downgrade xuống 1.17.3 rồi re-exec script này
+def _fix_onnxruntime_if_needed():
+    try:
+        import onnxruntime as _ort
+        ver = _ort.__version__
+        # So sánh version tuple để chắc chắn
+        parts = [int(x) for x in ver.split('.')[:2]]
+        if parts[0] > 1 or (parts[0] == 1 and parts[1] >= 18):
+            print(f"⚠️  onnxruntime {ver} không tương thích với vieneu (cần < 1.18)")
+            print("🔧 Đang tự động downgrade onnxruntime xuống 1.17.3...")
+            subprocess.run(
+                [sys.executable, '-m', 'pip', 'uninstall', '-y',
+                 'onnxruntime', 'onnxruntime-gpu'],
+                capture_output=True
+            )
+            r = subprocess.run(
+                [sys.executable, '-m', 'pip', 'install', '-q', 'onnxruntime-gpu==1.17.3'],
+                capture_output=True, text=True
+            )
+            if r.returncode != 0:
+                # Fallback: thử onnxruntime CPU
+                subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install', '-q', 'onnxruntime==1.17.3'],
+                    capture_output=True
+                )
+            print("✅ Downgrade xong! Đang khởi động lại script...")
+            # Re-exec để load đúng version
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        else:
+            print(f"✅ onnxruntime {ver} — OK (< 1.18)")
+    except ImportError:
+        print("📦 onnxruntime chưa cài, tiếp tục...")
+
+_fix_onnxruntime_if_needed()
+# ─────────────────────────────────────────────────────────────────────────────
+
 from flask import Flask, request, jsonify, send_file
 import soundfile as sf
 
@@ -17,16 +56,21 @@ CLONE_API_KEY = os.environ.get("CLONE_API_KEY", "sleep2k_clone_2024")
 
 print("⏳ Đang tải bộ máy AI VieNeu Voice Cloning...")
 from vieneu import Vieneu
-try:
+tts = None
+for _mode in ["v3turbo", "v3nano"]:
     try:
-        tts = Vieneu(mode="v3turbo")
-        print("✅ Đã khởi động thành công bộ máy VieNeu v3 Turbo (48kHz Ultra Studio Quality)!")
-    except Exception as e_turbo:
-        print(f"v3turbo khởi động không thành công ({e_turbo}), chuyển sang v3nano...")
-        tts = Vieneu(mode="v3nano")
-        print("✅ Đã khởi động bộ máy VieNeu v3 Nano (24kHz)!")
-except Exception as e:
-    print(f"Lỗi khởi động Vieneu: {e}")
+        tts = Vieneu(mode=_mode)
+        print(f"✅ Đã khởi động VieNeu {_mode} ({getattr(tts, 'sample_rate', '?')}Hz)!")
+        break
+    except Exception as _e:
+        err_s = str(_e)
+        print(f"⚠️  {_mode} lỗi: {err_s[:120]}")
+        if "External data path" in err_s:
+            print("❌ Lỗi onnxruntime path — không thể tự fix sau khi exec. Restart lại script.")
+            sys.exit(1)
+
+if tts is None:
+    print("❌ Không khởi động được bất kỳ mode nào của Vieneu. Thoát.")
     sys.exit(1)
 
 def get_ffmpeg_exe():
@@ -46,52 +90,7 @@ FFMPEG = get_ffmpeg_exe()
 @app.route("/", methods=["GET"])
 @app.route("/health", methods=["GET"])
 def health():
-    mode_name = "v3turbo" if "V3Turbo" in str(type(tts)) else "v3nano"
-    sr = getattr(tts, "sample_rate", 48000)
-    return jsonify({
-        "status": "online",
-        "service": "sleep2k_ai_clone_worker",
-        "device": "local",
-        "engine": f"VieNeu {mode_name} ({sr}Hz)",
-        "sample_rate": sr
-    }), 200
-
-@app.route("/api/analyze_vocal", methods=["POST"])
-def worker_analyze_vocal():
-    key = request.headers.get("X-API-Key", "")
-    if key != CLONE_API_KEY:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    if "audio" not in request.files:
-        return jsonify({"error": "No audio file provided"}), 400
-
-    audio_file = request.files["audio"]
-    temp_dir = Path(tempfile.gettempdir()) / f"analyze_{uuid.uuid4().hex[:8]}"
-    temp_dir.mkdir(parents=True, exist_ok=True)
-    clean_wav = temp_dir / "clean_vocal.wav"
-    raw_path = temp_dir / f"raw_{audio_file.filename}"
-
-    try:
-        audio_file.save(str(raw_path))
-        subprocess.run([
-            FFMPEG, "-y", "-i", str(raw_path),
-            "-ar", "16000", "-ac", "1",
-            str(clean_wav)
-        ], capture_output=True, check=True)
-
-        from vocal_analyzer import analyzer_instance
-        report = analyzer_instance.analyze(str(clean_wav))
-        return jsonify(report), 200
-    except Exception as ex:
-        print(f"Worker analyze error: {ex}")
-        return jsonify({"error": str(ex)}), 500
-    finally:
-        try:
-            for p in temp_dir.glob("*"):
-                p.unlink(missing_ok=True)
-            temp_dir.rmdir()
-        except Exception:
-            pass
+    return jsonify({"status": "online", "service": "sleep2k_ai_clone_worker", "device": "local"}), 200
 
 @app.route("/api/clone", methods=["POST"])
 def clone_voice():
@@ -118,25 +117,41 @@ def clone_voice():
     try:
         audio_file.save(str(raw_path))
 
-        target_sr = getattr(tts, "sample_rate", 48000)
         subprocess.run([
             FFMPEG, "-y", "-i", str(raw_path),
-            "-ar", str(target_sr), "-ac", "1",
+            "-ar", "24000", "-ac", "1",
             str(clean_wav)
         ], capture_output=True, check=True)
 
         t0 = time.time()
-        if hasattr(tts, "default_steps") and getattr(tts, "backend", "") == "onnx":
+        # Tối ưu hóa siêu thực:
+        # - temperature=0.68: bám sát tuyệt đối ngữ điệu và cao độ F0 của file mẫu (không bị phiêu lệch)
+        # - top_p=0.90: loại bỏ artifact khẩu hình méo
+        # - silence_p=0.18: tạo khoảng lấy hơi tự nhiên chuẩn tiếng Việt giữa các vế câu
+        # - apply_watermark=False: giữ nguyên sóng âm 48kHz trong trẻo
+        infer_kwargs = {
+            "ref_audio": str(clean_wav),
+            "speed": rate,
+            "temperature": 0.68,
+            "top_p": 0.90,
+            "silence_p": 0.18,
+            "denoise": True,
+            "use_ref_codes": True,
+            "apply_watermark": False
+        }
+        try:
+            wav_data = tts.infer(text, **infer_kwargs)
+        except TypeError:
+            # Fallback nếu backend v3nano/cũ không nhận tham số nâng cao
             wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=16, speed=rate)
-        else:
-            wav_data = tts.infer(text, ref_audio=str(clean_wav), speed=rate, denoise=True)
-        print(f"Synthesized '{text[:30]}...' in {time.time()-t0:.2f}s (SR: {target_sr})")
+
+        print(f"Synthesized '{text[:30]}...' in {time.time()-t0:.2f}s")
 
         temp_synth_wav = temp_dir / "temp_synth.wav"
         sf.write(str(temp_synth_wav), wav_data, tts.sample_rate)
         subprocess.run([
             FFMPEG, "-y", "-i", str(temp_synth_wav),
-            "-codec:a", "libmp3lame", "-b:a", "256k",
+            "-codec:a", "libmp3lame", "-b:a", "192k",
             str(out_mp3)
         ], capture_output=True, check=True)
 
