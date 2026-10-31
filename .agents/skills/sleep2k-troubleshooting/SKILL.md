@@ -80,3 +80,21 @@ python .agents/skills/sleep2k-troubleshooting/scripts/diagnose.py
   - Add self-healing stream generator (`generate_resilient_douyin_stream`) that auto-reconnects with Range up to 5 times on connection drops without closing the client socket.
   - In `templates/index.html`: Implement resumable Range-based fetch retry loop in `downloadVideoDirect` (up to 8 retries) preserving all previously buffered chunks.
   - Never return `true` on download failure in `downloadVideoDirect` to prevent bulk download queue flood.
+
+---
+
+### 7. Google Colab AI Clone Worker Crash (`External data path validation failed for initializer: ...vieneu_backbone_shared.data` / ONNXRuntimeError)
+* **Root Cause:**
+  - `onnxruntime` >= 1.18.0 added a strict security check blocking external data files that reside outside the main ONNX model directory.
+  - When VieNeu downloads models from HuggingFace to `~/.cache/huggingface/hub/...`, the shared weights (`vieneu_backbone_shared.data`) trigger `[ONNXRuntimeError] : 1 : FAIL : External data path validation failed for initializer`.
+* **Correct Fix:**
+  - In Colab notebook (`sleep2k_ai_worker.ipynb`) and `local_clone_worker.py`:
+    Always downgrade `onnxruntime` before loading models:
+    ```bash
+    pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-training
+    pip install -q onnxruntime-gpu==1.17.3
+    ```
+  - Use `os.execv()` self-restart in Python scripts if version >= 1.18 is detected in memory.
+  - Once the Cloudflare tunnel is created, worker automatically registers its URL with website via `POST /api/set_clone_worker_url`.
+  - Frontend checks status via `GET /api/clone_worker_status`. If the user has the browser tab open while Colab is booting, a simple page refresh (F5) or clicking "Lưu URL" pulls the registered worker URL into the UI.
+
