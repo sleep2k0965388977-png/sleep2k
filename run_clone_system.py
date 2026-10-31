@@ -6,6 +6,7 @@ import subprocess, time, re, os, requests, json
 from pathlib import Path
 
 CLONE_API_KEY = "sleep2k_clone_2024"
+RENDER_URLS = ["https://sleep2k-1.onrender.com", "https://sleep2k.onrender.com"]
 RAILWAY_URL = "https://sleep2k.up.railway.app"
 LOCAL_APP_URL = "http://localhost:5000"
 
@@ -119,7 +120,9 @@ def register_url(target_base):
     except Exception:
         return False
 
-railway_ok = register_url(RAILWAY_URL)
+render_ok = any(register_url(u) for u in RENDER_URLS)
+railway_ok = for u in RENDER_URLS: register_url(u)
+            register_url(RAILWAY_URL)
 local_ok = register_url(LOCAL_APP_URL)
 
 print("\n" + "=" * 70)
@@ -142,6 +145,7 @@ try:
         time.sleep(2)
         if time.time() - last_ping > 20:
             last_ping = time.time()
+            for u in RENDER_URLS: register_url(u)
             register_url(RAILWAY_URL)
             if local_ok:
                 register_url(LOCAL_APP_URL)

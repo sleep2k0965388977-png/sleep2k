@@ -4,7 +4,7 @@
 # TỰ ĐỘNG ĐỒNG BỘ 100% VỚI WEBSITE - KHÔNG CẦN COPY/DÁN THỦ CÔNG
 # ==============================================================================
 
-import os, sys, time, uuid, subprocess, re, json
+import os, sys, time, uuid, subprocess, re, json, urllib.request
 from pathlib import Path
 
 print("🚀 [1/4] Đang cài đặt thư viện AI âm thanh 48kHz & Cloudflare Tunnel...")
@@ -41,7 +41,7 @@ def health():
         "status": "online",
         "service": "sleep2k_colab_gpu_worker",
         "engine": f"VieNeu Studio ({sr}Hz Ultra)",
-        "gpu": gpu_name,
+        "gpu": f"{gpu_name} (Colab)",
         "sample_rate": sr
     }), 200
 
@@ -155,37 +155,41 @@ while time.time() - t0 < 35:
         except Exception:
             pass
 
+TARGET_ENDPOINTS = [
+    "https://sleep2k-1.onrender.com",
+    "https://sleep2k.onrender.com",
+    "https://sleep2k.up.railway.app"
+]
+
+def sync_to_website(turl):
+    synced = False
+    for ep in TARGET_ENDPOINTS:
+        try:
+            req = urllib.request.Request(
+                f"{ep}/api/set_clone_worker_url",
+                data=json.dumps({"worker_url": turl, "api_key": API_SECRET_KEY}).encode("utf-8"),
+                headers={"Content-Type": "application/json", "X-API-Key": API_SECRET_KEY}
+            )
+            with urllib.request.urlopen(req, timeout=10) as r:
+                print(f"🚀 TỰ ĐỘNG ĐỒNG BỘ: Website {ep} ĐÃ KẾT NỐI WORKER!")
+                synced = True
+        except Exception:
+            pass
+    return synced
+
 if tunnel_url:
     print("\n" + "="*70)
     print("🎉 KẾT NỐI THÀNH CÔNG! GPU NVIDIA T4 ĐANG SẴN SÀNG:")
     print(f"\n   👉 ĐƯỜNG DẪN WORKER: {tunnel_url}\n")
     print("="*70)
 
-    import urllib.request
-    try:
-        req = urllib.request.Request(
-            "https://sleep2k.up.railway.app/api/set_clone_worker_url",
-            data=json.dumps({"worker_url": tunnel_url, "api_key": API_SECRET_KEY}).encode("utf-8"),
-            headers={"Content-Type": "application/json", "X-API-Key": API_SECRET_KEY}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            print("🚀 TỰ ĐỘNG ĐỒNG BỘ: Website https://sleep2k.up.railway.app ĐÃ NHẬN WORKER!")
-            print("👉 Giờ bạn mở web trên bất kỳ máy nào là tạo được giọng giống 100%!")
-    except Exception as e_reg:
-        print(f"⚠️ Thông báo: Bạn có thể dán link trên vào ô Worker Settings nếu cần.")
+    sync_to_website(tunnel_url)
+    print("👉 Giờ bạn mở web trên bất kỳ máy nào là tạo được giọng giống 100%!")
 
     print("\n💓 AI Worker đang chạy liên tục trên GPU Colab... (Không đóng tab này)")
     while True:
         time.sleep(20)
-        try:
-            req = urllib.request.Request(
-                "https://sleep2k.up.railway.app/api/set_clone_worker_url",
-                data=json.dumps({"worker_url": tunnel_url, "api_key": API_SECRET_KEY}).encode("utf-8"),
-                headers={"Content-Type": "application/json", "X-API-Key": API_SECRET_KEY}
-            )
-            urllib.request.urlopen(req, timeout=10)
-        except Exception:
-            pass
+        sync_to_website(tunnel_url)
 else:
     print("⚠️ Không lấy được URL Cloudflare tự động. Vui lòng kiểm tra lại log.")
     while True:
