@@ -2558,7 +2558,12 @@
                         </button>
                     </div>
                     <div style="font-size: 10.5px; color: #94a3b8; margin-top: 6px; line-height: 1.4;">
-                        💡 Model 8.5GB chạy trên Google Colab GPU T4 miễn phí. Khi bạn ở nhà, chỉ cần chạy cell Colab hoặc Local Worker rồi dán URL vào đây.
+                        💡 AI Clone chạy trên chiếc máy tính này qua file <code>CHAY_AI_CLONE_GIONG.bat</code>. Khi sang máy khác hoặc dùng điện thoại, bạn có thể bấm nút dưới để mở Google Colab T4 GPU miễn phí:
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <a href="https://colab.research.google.com/github/sleep2k0965388977-png/sleep2k/blob/main/sleep2k_ai_worker.ipynb" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.18);border:1px solid rgba(249,115,22,0.4);color:#fdba74;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:11.5px;font-weight:600;">
+                            <i class="fa-solid fa-bolt"></i> ⚡ Mở Google Colab T4 GPU (Chạy AI Miễn Phí Từ Xa 100%)
+                        </a>
                     </div>
                 </div>
             </details>
@@ -3133,7 +3138,10 @@
                         <i class="fa-solid fa-wand-magic-sparkles" style="font-size:18px;color:#c084fc;"></i>
                         <div style="font-weight:700;color:#f3e8ff;font-size:13.5px;">+ Tải Lên / Clone Giọng Bản Thân</div>
                     </div>
-                    <div style="font-size:11px;color:#a78bfa;margin-top:3px;">Chỉ cần 5–15s ghi âm vocal của bạn</div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+                        <span style="font-size:11px;color:#a78bfa;">Chỉ cần 5–15s vocal</span>
+                        <span onclick="event.stopPropagation(); document.getElementById('importVoiceInput').click();" style="font-size:11px;color:#38bdf8;font-weight:600;cursor:pointer;padding:2px 7px;border-radius:6px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.3);" title="Nhập file giọng đã xuất từ máy khác"><i class="fa-solid fa-file-import"></i> Nhập file</span>
+                    </div>
                 `;
                 listEl.appendChild(addCard);
             }
@@ -3176,6 +3184,7 @@
                                 <i class="fa-solid fa-volume-high"></i> Nghe thử
                             </button>
                             ${isClone ? `<button class="btn-preview" style="background:rgba(168,85,247,0.22);border-color:rgba(168,85,247,0.5);color:#d8b4fe;" onclick="analyzeVocalVoice('${v.voice_type}',event)" title="Phân tích chuyên sâu 8 đặc trưng âm học & hơi thở"><i class="fa-solid fa-dna"></i> ADN Giọng</button>` : ''}
+                            ${isClone ? `<button class="btn-preview" style="background:rgba(59,130,246,0.22);border-color:rgba(59,130,246,0.5);color:#93c5fd;" onclick="exportCustomVoice('${v.voice_type}',event)" title="Tải file giọng để dùng trên mọi máy khác"><i class="fa-solid fa-download"></i> Tải về</button>` : ''}
                             ${isClone ? `<button class="btn-delete-voice" onclick="deleteCustomVoice('${v.voice_type}',event)" title="Xóa giọng này"><i class="fa-solid fa-trash-can"></i></button>` : ''}
                         </div>
                     </div>
@@ -6373,5 +6382,70 @@ function renderVideoGrid() {
         </div>
     </div>
 
+<input type="file" id="importVoiceInput" accept=".json,.sleep2k" style="display:none;" onchange="importCustomVoiceFile(event)">
+<script>
+        async function exportCustomVoice(voiceType, event) {
+            if (event) event.stopPropagation();
+            try {
+                const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
+                let vinfo = savedCustom[voiceType] || { voice_type: voiceType };
+                const voiceObj = (window.allVoices || []).find(v => v.voice_type === voiceType);
+                const name = (voiceObj ? voiceObj.display_name : '') || vinfo.name || voiceType;
+                vinfo.name = name;
+
+                if (!vinfo.base64) {
+                    const audioResp = await fetch(`/uploads/custom_voices/${voiceType}.wav`);
+                    if (audioResp.ok) {
+                        const blob = await audioResp.blob();
+                        const b64 = await new Promise((res) => {
+                            const r = new FileReader();
+                            r.onloadend = () => res(r.result);
+                            r.readAsDataURL(blob);
+                        });
+                        vinfo.base64 = b64;
+                    }
+                }
+
+                const jsonBlob = new Blob([JSON.stringify(vinfo, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(jsonBlob);
+                a.download = `voice_${name}.sleep2k.json`;
+                a.click();
+            } catch(err) {
+                alert('Lỗi xuất file: ' + err.message);
+            }
+        }
+
+        function importCustomVoiceFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data.voice_type || (!data.base64 && !data.audio_base64)) {
+                        alert('Tệp giọng không hợp lệ!');
+                        return;
+                    }
+                    const b64 = data.base64 || data.audio_base64;
+                    const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
+                    savedCustom[data.voice_type] = {
+                        voice_type: data.voice_type,
+                        name: data.name || 'Giọng Đã Nhập',
+                        base64: b64,
+                        updated_at: Date.now()
+                    };
+                    localStorage.setItem('sleep2k_saved_custom_voices', JSON.stringify(savedCustom));
+                    alert('🎉 Đã nhập thành công giọng "' + (data.name || data.voice_type) + '"! Giờ bạn có thể dùng bình thường trên máy này.');
+                    await fetchVoices();
+                    filterByLang('custom', document.getElementById('tabCustom'));
+                } catch(err) {
+                    alert('Lỗi đọc file: ' + err.message);
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+</script>
 </body>
 </html>

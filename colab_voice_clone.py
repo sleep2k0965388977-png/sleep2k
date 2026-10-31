@@ -141,15 +141,38 @@ while time.time() - start_t < 25:
         break
 
 if tunnel_url:
-    print("\n" + "="*65)
-    print("🎉 KẾT NỐI THÀNH CÔNG! ĐÃ CÓ LINK WORKER AI CLONE 98% SIÊU THỰC:")
-    print(f"\n   👉 COPY LINK NÀY:  {tunnel_url}\n")
-    print("Sau đó vào web -> Bấm '+ Tải Lên / Clone Giọng Bản Thân' ->")
-    print("Bấm 'Cấu hình Worker AI Clone' -> Dán link trên vào và bấm Lưu.")
-    print("="*65 + "\n")
+    print("\n" + "="*70)
+    print("🎉 KẾT NỐI THÀNH CÔNG! ĐÃ CÓ LINK WORKER AI CLONE 48kHz ULTRA STUDIO:")
+    print(f"\n   👉 LINK WORKER:  {tunnel_url}\n")
+    print("="*70)
+
+    # Tự động đăng ký URL lên Railway App
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            "https://sleep2k.up.railway.app/api/set_clone_worker_url",
+            data=json.dumps({"worker_url": tunnel_url, "api_key": API_SECRET_KEY}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "X-API-Key": API_SECRET_KEY}
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            print("🚀 TỰ ĐỘNG ĐỒNG BỘ THÀNH CÔNG: Website https://sleep2k.up.railway.app đã nhận Worker!")
+            print("👉 Giờ bạn có thể mở web trên bất kỳ máy tính, laptop hay điện thoại nào để tạo giọng 100% giống thật!")
+    except Exception as e_reg:
+        print(f"⚠️ Ghi nhận: Nếu Railway chưa cập nhật, bạn có thể dán link trên vào ô Worker Settings.")
+
+    print("\n💓 AI Worker đang chạy liên tục trên GPU Colab... (Không tắt tab này)")
+    while True:
+        time.sleep(20)
+        try:
+            req = urllib.request.Request(
+                "https://sleep2k.up.railway.app/api/set_clone_worker_url",
+                data=json.dumps({"worker_url": tunnel_url, "api_key": API_SECRET_KEY}).encode("utf-8"),
+                headers={"Content-Type": "application/json", "X-API-Key": API_SECRET_KEY}
+            )
+            urllib.request.urlopen(req, timeout=10)
+        except Exception:
+            pass
 else:
     print("⚠️ Không lấy được URL Cloudflare tự động. Vui lòng kiểm tra lại log.")
-
-# Giữ script hoạt động liên tục
-while True:
-    time.sleep(3600)
+    while True:
+        time.sleep(3600)
