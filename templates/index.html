@@ -3250,7 +3250,7 @@
                 try {
                     const c_stat = await fetch('/api/clone_worker_status').then(r => r.json());
                     if (c_stat.status !== 'online') {
-                        alert('⚠️ AI Clone trên máy tính của bạn hiện đang TẮT (Offline)!\n\n👉 Bạn hãy click đúp vào file CHAY_AI_CLONE_GIONG.bat trên màn hình máy tính để kết nối trước khi bấm tạo giọng clone nhé.');
+                        alert('⚠️ AI Clone Worker hiện đang TẮT (Offline)!\n\nĐể tạo giọng Clone giống thật 100%, bạn hãy chọn 1 trong 2 cách:\n1️⃣ Nếu dùng máy tính cá nhân: Click đúp chạy file "CHAY_AI_CLONE_GIONG.bat" trên máy.\n2️⃣ Nếu dùng máy khác / điện thoại: Bật máy tính ở nhà (hoặc dùng Google Colab GPU T4 miễn phí) để xử lý AI từ xa nhé!');
                         return;
                     }
                 } catch(e_chk) {}

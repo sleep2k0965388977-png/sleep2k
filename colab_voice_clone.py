@@ -75,27 +75,27 @@ def clone_voice():
     try:
         audio_file.save(str(raw_path))
 
-        # Bộ lọc làm sạch âm thanh phòng thu (Khử tạp âm, lọc tần số rè, chuẩn hóa âm lượng EBU R128)
+        target_sr = getattr(tts, "sample_rate", 48000)
         subprocess.run([
             "ffmpeg", "-y", "-i", str(raw_path),
-            "-af", "highpass=f=80,lowpass=f=14000,loudnorm=I=-16:TP=-1.5:LRA=11,silenceremove=start_periods=1:start_duration=0.1:start_threshold=-50dB",
-            "-ar", "24000", "-ac", "1",
+            "-ar", str(target_sr), "-ac", "1",
             str(clean_wav)
         ], capture_output=True, check=True)
 
         t0 = time.time()
-        # Chạy inference với chất lượng cao nhất trên GPU T4
-        wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=16, speed=rate)
+        if hasattr(tts, "default_steps") and getattr(tts, "backend", "") == "onnx":
+            wav_data = tts.infer(text, ref_audio=str(clean_wav), steps=16, speed=rate)
+        else:
+            wav_data = tts.infer(text, ref_audio=str(clean_wav), speed=rate, denoise=True)
         infer_time = time.time() - t0
-        print(f"✨ [AI 98% CLONE] Tạo xong '{text[:30]}...' trong {infer_time:.2f}s!")
+        print(f"✨ [AI 48kHz ULTRA CLONE] Tạo xong '{text[:30]}...' trong {infer_time:.2f}s!")
 
         temp_wav = work_dir / "temp_synth.wav"
         sf.write(str(temp_wav), wav_data, tts.sample_rate)
 
-        # Xuất file MP3 192kbps chuẩn studio
         subprocess.run([
             "ffmpeg", "-y", "-i", str(temp_wav),
-            "-codec:a", "libmp3lame", "-b:a", "192k",
+            "-codec:a", "libmp3lame", "-b:a", "256k",
             str(out_mp3)
         ], capture_output=True, check=True)
 

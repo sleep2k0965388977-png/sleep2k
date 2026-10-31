@@ -533,20 +533,22 @@ DUBBING_JOBS = {}
 
 CUSTOM_VOICES_DIR = UPLOAD_DIR / "custom_voices"
 CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
+CUSTOM_VOICES_FILE = Path(__file__).parent / "custom_voices.json"
 WORKER_CONFIG_FILE = Path(__file__).parent / "worker_config.json"
 CLONE_API_KEY = os.environ.get("CLONE_API_KEY", "sleep2k_clone_2024")
 
-# In-Memory Temporary Custom Voices (Ephemeral: NOT saved permanently to disk)
+# In-Memory & Persistent Custom Voices Store
 TEMP_CUSTOM_VOICES = {}  # {voice_type: voice_entry}
 
 def auto_clean_stale_custom_voices():
-    """Automatically delete temporary voice recordings older than 1 hour to prevent disk bloat."""
+    """Clean up orphaned temporary upload files without deleting active registered voices."""
     now = time.time()
-    for vid, v in list(TEMP_CUSTOM_VOICES.items()):
-        if now - v.get("created_at", now) > 3600:
-            delete_custom_voice_entry(vid)
     try:
-        for p in CUSTOM_VOICES_DIR.glob("clone_*.*"):
+        # Only clean temporary/transient scratch files older than 1 hour, protect all registered vocal files
+        for p in CUSTOM_VOICES_DIR.glob("temp_*.*"):
+            if now - p.stat().st_mtime > 3600:
+                p.unlink(missing_ok=True)
+        for p in CUSTOM_VOICES_DIR.glob("raw_*.*"):
             if now - p.stat().st_mtime > 3600:
                 p.unlink(missing_ok=True)
     except Exception:
@@ -607,40 +609,112 @@ def set_youtube_cookies(content):
 
 
 def load_custom_voices(session_id=None):
-    """Load temporary custom voices for the active browser session only."""
+    """Load persistent custom voices and session-specific custom voices across all devices."""
     auto_clean_stale_custom_voices()
-    if not session_id:
-        return []
+    voices = []
+    seen_ids = set()
+
+    # 1. Load from custom_voices.json (permanent sync across all machines)
+    if CUSTOM_VOICES_FILE.exists():
+        try:
+            with open(CUSTOM_VOICES_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                if isinstance(saved, list):
+                    for v in saved:
+                        vid = v.get("voice_type")
+                        if vid and vid not in seen_ids:
+                            seen_ids.add(vid)
+                            TEMP_CUSTOM_VOICES[vid] = v
+                            voices.append(v)
+        except Exception as e_cv:
+            logger.error(f"Error loading custom_voices.json: {e_cv}")
+
+    # 2. Load from disk metadata files
     try:
         for p in CUSTOM_VOICES_DIR.glob("clone_*.json"):
             vid = p.stem
-            if vid not in TEMP_CUSTOM_VOICES:
-                with open(p, "r", encoding="utf-8") as f:
-                    TEMP_CUSTOM_VOICES[vid] = json.load(f)
+            if vid not in seen_ids:
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        v = json.load(f)
+                        seen_ids.add(vid)
+                        TEMP_CUSTOM_VOICES[vid] = v
+                        voices.append(v)
+                except Exception:
+                    pass
     except Exception:
         pass
-    return [v for v in TEMP_CUSTOM_VOICES.values() if v.get("session_id") == session_id]
+
+    # 3. Include any in-memory session voices
+    for vid, v in TEMP_CUSTOM_VOICES.items():
+        if vid not in seen_ids:
+            seen_ids.add(vid)
+            voices.append(v)
+
+    return voices
 
 def save_custom_voice_entry(voice_entry):
-    """Save a temporary custom voice to in-memory session store and sync to disk."""
+    """Save a custom voice to in-memory store, disk metadata, and persistent custom_voices.json."""
     voice_type = voice_entry.get("voice_type")
     TEMP_CUSTOM_VOICES[voice_type] = voice_entry
+
+    # 1. Save metadata JSON on disk
     try:
         meta_p = CUSTOM_VOICES_DIR / f"{voice_type}.json"
         with open(meta_p, "w", encoding="utf-8") as f:
-            json.dump(voice_entry, f, ensure_ascii=False)
-    except Exception:
-        pass
+            json.dump(voice_entry, f, ensure_ascii=False, indent=2)
+    except Exception as e_meta:
+        logger.error(f"Error saving voice metadata: {e_meta}")
+
+    # 2. Sync to custom_voices.json for cross-device persistence
+    try:
+        current_list = []
+        if CUSTOM_VOICES_FILE.exists():
+            try:
+                with open(CUSTOM_VOICES_FILE, "r", encoding="utf-8") as f:
+                    current_list = json.load(f)
+                    if not isinstance(current_list, list):
+                        current_list = []
+            except Exception:
+                current_list = []
+
+        updated = False
+        for idx, item in enumerate(current_list):
+            if item.get("voice_type") == voice_type:
+                current_list[idx] = voice_entry
+                updated = True
+                break
+        if not updated:
+            current_list.insert(0, voice_entry)
+
+        with open(CUSTOM_VOICES_FILE, "w", encoding="utf-8") as f:
+            json.dump(current_list, f, ensure_ascii=False, indent=2)
+    except Exception as e_s:
+        logger.error(f"Error saving to custom_voices.json: {e_s}")
+
     return voice_entry
 
 def delete_custom_voice_entry(voice_type):
-    """Delete a temporary custom voice and instantly remove its vocal audio file and in-memory embeddings."""
+    """Delete a custom voice and remove its vocal audio files and catalog entry."""
     entry = TEMP_CUSTOM_VOICES.pop(voice_type, None)
     try:
         for p in CUSTOM_VOICES_DIR.glob(f"{voice_type}.*"):
             p.unlink(missing_ok=True)
     except Exception:
         pass
+
+    # Remove from custom_voices.json
+    try:
+        if CUSTOM_VOICES_FILE.exists():
+            with open(CUSTOM_VOICES_FILE, "r", encoding="utf-8") as f:
+                current_list = json.load(f)
+            if isinstance(current_list, list):
+                new_list = [v for v in current_list if v.get("voice_type") != voice_type]
+                with open(CUSTOM_VOICES_FILE, "w", encoding="utf-8") as f:
+                    json.dump(new_list, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
     global _NANO_TTS_INSTANCE
     if _NANO_TTS_INSTANCE and hasattr(_NANO_TTS_INSTANCE, "_preset_voices"):
         try:
@@ -2365,13 +2439,13 @@ def upload_custom_voice():
         temp_raw_path = CUSTOM_VOICES_DIR / f"raw_{voice_id}_{Path(audio_file.filename).name}"
         audio_file.save(str(temp_raw_path))
 
-        # Standardize audio to 24kHz mono PCM WAV (guarantees compatibility with WebM/M4A/MP3/Opus)
+        # Standardize audio to 48kHz mono PCM WAV (Ultra Studio Quality 48kHz)
         clean_wav_path = CUSTOM_VOICES_DIR / f"{voice_id}.wav"
         clean_mp3_path = CUSTOM_VOICES_DIR / f"{voice_id}.mp3"
         try:
             subprocess.run([
                 FFMPEG_BIN, "-y", "-i", str(temp_raw_path),
-                "-ar", "24000", "-ac", "1",
+                "-ar", "48000", "-ac", "1",
                 str(clean_wav_path)
             ], capture_output=True, check=True)
             # Create MP3 for fast browser preview
