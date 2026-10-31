@@ -94,6 +94,16 @@ if INDEX_HTML.exists():
 else:
     issues_found.append("[ERROR] templates/index.html not found")
 
+# Check 5: Colab / Local AI Clone Worker ONNX compatibility
+LOCAL_WORKER = ROOT / "local_clone_worker.py"
+if LOCAL_WORKER.exists():
+    w_txt = LOCAL_WORKER.read_text(encoding="utf-8", errors="ignore")
+    if "_fix_onnxruntime_if_needed" not in w_txt and "1.17.3" not in w_txt:
+        issues_found.append("[WARNING] local_clone_worker.py missing auto-downgrade fix for onnxruntime >= 1.18 external data validation")
+    else:
+        print("✅ local_clone_worker.py has onnxruntime self-healing compatibility fix")
+
+
 print("-" * 60)
 if not issues_found:
     print("🎉 ALL SYSTEMS PASS! No architectural or runtime watchdog issues detected.")
