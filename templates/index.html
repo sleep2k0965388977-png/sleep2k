@@ -58,182 +58,6 @@
         "url": "https://sleep2k.up.railway.app/"
       }
     }
-    
-        // =========================================================================
-        // VOCAL DNA 8-DIMENSION ANALYSIS MODAL
-        // =========================================================================
-        async function analyzeVocalVoice(voiceType, event) {
-            if (event) event.stopPropagation();
-            const modal = document.getElementById('vocalDnaModal');
-            const loading = document.getElementById('vocalDnaLoading');
-            const content = document.getElementById('vocalDnaContent');
-            
-            modal.style.display = 'flex';
-            loading.style.display = 'block';
-            content.style.display = 'none';
-
-            try {
-                let customB64 = null;
-                try {
-                    const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
-                    if (savedCustom[voiceType]) {
-                        customB64 = savedCustom[voiceType].base64;
-                    }
-                } catch(e) {}
-
-                const resp = await fetch('/api/analyze_vocal', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        voice_id: voiceType,
-                        audio_base64: customB64
-                    })
-                });
-
-                const data = await resp.json();
-                if (!resp.ok || data.status !== 'success') {
-                    throw new Error(data.message || 'Không thể phân tích âm thanh.');
-                }
-
-                renderVocalDnaReport(data);
-                loading.style.display = 'none';
-                content.style.display = 'block';
-
-            } catch(err) {
-                alert('Lỗi phân tích: ' + err.message);
-                closeVocalDnaModal();
-            }
-        }
-
-        function closeVocalDnaModal() {
-            const modal = document.getElementById('vocalDnaModal');
-            if (modal) modal.style.display = 'none';
-        }
-
-        function renderVocalDnaReport(report) {
-            const p = report.profile_8_dimensions;
-            const f = report.file_info;
-
-            // Overview
-            document.getElementById('dnaGender').innerText = f.predicted_gender || '--';
-            document.getElementById('dnaPitchMean').innerText = p['1_intonation'].mean_pitch_hz + ' Hz';
-            document.getElementById('dnaTextureCat').innerText = p['7_vocal_texture'].texture_category || '--';
-            document.getElementById('dnaEmotion').innerText = p['8_expressiveness'].emotional_tone || '--';
-
-            // 1. Intonation
-            document.getElementById('dnaF0Range').innerText = `${p['1_intonation'].min_pitch_hz}Hz - ${p['1_intonation'].max_pitch_hz}Hz (Trung bình: ${p['1_intonation'].mean_pitch_hz}Hz)`;
-            document.getElementById('dnaSemitones').innerText = p['1_intonation'].pitch_range_semitones + ' bán cung';
-            document.getElementById('dnaStability').innerText = p['1_intonation'].pitch_stability;
-
-            // 2. Breathing
-            document.getElementById('dnaBreathCount').innerText = p['2_breathing'].breath_events_count + ' lần';
-            document.getElementById('dnaBreathDur').innerText = p['2_breathing'].total_breath_time_s + ' giây';
-            document.getElementById('dnaBreathRatio').innerText = p['2_breathing'].breathiness_ratio_pct + '%';
-            document.getElementById('dnaBreathNotice').innerText = p['2_breathing'].has_natural_breathing ? 'Có tiếng lấy hơi tự nhiên giúp câu đọc sống động như người thật' : 'Âm thanh sạch, không có tiếng thở mạnh';
-
-            // 3. Pauses
-            document.getElementById('dnaPauseCount').innerText = p['3_pauses'].pause_count + ' điểm dừng';
-            document.getElementById('dnaAvgPause').innerText = p['3_pauses'].average_pause_duration_s + ' giây';
-            document.getElementById('dnaPauseRatio').innerText = p['3_pauses'].pause_ratio_pct + '%';
-
-            // 4. Vietnamese Tones
-            document.getElementById('dnaToneRising').innerText = p['4_pronunciation'].vietnamese_tones.rising_tones_pct + '%';
-            document.getElementById('dnaToneFalling').innerText = p['4_pronunciation'].vietnamese_tones.falling_tones_pct + '%';
-            document.getElementById('dnaToneDesc').innerText = p['4_pronunciation'].vietnamese_tones.inflection_description || '--';
-
-            // 5. Stress
-            document.getElementById('dnaDynRange').innerText = p['5_stress_and_emphasis'].dynamic_range_db + ' dB';
-            document.getElementById('dnaStressStyle').innerText = p['5_stress_and_emphasis'].emphasis_style;
-            document.getElementById('dnaStressFreq').innerText = p['5_stress_and_emphasis'].stress_frequency;
-
-            // 6. Rhythm
-            document.getElementById('dnaSpeakingRate').innerText = p['6_rhythm_and_pacing'].speaking_rate_syllables_sec + ' từ/giây';
-            document.getElementById('dnaTempoCat').innerText = p['6_rhythm_and_pacing'].tempo_category;
-            document.getElementById('dnaSpeechRatio').innerText = p['6_rhythm_and_pacing'].speech_time_ratio_pct + '%';
-
-            // 7. Texture
-            document.getElementById('dnaHnr').innerText = p['7_vocal_texture'].hnr_db;
-            document.getElementById('dnaJitter').innerText = p['7_vocal_texture'].jitter_local_pct + '%';
-            document.getElementById('dnaShimmer').innerText = p['7_vocal_texture'].shimmer_local_pct + '%';
-            document.getElementById('dnaF1').innerText = p['7_vocal_texture'].formants_hz.f1_openness;
-            document.getElementById('dnaF2').innerText = p['7_vocal_texture'].formants_hz.f2_frontness;
-
-            // 8. Emotion
-            document.getElementById('dnaEmotionDesc').innerText = p['8_expressiveness'].emotional_tone;
-            document.getElementById('dnaRichnessScore').innerText = p['8_expressiveness'].vocal_richness_score;
-
-            // Render Timeline Bar
-            renderTimelineBar(report.timeline_events, f.duration_seconds);
-
-            // Render Pitch Canvas
-            renderPitchCanvas(report.intonation_curve);
-        }
-
-        function renderTimelineBar(events, totalDur) {
-            const bar = document.getElementById('dnaTimelineBar');
-            bar.innerHTML = '';
-            if (!events || events.length === 0 || !totalDur) return;
-
-            events.forEach(e => {
-                const pct = Math.max(0.5, (e.duration / totalDur) * 100);
-                const el = document.createElement('div');
-                el.style.width = pct + '%';
-                el.style.height = '100%';
-                if (e.type === 'speech') {
-                    el.style.background = '#10b981';
-                    el.title = `Lời nói: ${e.start}s - ${e.end}s (${e.duration}s)`;
-                } else if (e.type === 'breath') {
-                    el.style.background = '#a855f7';
-                    el.title = `Lấy hơi: ${e.start}s - ${e.end}s (${e.duration}s)`;
-                } else {
-                    el.style.background = '#475569';
-                    el.title = `Khoảng lặng: ${e.start}s - ${e.end}s (${e.duration}s)`;
-                }
-                bar.appendChild(el);
-            });
-            document.getElementById('dnaTimelineSummary').innerText = `Tổng thời lượng: ${totalDur}s với ${events.length} sự kiện âm học được đánh dấu chi tiết.`;
-        }
-
-        function renderPitchCanvas(curve) {
-            const canvas = document.getElementById('dnaPitchCanvas');
-            if (!canvas || !curve || curve.length === 0) return;
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.parentElement.clientWidth || 350;
-            canvas.height = 55;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const valid = curve.map(c => c.pitch_hz).filter(p => p > 40);
-            if (valid.length < 2) return;
-
-            const minP = Math.min(...valid) * 0.9;
-            const maxP = Math.max(...valid) * 1.1;
-
-            ctx.beginPath();
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 2.5;
-
-            let started = false;
-            curve.forEach((pt, idx) => {
-                const x = (idx / (curve.length - 1)) * canvas.width;
-                if (pt.pitch_hz > 40) {
-                    const y = canvas.height - ((pt.pitch_hz - minP) / (maxP - minP)) * canvas.height;
-                    if (!started) {
-                        ctx.moveTo(x, y);
-                        started = true;
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                }
-            });
-            ctx.stroke();
-        }
-
-        // Tự động thông báo server khi đóng trình duyệt hoặc tắt tab
-        window.addEventListener('beforeunload', function () {
-            if (navigator.sendBeacon) {
-                navigator.sendBeacon('/api/client_leave');
-            }
-        });
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1565,6 +1389,39 @@
             }
         }
 
+        /* Video Dubbing Layout Styles */
+        .dub-settings-card {
+            margin-top: 20px;
+            padding: 22px;
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(8px);
+        }
+        .dub-settings-row-1 {
+            display: grid;
+            grid-template-columns: 1fr 1.6fr;
+            gap: 20px;
+            align-items: start;
+        }
+        .dub-settings-row-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        @media (max-width: 820px) {
+            .dub-settings-row-1, .dub-settings-row-2 {
+                grid-template-columns: 1fr !important;
+                gap: 14px !important;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -1761,7 +1618,7 @@
                             </span>
                         </div>
                         <div style="font-size:11.5px; color:#a1a1aa; line-height:1.45;">
-                            Ngắt chuẩn theo từng câu (dấu chấm <strong>. ! ?</strong>). 🟢 <em>Âm sắc tự nhiên, phát âm rõ ràng, không giật cục.</em>
+                            Tự ngắt câu thông minh mỗi 1.000 – 1.600 ký tự. 🟢 <em>Tối ưu tuyệt đối cho mọi độ dài văn bản, không sợ gián đoạn.</em>
                         </div>
                     </div>
 
@@ -1773,16 +1630,18 @@
                                 <span>Chia đoạn 3.000 – 5.000 Ký Tự</span>
                             </div>
                             <span style="font-size:11px; background:rgba(96,165,250,0.15); color:#60a5fa; padding:2px 8px; border-radius:6px; font-weight:700; border:1px solid rgba(96,165,250,0.3);">
-                                🎯 Đoạn dài / Review phim
+                                🎯 Đoạn dài liền mạch
                             </span>
                         </div>
                         <div style="font-size:11.5px; color:#a1a1aa; line-height:1.45;">
-                            Dành cho văn bản ít dấu câu ngắn. 🟢 <em>Tạo ít đoạn hơn, tiết kiệm thời gian tổng hợp.</em>
+                            Tự ngắt câu mỗi 3.000 – 4.000 ký tự. 🟢 <em>Thích hợp cho truyện dài, review phim cần các đoạn dài liên tục.</em>
                         </div>
                     </div>
                 </div>
 
-                <div id="cloneLimitAlertBox" style="display:none !important;"></div>
+                <!-- Hộp Cảnh báo khi vượt quá ký tự -->
+                <div id="cloneLimitAlertBox" style="display:none; margin-top:10px; background:rgba(239,68,68,0.14); border:1px solid rgba(239,68,68,0.4); border-radius:10px; padding:10px 14px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                </div>
             </div>
 
             <div class="textarea-container">
@@ -2312,40 +2171,100 @@
                     </div>
                 </div>
 
-                <!-- Settings Row -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.08);">
-                    <div>
-                        <label style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; display: block;">Ngôn ngữ gốc trong video:</label>
-                        <select id="dubSourceLang" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px;">
-                            <option value="zh" selected>🇨🇳 Tiếng Trung Quốc (Mặc định)</option>
-                            <option value="en">🇬🇧 Tiếng Anh</option>
-                            <option value="auto">🌐 Tự Động Nhận Diện</option>
-                        </select>
+                <!-- Settings Card Section -->
+                <div class="dub-settings-card">
+                    <!-- Row 1: Source Language (approx 35%) & TTS Voice Selector (approx 65%) -->
+                    <div class="dub-settings-row-1">
+                        <div>
+                            <label style="font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; display: flex; align-items: center; gap: 7px;">
+                                <i class="fa-solid fa-language" style="color: #38bdf8; font-size: 15px;"></i> Ngôn ngữ gốc trong video:
+                            </label>
+                            <select id="dubSourceLang" style="width: 100%; height: 46px; padding: 0 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; font-size: 13.5px; outline: none; transition: border-color 0.2s;">
+                                <option value="zh" selected>🇨🇳 Tiếng Trung Quốc (Mặc định)</option>
+                                <option value="en">🇬🇧 Tiếng Anh</option>
+                                <option value="auto">🌐 Tự Động Nhận Diện</option>
+                            </select>
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">Hệ thống nhận diện giọng nói & dịch thuật chuẩn xác sang tiếng Việt</div>
+                        </div>
+
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 600; color: #e2e8f0; margin: 0; display: flex; align-items: center; gap: 7px;">
+                                    <i class="fa-solid fa-microphone-lines" style="color: #c084fc; font-size: 15px;"></i> Giọng đọc tiếng Việt (TTS):
+                                </label>
+                                <button type="button" onclick="openDubVoiceModal()" style="background: linear-gradient(135deg, rgba(168,85,247,0.22), rgba(99,102,241,0.22)); border: 1px solid rgba(168,85,247,0.45); color: #e9d5ff; border-radius: 8px; padding: 5px 14px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; box-shadow: 0 2px 8px rgba(168,85,247,0.15);">
+                                    <i class="fa-solid fa-layer-group"></i> Voice Station (40+ Giọng)
+                                </button>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <select id="dubVoice" onchange="onDubVoiceChanged()" style="flex: 1; min-width: 0; height: 46px; padding: 0 14px; background: #1e293b; border: 1px solid rgba(168,85,247,0.4); border-radius: 10px; color: #fff; font-size: 14px; font-weight: 500; outline: none; cursor: pointer;">
+                                    <optgroup label="👩 Giọng Nữ Tiếng Việt">
+                                        <option value="BV421_vivn_streaming" selected>Nhỏ Ngọt Ngào (CapCut Neural)</option>
+                                        <option value="vi-VN-HoaiMyNeural">Hoài My (Edge Neural)</option>
+                                        <option value="BV074_streaming">Cô Gái Hoạt Ngôn</option>
+                                        <option value="vi_female_huong">Giọng Nữ Phổ Thông</option>
+                                        <option value="BV562_streaming">Mai (Truyền cảm)</option>
+                                        <option value="multi_female_yangguangnv_uranus_bigtts">Ban Mai (Ấm áp)</option>
+                                        <option value="multi_female_sisi_uranus_bigtts">Bản Tin Nữ</option>
+                                        <option value="multi_female_peiqi_uranus_bigtts">Giọng Gái Mới Lớn</option>
+                                        <option value="vieneu_truc_ly">Trúc Ly (Nữ Bắc - Tự nhiên)</option>
+                                        <option value="vieneu_ngoc_linh">Ngọc Linh (Nữ Bắc - Kể chuyện)</option>
+                                        <option value="vieneu_thuy_dung">Thùy Dung (Nữ Nam - Tin tức)</option>
+                                    </optgroup>
+                                    <optgroup label="👨 Giọng Nam Tiếng Việt">
+                                        <option value="vi-VN-NamMinhNeural">Nam Minh (Edge Neural)</option>
+                                        <option value="BV422_vivn_streaming">Nam Thuyết Minh (CapCut)</option>
+                                        <option value="multi_male_felipe_uranus_bigtts">Giọng Nam Trầm</option>
+                                        <option value="BV075_streaming">Thanh Niên Tự Tin</option>
+                                        <option value="BV560_streaming">Alex Đại Đế</option>
+                                        <option value="vieneu_minh_duc">Minh Đức (Nam Bắc - Tin tức)</option>
+                                        <option value="vieneu_thai_son">Thái Sơn (Nam Nam - Kể chuyện)</option>
+                                    </optgroup>
+                                    <optgroup label="🎭 Giọng Giải Trí & Review Phim">
+                                        <option value="BV074_streaming_dsp">Giọng Bé (Dễ thương)</option>
+                                        <option value="BV075_streaming_vibrato_dsp">Việt Méo (Hài hước)</option>
+                                        <option value="multi_female_richgirl_uranus_bigtts">Review Phim new</option>
+                                        <option value="multi_female_xyf04auto_uranus_bigtts">Review Phim 2</option>
+                                        <option value="multi_female_daqi_uranus_bigtts">Review Phim 3</option>
+                                        <option value="multi_female_stokie_uranus_bigtts">Review Phim 4</option>
+                                        <option value="BV075_streaming_robot_dsp">Robot VN</option>
+                                    </optgroup>
+                                </select>
+                                <button type="button" id="btnPreviewDubVoice" onclick="previewCurrentDubVoice(this, event)" title="Nghe thử giọng đang chọn" style="height: 46px; padding: 0 18px; background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(147,51,234,0.3)); border: 1px solid rgba(168,85,247,0.5); border-radius: 10px; color: #f3e8ff; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; white-space: nowrap; flex-shrink: 0; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(168,85,247,0.2);">
+                                    <i class="fa-solid fa-volume-high"></i> Nghe thử
+                                </button>
+                            </div>
+                            <div style="font-size: 11.5px; color: #c084fc; margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-circle-check" style="font-size: 11px;"></i> Đầy đủ các giọng CapCut Neural, VieNeu AI & Edge TTS truyền cảm
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
-                        <label style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; display: block;">Giọng đọc tiếng Việt (TTS):</label>
-                        <select id="dubVoice" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px;">
-                            <option value="vi-VN-HoaiMyNeural" selected>👩 Nữ - Hoài My (Ngọt ngào, truyền cảm)</option>
-                            <option value="vi-VN-NamMinhNeural">👨 Nam - Nam Minh (Trầm ấm, thời sự)</option>
-                        </select>
-                    </div>
+                    <!-- Row 2: Audio Mode & Whisper Model (Equal 50% / 50%) -->
+                    <div class="dub-settings-row-2">
+                        <div>
+                            <label style="font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; display: flex; align-items: center; gap: 7px;">
+                                <i class="fa-solid fa-sliders" style="color: #38bdf8; font-size: 15px;"></i> Chế độ âm thanh xuất ra:
+                            </label>
+                            <select id="dubMode" style="width: 100%; height: 46px; padding: 0 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; font-size: 13px; outline: none;">
+                                <option value="replace" selected>🔇 Xóa sạch giọng gốc (100% tiếng Việt, tắt hẳn tiếng Trung/gốc) - Khuyên dùng</option>
+                                <option value="smart_mute">✨ Tắt giọng gốc khi nói (Mute âm gốc lúc có thoại, giữ nhạc lúc nghỉ)</option>
+                                <option value="ducking">🎬 Thuyết minh (Giữ tiếng gốc nhỏ 15% + Đè tiếng Việt lên)</option>
+                            </select>
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">Khuyên dùng: Xóa sạch tiếng gốc giúp video không bị lẫn tạp âm</div>
+                        </div>
 
-                    <div>
-                        <label style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; display: block;">Chế độ âm thanh xuất ra:</label>
-                        <select id="dubMode" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px;">
-                            <option value="ducking" selected>🎬 Thuyết minh (Giữ nhạc nền 15% + Lồng tiếng)</option>
-                            <option value="replace">🔇 Thay thế hoàn toàn (Chỉ giữ tiếng Việt)</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px; display: block;">Độ chính xác AI (Whisper):</label>
-                        <select id="dubWhisperModel" style="width: 100%; padding: 10px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13.5px;">
-                            <option value="base" selected>⚡ Base (Nhanh & chuẩn - Khuyên dùng)</option>
-                            <option value="small">🎯 Small (Chính xác cao hơn)</option>
-                            <option value="tiny">🚀 Tiny (Siêu tốc độ)</option>
-                        </select>
+                        <div>
+                            <label style="font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; display: flex; align-items: center; gap: 7px;">
+                                <i class="fa-solid fa-brain" style="color: #a855f7; font-size: 15px;"></i> Độ chính xác AI (Whisper):
+                            </label>
+                            <select id="dubWhisperModel" style="width: 100%; height: 46px; padding: 0 14px; background: #1e293b; border: 1px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff; font-size: 13px; outline: none;">
+                                <option value="base" selected>⚡ Base (Nhanh & chuẩn xác - Khuyên dùng)</option>
+                                <option value="small">🎯 Small (Chính xác cao hơn)</option>
+                                <option value="tiny">🚀 Tiny (Siêu tốc độ)</option>
+                            </select>
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 6px;">Tự động căn chỉnh khẩu hình và độ dài video khớp với âm thanh</div>
+                        </div>
                     </div>
                 </div>
 
@@ -2379,13 +2298,34 @@
                         <i class="fa-solid fa-circle-check"></i>
                         <span>Video Đã Lồng Tiếng Việt Thành Công!</span>
                     </div>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <a id="dubDownloadVideoBtn" href="#" download class="social-btn" style="background: rgba(16,185,129,0.2); color: #6ee7b7; border-color: rgba(16,185,129,0.4); text-decoration: none;">
                             <i class="fa-solid fa-download"></i> Tải Video MP4
+                        </a>
+                        <a id="dubDownloadAudioBtn" href="#" download class="social-btn" style="background: rgba(168,85,247,0.2); color: #d8b4fe; border-color: rgba(168,85,247,0.4); text-decoration: none;">
+                            <i class="fa-solid fa-music"></i> Tải Audio MP3 (Sạch)
                         </a>
                         <a id="dubDownloadSrtBtn" href="#" download class="social-btn" style="background: rgba(59,130,246,0.2); color: #93c5fd; border-color: rgba(59,130,246,0.4); text-decoration: none;">
                             <i class="fa-solid fa-closed-captioning"></i> Tải Phụ Đề SRT
                         </a>
+                    </div>
+                </div>
+
+                <!-- Instant Audio Mode Switcher (1-Click Re-mux in 1s) -->
+                <div style="background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.25); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-size: 13.5px;">
+                        <span style="color: var(--text-muted); font-weight: 500;">Chế độ âm thanh video:</span>
+                        <span id="currentDubModeBadge" style="background: #10b981; color: #fff; padding: 3px 12px; border-radius: 12px; font-weight: 600; font-size: 12px;">🔇 Đã xóa sạch giọng gốc</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <select id="quickRemuxMode" style="padding: 7px 12px; background: #1e293b; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 13px;">
+                            <option value="replace">🔇 Xóa sạch giọng gốc (0% gốc)</option>
+                            <option value="smart_mute">✨ Tắt giọng gốc khi nói (Giữ nhạc nền)</option>
+                            <option value="ducking">🎬 Thuyết minh (Giữ tiếng gốc 15%)</option>
+                        </select>
+                        <button id="btnQuickRemux" onclick="changeDubModeInstant()" style="background: linear-gradient(135deg, #a855f7, #6366f1); border: none; color: #fff; padding: 7px 16px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 10px rgba(168,85,247,0.3); transition: all 0.2s ease;">
+                            <i class="fa-solid fa-arrows-rotate"></i> Đổi Chế Độ Ngay (1s)
+                        </button>
                     </div>
                 </div>
 
@@ -2489,6 +2429,52 @@
         </aside>
     </div>
 
+    <!-- Dubbing Voice Station Modal (Choose voice with search and preview for video dubbing) -->
+    <div class="modal-overlay" id="dubVoiceModal" onclick="if(event.target===this) closeDubVoiceModal()">
+        <div class="modal-card" style="max-width: 960px; width: 94%; max-height: 88vh; display: flex; flex-direction: column; text-align: left; padding: 24px; box-sizing: border-box;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg,#a855f7,#6366f1); display:flex; align-items:center; justify-content:center; box-shadow:0 0 15px rgba(168,85,247,0.4); flex-shrink:0;">
+                        <i class="fa-solid fa-microphone-lines" style="color:#fff; font-size:18px;"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin:0; font-size:16.5px; font-weight:700; color:#fff;">Danh Sách Giọng Đọc (Voice Station) - Lồng Tiếng Video</h3>
+                        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Bấm "Nghe thử" để nghe trước giọng đọc, bấm vào thẻ để chọn cho video</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="closeDubVoiceModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Language Tabs & Search in Modal -->
+            <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+                <div class="lang-filter-bar" id="dubVoiceModalLangTabs" style="margin:0;">
+                    <button class="lang-tab active" onclick="filterDubModalVoices('vi', this)">🇻🇳 Tiếng Việt</button>
+                    <button class="lang-tab" onclick="filterDubModalVoices('custom', this)">⭐ Giọng Của Tôi</button>
+                    <button class="lang-tab" onclick="filterDubModalVoices('all', this)">🌐 Tất Cả</button>
+                </div>
+                <div class="search-box" style="margin:0; min-width:260px; flex:1; max-width:340px;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="dubVoiceModalSearch" placeholder="Tìm kiếm giọng (VD: Nhỏ Ngọt Ngào, Bé, Việt Méo...)" oninput="filterDubModalVoices()">
+                </div>
+            </div>
+
+            <!-- Voice List Grid in Modal -->
+            <div class="voice-list" id="dubVoiceModalList" style="flex:1; overflow-y:auto; max-height:calc(88vh - 220px); padding-right:6px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));">
+                <!-- Dynamically populated from allVoices -->
+            </div>
+
+            <div style="margin-top:16px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="font-size:13px; color:#cbd5e1; display:flex; align-items:center; gap:8px;">
+                    <span>Giọng đang chọn:</span>
+                    <span id="dubModalSelectedName" style="color:#c084fc; font-weight:700; background:rgba(168,85,247,0.15); padding:3px 10px; border-radius:6px; border:1px solid rgba(168,85,247,0.3);">Nhỏ Ngọt Ngào</span>
+                </div>
+                <button type="button" onclick="closeDubVoiceModal()" style="background:linear-gradient(135deg,#a855f7,#6366f1); border:none; color:#fff; padding:9px 26px; border-radius:20px; font-weight:700; font-size:13px; cursor:pointer; box-shadow:0 2px 10px rgba(168,85,247,0.4);">
+                    <i class="fa-solid fa-check"></i> Xác Nhận Giọng Này
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Voice Clone Modal -->
     <div class="modal-overlay" id="cloneModal" onclick="if(event.target===this) closeCloneModal()">
         <div class="modal-card" style="max-width: 520px; text-align: left; padding: 26px;">
@@ -2551,19 +2537,9 @@
 
             <!-- Worker Settings Accordion -->
             <details style="margin-bottom: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px;">
-                <summary style="font-size: 12px; font-weight: 600; color: #a78bfa; cursor: pointer; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
-                    <span style="display:flex; align-items:center; gap:8px;">
-                        <i class="fa-solid fa-server"></i> Cấu hình Worker AI Clone (Colab / Local GPU)
-                        <a href="https://colab.research.google.com/github/sleep2k0965388977-png/sleep2k/blob/main/sleep2k_ai_worker.ipynb" target="_blank" onclick="event.stopPropagation()" style="background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px;box-shadow:0 2px 6px rgba(249,115,22,0.35);" title="Mở Google Colab T4 GPU (Chạy AI Miễn Phí Từ Xa 100%)">
-                            <i class="fa-solid fa-play"></i> Chạy Colab GPU
-                        </a>
-                    </span>
-                    <span style="display:inline-flex; align-items:center; gap:6px;">
-                        <span id="workerStatusBadge" style="font-size:10px; padding:2px 8px; border-radius:10px; background:rgba(100,116,139,0.2); color:#94a3b8;">Đang kiểm tra...</span>
-                        <button type="button" id="btnStopWorker" onclick="event.stopPropagation(); shutdownWorkerFromUI();" style="display:none; background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; border:none; padding:3px 10px; border-radius:5px; font-size:10.5px; font-weight:700; cursor:pointer; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(239,68,68,0.35);" title="Tắt máy chủ GPU trên Kaggle ngay từ web để tiết kiệm giờ">
-                            <i class="fa-solid fa-power-off"></i> Tắt GPU (Tiết kiệm giờ)
-                        </button>
-                    </span>
+                <summary style="font-size: 12px; font-weight: 600; color: #a78bfa; cursor: pointer; display:flex; align-items:center; justify-content:space-between;">
+                    <span><i class="fa-solid fa-server"></i> Cấu hình Worker AI Clone (Colab / Local GPU)</span>
+                    <span id="workerStatusBadge" style="font-size:10px; padding:2px 8px; border-radius:10px; background:rgba(100,116,139,0.2); color:#94a3b8;">Đang kiểm tra...</span>
                 </summary>
                 <div style="margin-top: 10px; font-size: 11.5px; color: #cbd5e1;">
                     <div style="margin-bottom: 6px;">URL kết nối Worker (Ngrok / Cloudflared):</div>
@@ -2574,14 +2550,17 @@
                         </button>
                     </div>
                     <div style="font-size: 10.5px; color: #94a3b8; margin-top: 6px; line-height: 1.4;">
-                        💡 AI Clone chạy trên chiếc máy tính này qua file <code>CHAY_AI_CLONE_GIONG.bat</code>. Khi sang máy khác hoặc dùng điện thoại, bạn có thể bấm nút dưới để mở Google Colab T4 GPU miễn phí:
+                        ☁️ Bộ máy Cloud AI hoạt động trực tiếp 24/7 trên VPS (không cần bật máy tính cá nhân). Tùy chọn: Bạn có thể kết nối thêm Worker cá nhân (GPU T4/RTX) qua URL nếu muốn tăng tốc xử lý.
                     </div>
-                    <div style="margin-top: 8px; display:flex; flex-wrap:wrap; gap:8px;">
-                        <a href="https://colab.research.google.com/github/sleep2k0965388977-png/sleep2k/blob/main/sleep2k_ai_worker.ipynb" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.18);border:1px solid rgba(249,115,22,0.4);color:#fdba74;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:11.5px;font-weight:600;">
-                            <i class="fa-solid fa-bolt"></i> ⚡ Mở Google Colab T4 GPU
+                    <!-- Nút mở GPU Worker miễn phí -->
+                    <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                        <a href="https://colab.research.google.com/github/sleep2k0965388977-png/sleep2k/blob/main/colab/sleep2k_ai_worker.ipynb" target="_blank" rel="noopener noreferrer"
+                           style="flex:1; min-width:160px; display:inline-flex; align-items:center; justify-content:center; gap:8px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border:none; padding:9px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; text-decoration:none; box-shadow:0 2px 10px rgba(245,158,11,0.35);">
+                            <i class="fa-solid fa-bolt"></i> Mở Google Colab T4 GPU
                         </a>
-                        <a href="https://www.kaggle.com/code/chillsleep/notebookebfc6db907/edit" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(14,165,233,0.18);border:1px solid rgba(14,165,233,0.4);color:#7dd3fc;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:11.5px;font-weight:600;" title="Chạy ngầm 12 tiếng - Tắt tab đi ngủ thoải mái">
-                            <i class="fa-solid fa-cloud"></i> 🌙 Mở Kaggle GPU (Chạy ngầm 12h - Đóng X thoải mái)
+                        <a href="https://www.kaggle.com/kernels/welcome?src=https://raw.githubusercontent.com/sleep2k0965388977-png/sleep2k/main/colab/sleep2k_ai_worker.ipynb" target="_blank" rel="noopener noreferrer"
+                           style="flex:1; min-width:160px; display:inline-flex; align-items:center; justify-content:center; gap:8px; background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; border:none; padding:9px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; text-decoration:none; box-shadow:0 2px 10px rgba(14,165,233,0.35);">
+                            <i class="fa-solid fa-cloud"></i> Mở Kaggle GPU <span style="font-size:10px; opacity:0.85;">(Chạy ngầm 12h - Đóng X thoải mái)</span>
                         </a>
                     </div>
                 </div>
@@ -2750,18 +2729,16 @@
 
         function setCloneCharMode(limit) {
             cloneCharLimit = limit;
-            const r2k = document.getElementById("radio2k");
-            const r5k = document.getElementById("radio5k");
             const c2k = document.getElementById("modeCard2k");
             const c5k = document.getElementById("modeCard5k");
+            const r2k = document.getElementById("radio2k");
+            const r5k = document.getElementById("radio5k");
 
             if (limit === 2000) {
                 if (r2k) r2k.checked = true;
-                if (r5k) r5k.checked = false;
                 if (c2k) c2k.classList.add("active");
                 if (c5k) c5k.classList.remove("active");
             } else {
-                if (r2k) r2k.checked = false;
                 if (r5k) r5k.checked = true;
                 if (c2k) c2k.classList.remove("active");
                 if (c5k) c5k.classList.add("active");
@@ -3053,6 +3030,9 @@
                     } catch (e_sc) {}
                     updateLangCounts();
                     applyFilters(); 
+                    if (typeof populateDubVoiceDropdown === 'function') {
+                        populateDubVoiceDropdown(allVoices);
+                    }
                 }
             } catch (e) { console.error("Fetch voices error:", e); }
         }
@@ -3157,10 +3137,7 @@
                         <i class="fa-solid fa-wand-magic-sparkles" style="font-size:18px;color:#c084fc;"></i>
                         <div style="font-weight:700;color:#f3e8ff;font-size:13.5px;">+ Tải Lên / Clone Giọng Bản Thân</div>
                     </div>
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
-                        <span style="font-size:11px;color:#a78bfa;">Chỉ cần 5–15s vocal</span>
-                        <span onclick="event.stopPropagation(); document.getElementById('importVoiceInput').click();" style="font-size:11px;color:#38bdf8;font-weight:600;cursor:pointer;padding:2px 7px;border-radius:6px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.3);" title="Nhập file giọng đã xuất từ máy khác"><i class="fa-solid fa-file-import"></i> Nhập file</span>
-                    </div>
+                    <div style="font-size:11px;color:#a78bfa;margin-top:3px;">Chỉ cần 5–15s ghi âm vocal của bạn</div>
                 `;
                 listEl.appendChild(addCard);
             }
@@ -3198,12 +3175,10 @@
                 item.innerHTML = `
                     <div class="voice-header">
                         <div class="voice-name" title="${v.display_name || v.voice_type}">${v.display_name || v.voice_type}</div>
-                        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                        <div style="display:flex;align-items:center;gap:4px;">
                             <button class="btn-preview" onclick="previewVoice('${v.voice_type}','${v.lan||'vi'}',this,event)">
                                 <i class="fa-solid fa-volume-high"></i> Nghe thử
                             </button>
-                            ${isClone ? `<button class="btn-preview" style="background:rgba(168,85,247,0.22);border-color:rgba(168,85,247,0.5);color:#d8b4fe;" onclick="analyzeVocalVoice('${v.voice_type}',event)" title="Phân tích chuyên sâu 8 đặc trưng âm học & hơi thở"><i class="fa-solid fa-dna"></i> ADN Giọng</button>` : ''}
-                            ${isClone ? `<button class="btn-preview" style="background:rgba(59,130,246,0.22);border-color:rgba(59,130,246,0.5);color:#93c5fd;" onclick="exportCustomVoice('${v.voice_type}',event)" title="Tải file giọng để dùng trên mọi máy khác"><i class="fa-solid fa-download"></i> Tải về</button>` : ''}
                             ${isClone ? `<button class="btn-delete-voice" onclick="deleteCustomVoice('${v.voice_type}',event)" title="Xóa giọng này"><i class="fa-solid fa-trash-can"></i></button>` : ''}
                         </div>
                     </div>
@@ -3224,6 +3199,40 @@
             previewAudioEl.pause();
             if (activePreviewBtn) { activePreviewBtn.classList.remove("playing"); activePreviewBtn.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử'; }
             if (activePreviewBtn === btnEl && !previewAudioEl.paused) { activePreviewBtn = null; return; }
+
+            // Instant local preview for custom clone voices stored in localStorage (100% faithful to original voice sample)
+            if (voiceType.startsWith("clone_") || (allVoices.find(v => v.voice_type === voiceType)?.is_clone)) {
+                try {
+                    const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
+                    if (savedCustom[voiceType] && savedCustom[voiceType].base64) {
+                        previewAudioEl.src = savedCustom[voiceType].base64;
+                        previewAudioEl.play();
+                        activePreviewBtn = btnEl;
+                        btnEl.classList.add("playing");
+                        btnEl.innerHTML = '<i class="fa-solid fa-pause"></i> Đang phát';
+                        previewAudioEl.onended = () => {
+                            btnEl.classList.remove("playing");
+                            btnEl.innerHTML = '<i class="fa-solid fa-volume-high"></i> Nghe thử';
+                            activePreviewBtn = null;
+                        };
+                        // Sync with server in background to ensure server has reference audio
+                        fetch("/api/preview_voice", {
+                            method: "POST",
+                            headers: {"Content-Type":"application/json"},
+                            body: JSON.stringify({
+                                voice: voiceType,
+                                lan: lan,
+                                custom_ref_b64: savedCustom[voiceType].base64,
+                                custom_name: savedCustom[voiceType].name
+                            })
+                        }).catch(() => {});
+                        return;
+                    }
+                } catch (e_ls) {
+                    console.error("Local preview error:", e_ls);
+                }
+            }
+
             btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Nạp...'; btnEl.disabled = true;
             try {
                 const resp = await fetch("/api/preview_voice", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({voice:voiceType,lan:lan}) });
@@ -3268,21 +3277,11 @@
         async function startGeneration() {
             const text = document.getElementById("textInput").value.trim();
             if (!text) { alert("Vui lòng nhập văn bản!"); return; }
-            // Cho phép văn bản dài không giới hạn - tự động chia đoạn & ghép file
+            // Cho phép văn bản dài không giới hạn - tự động chia đoạn & ghép file MP3
 
             const btn = document.getElementById("btnGenerate"), rate = document.getElementById("rateSelect").value;
             const progressCard = document.getElementById("progressCard"), playerCard = document.getElementById("playerCard");
             const fillEl = document.getElementById("progressFill"), pctEl = document.getElementById("progressPercentage"), statusEl = document.getElementById("progressStatus");
-
-            if (isCurrentVoiceClone()) {
-                try {
-                    const c_stat = await fetch('/api/clone_worker_status').then(r => r.json());
-                    if (c_stat.status !== 'online') {
-                        alert('⚠️ AI Clone Worker hiện đang TẮT (Offline)!\n\nĐể tạo giọng Clone giống thật 100%, bạn hãy chọn 1 trong 2 cách:\n1️⃣ Nếu dùng máy tính cá nhân: Click đúp chạy file "CHAY_AI_CLONE_GIONG.bat" trên máy.\n2️⃣ Nếu dùng máy khác / điện thoại: Bật máy tính ở nhà (hoặc dùng Google Colab GPU T4 miễn phí) để xử lý AI từ xa nhé!');
-                        return;
-                    }
-                } catch(e_chk) {}
-            }
 
             btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
             playerCard.classList.remove("show"); progressCard.classList.add("show");
@@ -4820,42 +4819,21 @@
                     localStorage.setItem('sleep2k_clone_worker_url', data.worker_url);
                 }
 
-                const stopBtn = document.getElementById('btnStopWorker');
                 if (data.status === 'online') {
                     badge.style.background = 'rgba(16,185,129,0.2)';
                     badge.style.color = '#10b981';
-                    badge.innerText = '🟢 Worker Online (' + (data.gpu || 'GPU') + ')';
-                    if (stopBtn) stopBtn.style.display = 'inline-flex';
-                } else if (data.status === 'offline') {
-                    badge.style.background = 'rgba(239,68,68,0.2)';
-                    badge.style.color = '#ef4444';
-                    badge.innerText = '🔴 Worker Offline (Chưa bật)';
-                    if (stopBtn) stopBtn.style.display = 'none';
+                    if (data.mode === 'external') {
+                        badge.innerText = '🟢 Dedicated Worker (' + (data.gpu || 'GPU') + ')';
+                    } else {
+                        badge.innerText = '🟢 Cloud AI Online (Trực tuyến 24/7)';
+                    }
                 } else {
-                    badge.style.background = 'rgba(100,116,139,0.2)';
-                    badge.style.color = '#94a3b8';
-                    badge.innerText = '⚪ Chưa cấu hình';
-                    if (stopBtn) stopBtn.style.display = 'none';
+                    badge.style.background = 'rgba(16,185,129,0.2)';
+                    badge.style.color = '#10b981';
+                    badge.innerText = '🟢 Cloud AI Online (Trực tuyến 24/7)';
                 }
             } catch (e) {
                 console.log('Worker status error:', e);
-            }
-        }
-
-        async function shutdownWorkerFromUI() {
-            if (!confirm('Bạn có chắc chắn muốn TẮT MÁY CHỦ GPU để tiết kiệm giờ không?\n(Tiến trình trên Kaggle sẽ được ngắt ngay lập tức để bảo lưu số giờ còn lại của tuần)')) {
-                return;
-            }
-            const btn = document.getElementById('btnStopWorker');
-            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tắt...';
-            try {
-                const resp = await fetch('/api/worker_shutdown', { method: 'POST' });
-                const res = await resp.json();
-                alert(res.message || 'Đã ngắt Worker để tiết kiệm giờ thành công!');
-                checkWorkerStatus();
-            } catch (err) {
-                alert('Lỗi khi gửi lệnh ngắt: ' + err);
-                checkWorkerStatus();
             }
         }
 
@@ -5974,6 +5952,7 @@ function renderVideoGrid() {
         }
 
         function onDubbingCompleted(data) {
+            window.currentDubJobId = data.job_id;
             const btn = document.getElementById("btnStartDubbing");
             btn.disabled = false;
             btn.style.opacity = "1";
@@ -5991,6 +5970,21 @@ function renderVideoGrid() {
 
             document.getElementById("dubDownloadVideoBtn").href = data.video_url || "#";
             document.getElementById("dubDownloadSrtBtn").href = data.srt_url || "#";
+            
+            const audioBtn = document.getElementById("dubDownloadAudioBtn");
+            if (audioBtn) {
+                if (data.audio_url) {
+                    audioBtn.href = data.audio_url;
+                    audioBtn.style.display = "inline-flex";
+                } else {
+                    audioBtn.style.display = "none";
+                }
+            }
+
+            const initialMode = data.mode || "replace";
+            updateDubModeBadge(initialMode);
+            const quickSel = document.getElementById("quickRemuxMode");
+            if (quickSel) quickSel.value = initialMode;
 
             // Render segments
             const segments = data.segments || [];
@@ -6022,6 +6016,61 @@ function renderVideoGrid() {
             showToast("Đã dịch và lồng tiếng video thành công!", "success");
         }
 
+        function updateDubModeBadge(mode) {
+            const badge = document.getElementById("currentDubModeBadge");
+            if (!badge) return;
+            if (mode === "replace") {
+                badge.style.background = "#10b981";
+                badge.innerText = "🔇 Đã xóa sạch giọng gốc (100% tiếng Việt)";
+            } else if (mode === "smart_mute") {
+                badge.style.background = "#8b5cf6";
+                badge.innerText = "✨ Tắt giọng gốc khi nói (Giữ nhạc lúc nghỉ)";
+            } else {
+                badge.style.background = "#f59e0b";
+                badge.innerText = "🎬 Thuyết minh (Giữ tiếng gốc 15%)";
+            }
+        }
+
+        async function changeDubModeInstant() {
+            if (!window.currentDubJobId) {
+                showToast("Vui lòng đợi quá trình lồng tiếng hoàn tất!", "warning");
+                return;
+            }
+            const newMode = document.getElementById("quickRemuxMode").value;
+            const remuxBtn = document.getElementById("btnQuickRemux");
+            remuxBtn.disabled = true;
+            remuxBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang hòa trộn...`;
+
+            try {
+                const formData = new FormData();
+                formData.append("job_id", window.currentDubJobId);
+                formData.append("mode", newMode);
+
+                const resp = await fetch("/api/dubbing/remux", {
+                    method: "POST",
+                    body: formData
+                });
+                const res = await resp.json();
+                if (!resp.ok || res.status !== "success") {
+                    throw new Error(res.message || "Không thể chuyển đổi chế độ hòa trộn!");
+                }
+
+                const player = document.getElementById("dubVideoPlayer");
+                player.src = res.video_url;
+                player.load();
+                player.play().catch(() => {});
+
+                document.getElementById("dubDownloadVideoBtn").href = res.video_url;
+                updateDubModeBadge(newMode);
+                showToast(res.message || "Đã chuyển đổi chế độ âm thanh thành công!", "success");
+            } catch (err) {
+                showToast("Lỗi chuyển đổi: " + err.message, "error");
+            } finally {
+                remuxBtn.disabled = false;
+                remuxBtn.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i> Đổi Chế Độ Ngay (1s)`;
+            }
+        }
+
         function formatSecondsToHms(sec) {
             sec = Math.max(0, parseFloat(sec) || 0);
             const m = Math.floor(sec / 60);
@@ -6034,182 +6083,251 @@ function renderVideoGrid() {
             return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
 
+        // ── Voice Station Integration for Video Dubbing ──
+        let dubModalCurrentLang = "vi";
+
+        function populateDubVoiceDropdown(voices) {
+            const sel = document.getElementById("dubVoice");
+            if (!sel || !voices || voices.length === 0) return;
+
+            const savedVoice = sel.value || "BV421_vivn_streaming";
+            sel.innerHTML = "";
+
+            // 1. Cloned voices
+            const cloneVoices = voices.filter(v => v.is_clone || (v.voice_type || "").startsWith("clone_"));
+            if (cloneVoices.length > 0) {
+                const grp = document.createElement("optgroup");
+                grp.label = "🌟 Giọng Của Tôi (AI Voice Clone)";
+                cloneVoices.forEach(v => {
+                    const opt = document.createElement("option");
+                    opt.value = v.voice_type;
+                    opt.innerText = `⭐ ${v.display_name || v.voice_type} (Giọng nhân bản)`;
+                    grp.appendChild(opt);
+                });
+                sel.appendChild(grp);
+            }
+
+            // 2. Vietnamese voices
+            const viVoices = voices.filter(v => {
+                const lan = (v.lan || "").toLowerCase();
+                const vt = (v.voice_type || "").toLowerCase();
+                const dn = (v.display_name || "").toLowerCase();
+                return !v.is_clone && !vt.startsWith("clone_") && (lan.includes("vi") || vt.includes("vivn") || dn.includes("việt") || dn.includes("viet"));
+            });
+
+            if (viVoices.length > 0) {
+                const grpFemale = document.createElement("optgroup");
+                grpFemale.label = "👩 Giọng Nữ Tiếng Việt";
+                const grpMale = document.createElement("optgroup");
+                grpMale.label = "👨 Giọng Nam Tiếng Việt";
+                const grpOther = document.createElement("optgroup");
+                grpOther.label = "🎭 Giọng Giải Trí & Review Phim";
+
+                viVoices.forEach(v => {
+                    const opt = document.createElement("option");
+                    opt.value = v.voice_type;
+                    const dn = v.display_name || v.voice_type;
+                    opt.innerText = dn;
+
+                    const dnLow = dn.toLowerCase();
+                    const vtLow = (v.voice_type || "").toLowerCase();
+
+                    // 1. Giải trí & Review
+                    if (dnLow.includes("bé") || dnLow.includes("méo") || dnLow.includes("review") || dnLow.includes("robot") || vtLow.includes("vibrato")) {
+                        grpOther.appendChild(opt);
+                    } else {
+                        // 2. Giọng Nữ (Bắt buộc kiểm tra female TRƯỚC VÌ từ "female" chứa "male"!)
+                        const femaleKeys = ["nữ", "gái", "cô", "mai", "ly", "linh", "trang", "huyền", "dung", "đoan", "duyên", "trân", "idol", "ngọt", "hoai my", "hoài my", "peiqi", "sisi", "yangguangnv", "richgirl", "quanweinv", "tianmeijieshuo", "kiwi"];
+                        let isFemale = vtLow.includes("female") || femaleKeys.some(k => dnLow.includes(k));
+                        if (dnLow.startsWith("nam ") || dnLow.includes("nam bản tin")) {
+                            isFemale = false;
+                        }
+
+                        if (isFemale) {
+                            grpFemale.appendChild(opt);
+                        } else {
+                            // 3. Giọng Nam
+                            const maleKeys = ["nam", "thanh niên", "đại đế", "hùng", "đức", "tuyên", "bình", "sơn", "vĩnh", "triết", "trí", "adam"];
+                            const isMale = (vtLow.includes("male") && !vtLow.includes("female")) || vtLow.includes("bv422") || vtLow.includes("bv560") || maleKeys.some(k => dnLow.includes(k));
+                            if (isMale) {
+                                grpMale.appendChild(opt);
+                            } else {
+                                grpFemale.appendChild(opt);
+                            }
+                        }
+                    }
+                });
+
+                if (grpFemale.children.length > 0) sel.appendChild(grpFemale);
+                if (grpMale.children.length > 0) sel.appendChild(grpMale);
+                if (grpOther.children.length > 0) sel.appendChild(grpOther);
+            }
+
+            // 3. Other languages
+            const otherVoices = voices.filter(v => {
+                const lan = (v.lan || "").toLowerCase();
+                const vt = (v.voice_type || "").toLowerCase();
+                return !v.is_clone && !vt.startsWith("clone_") && !lan.includes("vi") && !vt.includes("vivn");
+            });
+            if (otherVoices.length > 0) {
+                const grpOther = document.createElement("optgroup");
+                grpOther.label = "🌐 Giọng Quốc Tế (Anh, Trung, Nhật...)";
+                otherVoices.slice(0, 30).forEach(v => {
+                    const opt = document.createElement("option");
+                    opt.value = v.voice_type;
+                    opt.innerText = `[${(v.lan || '').toUpperCase()}] ${v.display_name || v.voice_type}`;
+                    grpOther.appendChild(opt);
+                });
+                sel.appendChild(grpOther);
+            }
+
+            // Restore selection or default to BV421_vivn_streaming (Nhỏ Ngọt Ngào)
+            if (Array.from(sel.options).some(o => o.value === savedVoice)) {
+                sel.value = savedVoice;
+            } else if (Array.from(sel.options).some(o => o.value === "BV421_vivn_streaming")) {
+                sel.value = "BV421_vivn_streaming";
+            }
+        }
+
+        function openDubVoiceModal() {
+            const modal = document.getElementById("dubVoiceModal");
+            if (!modal) return;
+            modal.classList.add("show");
+            filterDubModalVoices("vi");
+            const curVal = document.getElementById("dubVoice").value;
+            const curVoiceObj = allVoices.find(v => v.voice_type === curVal);
+            const nameEl = document.getElementById("dubModalSelectedName");
+            if (nameEl) nameEl.innerText = curVoiceObj ? (curVoiceObj.display_name || curVal) : curVal;
+        }
+
+        function closeDubVoiceModal() {
+            const modal = document.getElementById("dubVoiceModal");
+            if (modal) modal.classList.remove("show");
+        }
+
+        function filterDubModalVoices(langFilter, btnEl) {
+            if (langFilter) {
+                dubModalCurrentLang = langFilter;
+                document.querySelectorAll("#dubVoiceModalLangTabs .lang-tab").forEach(b => b.classList.remove("active"));
+                if (btnEl) btnEl.classList.add("active");
+            }
+            const term = (document.getElementById("dubVoiceModalSearch").value || "").toLowerCase().trim();
+            const filtered = allVoices.filter(v => {
+                const lan = (v.lan || "").toLowerCase();
+                const vtype = (v.voice_type || "").toLowerCase();
+                const dname = (v.display_name || "").toLowerCase();
+
+                let matchesLang = false;
+                if (dubModalCurrentLang === "all") matchesLang = true;
+                else if (dubModalCurrentLang === "custom") matchesLang = (v.is_clone || vtype.startsWith("clone_"));
+                else if (dubModalCurrentLang === "vi") matchesLang = lan.includes("vi") || vtype.includes("vivn") || dname.includes("việt");
+
+                let matchesSearch = true;
+                if (term) matchesSearch = dname.includes(term) || vtype.includes(term) || lan.includes(term);
+
+                return matchesLang && matchesSearch;
+            });
+            renderDubModalVoices(filtered);
+        }
+
+        function renderDubModalVoices(voices) {
+            const listEl = document.getElementById("dubVoiceModalList");
+            if (!listEl) return;
+            listEl.innerHTML = "";
+
+            const curVal = document.getElementById("dubVoice").value;
+
+            if (!voices || voices.length === 0) {
+                listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;grid-column:1/-1;text-align:center;padding:24px;">Không tìm thấy giọng đọc phù hợp.</div>';
+                return;
+            }
+
+            voices.forEach(v => {
+                const item = document.createElement("div");
+                const isClone = (v.is_clone || (v.voice_type || "").startsWith("clone_"));
+                const isVieneu = (v.voice_type || "").startsWith("vieneu_");
+                const isEdge = (v.voice_type || "").includes("Neural");
+                const isSelected = (v.voice_type === curVal);
+
+                item.className = `voice-item ${isSelected ? 'active' : ''}`;
+                item.style.cursor = "pointer";
+
+                item.onclick = (e) => {
+                    if (e.target.closest('.btn-preview')) return;
+                    selectDubVoiceFromModal(v.voice_type, v.display_name || v.voice_type);
+                };
+
+                let badgeHtml = '';
+                if (isClone) {
+                    badgeHtml = '<span style="color:#ec4899;font-weight:700;"><i class="fa-solid fa-sparkles"></i> Giọng Clone</span>';
+                } else if (isVieneu) {
+                    badgeHtml = '<span style="color:#a78bfa;font-weight:700;">✨ VieNeu</span>';
+                } else if (isEdge) {
+                    badgeHtml = '<span style="color:#60a5fa;font-weight:600;">⚡ Edge Neural</span>';
+                } else {
+                    const langBadge = v.lan ? `[${v.lan.toUpperCase()}]` : '';
+                    badgeHtml = `${langBadge} ${v.voice_type}`;
+                }
+
+                item.innerHTML = `
+                    <div class="voice-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                        <div>
+                            <div class="voice-name" style="font-weight:700; font-size:13.5px; color:#f1f5f9;">${escapeHtml(v.display_name || v.voice_type)}</div>
+                            <div class="voice-type" style="font-size:11px; margin-top:2px;">${badgeHtml}</div>
+                        </div>
+                        <button class="btn-preview" onclick="previewVoice('${v.voice_type}', '${v.lan || 'vi'}', this, event)" title="Nghe thử giọng này" style="padding:4px 9px; font-size:11px; flex-shrink:0;">
+                            <i class="fa-solid fa-volume-high"></i> Nghe thử
+                        </button>
+                    </div>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        function selectDubVoiceFromModal(voiceType, displayName) {
+            const sel = document.getElementById("dubVoice");
+            if (sel) {
+                if (!Array.from(sel.options).some(o => o.value === voiceType)) {
+                    const opt = document.createElement("option");
+                    opt.value = voiceType;
+                    opt.innerText = displayName || voiceType;
+                    sel.appendChild(opt);
+                }
+                sel.value = voiceType;
+            }
+            const nameEl = document.getElementById("dubModalSelectedName");
+            if (nameEl) nameEl.innerText = displayName || voiceType;
+
+            document.querySelectorAll("#dubVoiceModalList .voice-item").forEach(el => el.classList.remove("active"));
+            const clicked = event && event.target ? event.target.closest(".voice-item") : null;
+            if (clicked) clicked.classList.add("active");
+
+            showToast(`Đã chọn giọng: ${displayName || voiceType}`, "success");
+        }
+
+        function previewCurrentDubVoice(btnEl, event) {
+            const voice = document.getElementById("dubVoice").value;
+            if (!voice) return;
+            const vObj = allVoices.find(v => v.voice_type === voice);
+            const lan = vObj ? (vObj.lan || "vi") : "vi";
+            previewVoice(voice, lan, btnEl, event);
+        }
+
+        function onDubVoiceChanged() {
+            const sel = document.getElementById("dubVoice");
+            if (!sel) return;
+            const vObj = allVoices.find(v => v.voice_type === sel.value);
+            const dn = vObj ? (vObj.display_name || sel.value) : sel.value;
+            const nameEl = document.getElementById("dubModalSelectedName");
+            if (nameEl) nameEl.innerText = dn;
+        }
+
         // Tự động khởi tạo số lượng đã tải khi mở trang
         document.addEventListener("DOMContentLoaded", () => {
             updateHistoryCountBadge();
         });
 
-    
-        // =========================================================================
-        // VOCAL DNA 8-DIMENSION ANALYSIS MODAL
-        // =========================================================================
-        async function analyzeVocalVoice(voiceType, event) {
-            if (event) event.stopPropagation();
-            const modal = document.getElementById('vocalDnaModal');
-            const loading = document.getElementById('vocalDnaLoading');
-            const content = document.getElementById('vocalDnaContent');
-            
-            modal.style.display = 'flex';
-            loading.style.display = 'block';
-            content.style.display = 'none';
-
-            try {
-                let customB64 = null;
-                try {
-                    const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
-                    if (savedCustom[voiceType]) {
-                        customB64 = savedCustom[voiceType].base64;
-                    }
-                } catch(e) {}
-
-                const resp = await fetch('/api/analyze_vocal', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        voice_id: voiceType,
-                        audio_base64: customB64
-                    })
-                });
-
-                const data = await resp.json();
-                if (!resp.ok || data.status !== 'success') {
-                    throw new Error(data.message || 'Không thể phân tích âm thanh.');
-                }
-
-                renderVocalDnaReport(data);
-                loading.style.display = 'none';
-                content.style.display = 'block';
-
-            } catch(err) {
-                alert('Lỗi phân tích: ' + err.message);
-                closeVocalDnaModal();
-            }
-        }
-
-        function closeVocalDnaModal() {
-            const modal = document.getElementById('vocalDnaModal');
-            if (modal) modal.style.display = 'none';
-        }
-
-        function renderVocalDnaReport(report) {
-            const p = report.profile_8_dimensions;
-            const f = report.file_info;
-
-            // Overview
-            document.getElementById('dnaGender').innerText = f.predicted_gender || '--';
-            document.getElementById('dnaPitchMean').innerText = p['1_intonation'].mean_pitch_hz + ' Hz';
-            document.getElementById('dnaTextureCat').innerText = p['7_vocal_texture'].texture_category || '--';
-            document.getElementById('dnaEmotion').innerText = p['8_expressiveness'].emotional_tone || '--';
-
-            // 1. Intonation
-            document.getElementById('dnaF0Range').innerText = `${p['1_intonation'].min_pitch_hz}Hz - ${p['1_intonation'].max_pitch_hz}Hz (Trung bình: ${p['1_intonation'].mean_pitch_hz}Hz)`;
-            document.getElementById('dnaSemitones').innerText = p['1_intonation'].pitch_range_semitones + ' bán cung';
-            document.getElementById('dnaStability').innerText = p['1_intonation'].pitch_stability;
-
-            // 2. Breathing
-            document.getElementById('dnaBreathCount').innerText = p['2_breathing'].breath_events_count + ' lần';
-            document.getElementById('dnaBreathDur').innerText = p['2_breathing'].total_breath_time_s + ' giây';
-            document.getElementById('dnaBreathRatio').innerText = p['2_breathing'].breathiness_ratio_pct + '%';
-            document.getElementById('dnaBreathNotice').innerText = p['2_breathing'].has_natural_breathing ? 'Có tiếng lấy hơi tự nhiên giúp câu đọc sống động như người thật' : 'Âm thanh sạch, không có tiếng thở mạnh';
-
-            // 3. Pauses
-            document.getElementById('dnaPauseCount').innerText = p['3_pauses'].pause_count + ' điểm dừng';
-            document.getElementById('dnaAvgPause').innerText = p['3_pauses'].average_pause_duration_s + ' giây';
-            document.getElementById('dnaPauseRatio').innerText = p['3_pauses'].pause_ratio_pct + '%';
-
-            // 4. Vietnamese Tones
-            document.getElementById('dnaToneRising').innerText = p['4_pronunciation'].vietnamese_tones.rising_tones_pct + '%';
-            document.getElementById('dnaToneFalling').innerText = p['4_pronunciation'].vietnamese_tones.falling_tones_pct + '%';
-            document.getElementById('dnaToneDesc').innerText = p['4_pronunciation'].vietnamese_tones.inflection_description || '--';
-
-            // 5. Stress
-            document.getElementById('dnaDynRange').innerText = p['5_stress_and_emphasis'].dynamic_range_db + ' dB';
-            document.getElementById('dnaStressStyle').innerText = p['5_stress_and_emphasis'].emphasis_style;
-            document.getElementById('dnaStressFreq').innerText = p['5_stress_and_emphasis'].stress_frequency;
-
-            // 6. Rhythm
-            document.getElementById('dnaSpeakingRate').innerText = p['6_rhythm_and_pacing'].speaking_rate_syllables_sec + ' từ/giây';
-            document.getElementById('dnaTempoCat').innerText = p['6_rhythm_and_pacing'].tempo_category;
-            document.getElementById('dnaSpeechRatio').innerText = p['6_rhythm_and_pacing'].speech_time_ratio_pct + '%';
-
-            // 7. Texture
-            document.getElementById('dnaHnr').innerText = p['7_vocal_texture'].hnr_db;
-            document.getElementById('dnaJitter').innerText = p['7_vocal_texture'].jitter_local_pct + '%';
-            document.getElementById('dnaShimmer').innerText = p['7_vocal_texture'].shimmer_local_pct + '%';
-            document.getElementById('dnaF1').innerText = p['7_vocal_texture'].formants_hz.f1_openness;
-            document.getElementById('dnaF2').innerText = p['7_vocal_texture'].formants_hz.f2_frontness;
-
-            // 8. Emotion
-            document.getElementById('dnaEmotionDesc').innerText = p['8_expressiveness'].emotional_tone;
-            document.getElementById('dnaRichnessScore').innerText = p['8_expressiveness'].vocal_richness_score;
-
-            // Render Timeline Bar
-            renderTimelineBar(report.timeline_events, f.duration_seconds);
-
-            // Render Pitch Canvas
-            renderPitchCanvas(report.intonation_curve);
-        }
-
-        function renderTimelineBar(events, totalDur) {
-            const bar = document.getElementById('dnaTimelineBar');
-            bar.innerHTML = '';
-            if (!events || events.length === 0 || !totalDur) return;
-
-            events.forEach(e => {
-                const pct = Math.max(0.5, (e.duration / totalDur) * 100);
-                const el = document.createElement('div');
-                el.style.width = pct + '%';
-                el.style.height = '100%';
-                if (e.type === 'speech') {
-                    el.style.background = '#10b981';
-                    el.title = `Lời nói: ${e.start}s - ${e.end}s (${e.duration}s)`;
-                } else if (e.type === 'breath') {
-                    el.style.background = '#a855f7';
-                    el.title = `Lấy hơi: ${e.start}s - ${e.end}s (${e.duration}s)`;
-                } else {
-                    el.style.background = '#475569';
-                    el.title = `Khoảng lặng: ${e.start}s - ${e.end}s (${e.duration}s)`;
-                }
-                bar.appendChild(el);
-            });
-            document.getElementById('dnaTimelineSummary').innerText = `Tổng thời lượng: ${totalDur}s với ${events.length} sự kiện âm học được đánh dấu chi tiết.`;
-        }
-
-        function renderPitchCanvas(curve) {
-            const canvas = document.getElementById('dnaPitchCanvas');
-            if (!canvas || !curve || curve.length === 0) return;
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.parentElement.clientWidth || 350;
-            canvas.height = 55;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const valid = curve.map(c => c.pitch_hz).filter(p => p > 40);
-            if (valid.length < 2) return;
-
-            const minP = Math.min(...valid) * 0.9;
-            const maxP = Math.max(...valid) * 1.1;
-
-            ctx.beginPath();
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 2.5;
-
-            let started = false;
-            curve.forEach((pt, idx) => {
-                const x = (idx / (curve.length - 1)) * canvas.width;
-                if (pt.pitch_hz > 40) {
-                    const y = canvas.height - ((pt.pitch_hz - minP) / (maxP - minP)) * canvas.height;
-                    if (!started) {
-                        ctx.moveTo(x, y);
-                        started = true;
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                }
-            });
-            ctx.stroke();
-        }
-
-</script>
+    </script>
 
     <!-- Modal Cau hinh Cookie YouTube -->
     <div id="modalYoutubeCookie" style="display:none; position:fixed; z-index:99999; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:16px;">
@@ -6224,7 +6342,7 @@ function renderVideoGrid() {
                 <div style="font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px; font-size:12.5px;">
                     <i class="fa-solid fa-bolt"></i> CÁCH 1 (NHANH NHẤT - KHÔNG CẦN NẠP COOKIE):
                 </div>
-                Chỉ cần mở file <b>CHAY_AI_CLONE_GIONG.bat</b> trên Desktop máy tính. Web sẽ tự động kết nối và dùng mạng máy tính cá nhân để trích xuất video YouTube 100% không bao giờ bị chặn bot!
+                Chế độ Cloud VPS tự động hoạt động 24/7. Bạn cũng có thể mở file <b>CHAY_AI_CLONE_GIONG.bat</b> trên Desktop máy tính để chuyển hướng trích xuất qua IP mạng cá nhân khi YouTube kiểm duyệt gắt gao.
             </div>
             <div style="font-size:12.5px; color:#cbd5e1; line-height:1.6; margin-bottom:14px;">
                 <div style="font-weight:600; color:#fbbf24; margin-bottom:4px;">CÁCH 2: Nạp Cookie YouTube (Chỉ cần làm 1 lần duy nhất):</div>
@@ -6247,245 +6365,5 @@ function renderVideoGrid() {
         </div>
     </div>
 
-
-    <!-- Modal Báo Cáo Phân Tích Âm Học Vocal DNA (8 Chiều) -->
-    <div id="vocalDnaModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(10px); z-index:99999; align-items:center; justify-content:center; padding:16px;">
-        <div class="modal-card" style="max-width:920px; width:100%; max-height:90vh; overflow-y:auto; background:linear-gradient(145deg, #0b0f19, #131b2e); border:1.5px solid rgba(168,85,247,0.4); border-radius:22px; padding:26px; box-shadow:0 25px 60px -15px rgba(168,85,247,0.3); color:#f8fafc;">
-            
-            <!-- Header -->
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:14px;">
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <div style="width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg, #a855f7, #ec4899); display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff; box-shadow:0 4px 15px rgba(168,85,247,0.4);">
-                        <i class="fa-solid fa-dna"></i>
-                    </div>
-                    <div>
-                        <h3 style="margin:0; font-size:18px; font-weight:800; color:#fff; display:flex; align-items:center; gap:8px;">
-                            BÁO CÁO PHÂN TÍCH ÂM HỌC VOCAL DNA
-                            <span style="font-size:11px; background:rgba(168,85,247,0.25); color:#d8b4fe; border:1px solid rgba(168,85,247,0.4); padding:2px 8px; border-radius:10px;">8 Chiều Chuyên Sâu</span>
-                        </h3>
-                        <p style="margin:4px 0 0; font-size:12.5px; color:#94a3b8;">Khám phá toàn diện ngữ điệu F0, hơi thở sinh học, nhịp ngắt nghỉ, thanh điệu tiếng Việt & âm sắc</p>
-                    </div>
-                </div>
-                <button onclick="closeVocalDnaModal()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#cbd5e1; width:34px; height:34px; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.2)';this.style.color='#f87171'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#cbd5e1'">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <!-- Loading Spinner inside Modal -->
-            <div id="vocalDnaLoading" style="text-align:center; padding:60px 20px; display:none;">
-                <i class="fa-solid fa-circle-notch fa-spin" style="font-size:42px; color:#c084fc; margin-bottom:16px;"></i>
-                <h4 style="font-size:16px; margin:0; color:#e2e8f0;">Đang giải phẫu âm thanh bằng Praat & AI...</h4>
-                <p style="font-size:13px; color:#94a3b8; margin:6px 0 0;">Đo lường F0, Formant F1-F3, HNR, tiếng lấy hơi & 6 thanh điệu</p>
-            </div>
-
-            <!-- Content Container -->
-            <div id="vocalDnaContent" style="display:none;">
-                
-                <!-- Quick Overview Bar -->
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
-                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; text-align:center;">
-                        <div style="font-size:11.5px; color:#94a3b8; margin-bottom:4px;"><i class="fa-solid fa-venus-mars"></i> Giới tính & Âm vực</div>
-                        <div id="dnaGender" style="font-size:14.5px; font-weight:700; color:#a78bfa;">--</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; text-align:center;">
-                        <div style="font-size:11.5px; color:#94a3b8; margin-bottom:4px;"><i class="fa-solid fa-music"></i> Cao độ trung bình</div>
-                        <div id="dnaPitchMean" style="font-size:14.5px; font-weight:700; color:#38bdf8;">-- Hz</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; text-align:center;">
-                        <div style="font-size:11.5px; color:#94a3b8; margin-bottom:4px;"><i class="fa-solid fa-gem"></i> Chất giọng (Texture)</div>
-                        <div id="dnaTextureCat" style="font-size:13.5px; font-weight:700; color:#34d399;">--</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:12px; text-align:center;">
-                        <div style="font-size:11.5px; color:#94a3b8; margin-bottom:4px;"><i class="fa-solid fa-masks-theater"></i> Phong cách biểu cảm</div>
-                        <div id="dnaEmotion" style="font-size:13.5px; font-weight:700; color:#f472b6;">--</div>
-                    </div>
-                </div>
-
-                <!-- Speech Timeline Bar -->
-                <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px; margin-bottom:20px;">
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                        <div style="font-size:13px; font-weight:700; color:#e2e8f0; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-timeline" style="color:#c084fc;"></i> DÒNG THỜI GIAN ÂM THANH (SPEECH TIMELINE)
-                        </div>
-                        <div style="display:flex; align-items:center; gap:12px; font-size:11px;">
-                            <span style="display:inline-flex; align-items:center; gap:4px; color:#34d399;"><span style="width:10px; height:10px; background:#10b981; border-radius:3px;"></span> Lời nói</span>
-                            <span style="display:inline-flex; align-items:center; gap:4px; color:#c084fc;"><span style="width:10px; height:10px; background:#a855f7; border-radius:3px;"></span> Lấy hơi (Breath)</span>
-                            <span style="display:inline-flex; align-items:center; gap:4px; color:#94a3b8;"><span style="width:10px; height:10px; background:#475569; border-radius:3px;"></span> Khoảng lặng</span>
-                        </div>
-                    </div>
-                    <div id="dnaTimelineBar" style="width:100%; height:24px; background:#1e293b; border-radius:8px; display:flex; overflow:hidden; position:relative;">
-                    </div>
-                    <div id="dnaTimelineSummary" style="font-size:11.5px; color:#94a3b8; margin-top:8px;"></div>
-                </div>
-
-                <!-- 8 Dimension Detailed Grid -->
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:14px;">
-                    
-                    <!-- 1. Intonation -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                        <div style="font-weight:700; font-size:14px; color:#38bdf8; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-chart-line"></i> 1. Ngữ Điệu & Đường Cao Độ (Intonation)
-                        </div>
-                        <div style="font-size:12.5px; line-height:1.7; color:#cbd5e1;">
-                            <div>• Cao độ F0: <strong id="dnaF0Range" style="color:#fff;">--</strong></div>
-                            <div>• Dải bán cung: <strong id="dnaSemitones" style="color:#fff;">--</strong> (Độ dốc: <span id="dnaStability" style="color:#38bdf8;">--</span>)</div>
-                        </div>
-                        <canvas id="dnaPitchCanvas" style="width:100%; height:55px; background:rgba(0,0,0,0.25); border-radius:8px; margin-top:10px;"></canvas>
-                    </div>
-
-                    <!-- 2. Breathing -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                        <div style="font-weight:700; font-size:14px; color:#c084fc; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-wind"></i> 2. Hơi Thở Sinh Học (Breathing)
-                        </div>
-                        <div style="font-size:12.5px; line-height:1.7; color:#cbd5e1;">
-                            <div>• Số lần lấy hơi phát hiện: <strong id="dnaBreathCount" style="color:#c084fc;">--</strong></div>
-                            <div>• Thời lượng hít vào: <strong id="dnaBreathDur" style="color:#fff;">--</strong> (<span id="dnaBreathRatio">--%</span> tổng file)</div>
-                            <div>• Đánh giá: <span id="dnaBreathNotice" style="color:#cbd5e1;">--</span></div>
-                        </div>
-                    </div>
-
-                    <!-- 3. Pauses -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                        <div style="font-weight:700; font-size:14px; color:#94a3b8; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-pause"></i> 3. Nhịp Ngắt Nghỉ (Pauses)
-                        </div>
-                        <div style="font-size:12.5px; line-height:1.7; color:#cbd5e1;">
-                            <div>• Số điểm dừng/ngắt: <strong id="dnaPauseCount" style="color:#fff;">--</strong></div>
-                            <div>• Độ dài ngắt trung bình: <strong id="dnaAvgPause" style="color:#fff;">-- giây</strong></div>
-                            <div>• Tỷ lệ ngắt nghỉ: <strong id="dnaPauseRatio" style="color:#cbd5e1;">--%</strong></div>
-                        </div>
-                    </div>
-
-                    <!-- 4. Vietnamese Tones -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                        <div style="font-weight:700; font-size:14px; color:#fbbf24; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-language"></i> 4. Thanh Điệu Tiếng Việt (Tones)
-                        </div>
-                        <div style="font-size:12.5px; line-height:1.7; color:#cbd5e1;">
-                            <div>• Thanh lướt lên (Sắc / Hỏi): <strong id="dnaToneRising" style="color:#fbbf24;">--%</strong></div>
-                            <div>• Thanh trầm / buông (Huyền / Nặng): <strong id="dnaToneFalling" style="color:#f59e0b;">--%</strong></div>
-                            <div>• Đặc trưng luyến láy: <span id="dnaToneDesc" style="color:#cbd5e1;">--</span></div>
-                        </div>
-                    </div>
-
-                    <!-- 5. Stress & Emphasis -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                        <div style="font-weight:700; font-size:14px; color:#f87171; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-bolt"></i> 5. Trọng Âm & Nhấn Nhá (Stress)
-                        </div>
-                        <div style="font-size:12.5px; line-height:1.7; color:#cbd5e1;">
-                            <div>• Dải năng lượng động: <strong id="dnaDynRange" style="color:#f87171;">-- dB</strong></div>
-                            <div>• Kiểu nhấn nhá: <strong id="dnaStressStyle" style="color:#fff;">--</strong></div>
-                            <div>• Phân loại: <span id="dnaStressFreq" style="color:#cbd5e1;">--</span></div>
-                        </div>
-                    </div>
-
-                    <!-- 6. Rhythm & Pacing -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                        <div style="font-weight:700; font-size:14px; color:#34d399; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-gauge-high"></i> 6. Nhịp Điệu & Tốc Độ (Pacing)
-                        </div>
-                        <div style="font-size:12.5px; line-height:1.7; color:#cbd5e1;">
-                            <div>• Tốc độ nói: <strong id="dnaSpeakingRate" style="color:#34d399;">-- từ/giây</strong></div>
-                            <div>• Phân khúc nhịp: <strong id="dnaTempoCat" style="color:#fff;">--</strong></div>
-                            <div>• Tỷ lệ thời gian phát âm: <strong id="dnaSpeechRatio" style="color:#cbd5e1;">--%</strong></div>
-                        </div>
-                    </div>
-
-                    <!-- 7. Vocal Texture -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                        <div style="font-weight:700; font-size:14px; color:#2dd4bf; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-microphone-lines"></i> 7. Chất Giọng (Acoustic Texture)
-                        </div>
-                        <div style="font-size:12.5px; line-height:1.7; color:#cbd5e1;">
-                            <div>• Độ trong HNR: <strong id="dnaHnr" style="color:#2dd4bf;">-- dB</strong> (Jitter: <span id="dnaJitter">--%</span>, Shimmer: <span id="dnaShimmer">--%</span>)</div>
-                            <div>• Formant F1 (Vang trầm): <strong id="dnaF1" style="color:#fff;">-- Hz</strong> | F2 (Độ sáng): <strong id="dnaF2" style="color:#fff;">-- Hz</strong></div>
-                        </div>
-                    </div>
-
-                    <!-- 8. Expressiveness -->
-                    <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:16px;">
-                        <div style="font-weight:700; font-size:14px; color:#f472b6; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
-                            <i class="fa-solid fa-heart-pulse"></i> 8. Biểu Cảm & Cảm Xúc (Expressiveness)
-                        </div>
-                        <div style="font-size:12.5px; line-height:1.7; color:#cbd5e1;">
-                            <div>• Cảm xúc chủ đạo: <strong id="dnaEmotionDesc" style="color:#f472b6;">--</strong></div>
-                            <div>• Điểm biểu đạt âm học: <strong id="dnaRichnessScore" style="color:#fff;">--/100</strong></div>
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-    </div>
-
-<input type="file" id="importVoiceInput" accept=".json,.sleep2k" style="display:none;" onchange="importCustomVoiceFile(event)">
-<script>
-        async function exportCustomVoice(voiceType, event) {
-            if (event) event.stopPropagation();
-            try {
-                const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
-                let vinfo = savedCustom[voiceType] || { voice_type: voiceType };
-                const voiceObj = (window.allVoices || []).find(v => v.voice_type === voiceType);
-                const name = (voiceObj ? voiceObj.display_name : '') || vinfo.name || voiceType;
-                vinfo.name = name;
-
-                if (!vinfo.base64) {
-                    const audioResp = await fetch(`/uploads/custom_voices/${voiceType}.wav`);
-                    if (audioResp.ok) {
-                        const blob = await audioResp.blob();
-                        const b64 = await new Promise((res) => {
-                            const r = new FileReader();
-                            r.onloadend = () => res(r.result);
-                            r.readAsDataURL(blob);
-                        });
-                        vinfo.base64 = b64;
-                    }
-                }
-
-                const jsonBlob = new Blob([JSON.stringify(vinfo, null, 2)], { type: 'application/json' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(jsonBlob);
-                a.download = `voice_${name}.sleep2k.json`;
-                a.click();
-            } catch(err) {
-                alert('Lỗi xuất file: ' + err.message);
-            }
-        }
-
-        function importCustomVoiceFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (!data.voice_type || (!data.base64 && !data.audio_base64)) {
-                        alert('Tệp giọng không hợp lệ!');
-                        return;
-                    }
-                    const b64 = data.base64 || data.audio_base64;
-                    const savedCustom = JSON.parse(localStorage.getItem('sleep2k_saved_custom_voices') || '{}');
-                    savedCustom[data.voice_type] = {
-                        voice_type: data.voice_type,
-                        name: data.name || 'Giọng Đã Nhập',
-                        base64: b64,
-                        updated_at: Date.now()
-                    };
-                    localStorage.setItem('sleep2k_saved_custom_voices', JSON.stringify(savedCustom));
-                    alert('🎉 Đã nhập thành công giọng "' + (data.name || data.voice_type) + '"! Giờ bạn có thể dùng bình thường trên máy này.');
-                    await fetchVoices();
-                    filterByLang('custom', document.getElementById('tabCustom'));
-                } catch(err) {
-                    alert('Lỗi đọc file: ' + err.message);
-                }
-                event.target.value = '';
-            };
-            reader.readAsText(file);
-        }
-</script>
 </body>
 </html>
