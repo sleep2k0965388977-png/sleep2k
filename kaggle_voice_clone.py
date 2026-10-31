@@ -1,10 +1,10 @@
 # ==============================================================================
 # SLEEP2K KAGGLE AI CLONE WORKER (48kHz ULTRA STUDIO GPU ENGINE)
 # Chạy ngầm 100% trên Kaggle NVIDIA T4 GPU - ĐÓNG DẤU X THOẢI MÁI SUỐT 12 TIẾNG
-# TỰ ĐỘNG ĐỒNG BỘ 100% VỚI WEBSITE - KHÔNG CẦN COPY/DÁN THỦ CÔNG
+# TỰ ĐỘNG ĐỒNG BỘ 100% VỚI WEBSITE - TÍCH HỢP NÚT TẮT TIẾT KIỆM GIỜ TỪ XA
 # ==============================================================================
 
-import os, sys, time, uuid, subprocess, re, json, urllib.request
+import os, sys, time, uuid, subprocess, re, json, urllib.request, threading
 from pathlib import Path
 
 print("=" * 70)
@@ -48,9 +48,24 @@ def health():
         "status": "online",
         "service": "sleep2k_kaggle_gpu_worker",
         "engine": f"VieNeu Studio ({sr}Hz Ultra)",
-        "gpu": f"{gpu_name} (Kaggle Background)",
+        "gpu": f"{gpu_name} (Kaggle 12h)",
         "sample_rate": sr
     }), 200
+
+@app.route("/api/shutdown", methods=["POST"])
+def shutdown_worker():
+    """Tắt worker theo lệnh từ nút bấm trên Web App để bảo lưu số giờ GPU."""
+    if request.headers.get("X-API-Key") != API_SECRET_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    print("\n🛑 [SHUTDOWN] Nhận lệnh TẮT WORKER từ Website. Đang ngắt Kaggle GPU để tiết kiệm giờ...")
+    def do_exit():
+        time.sleep(1)
+        os.system("pkill cloudflared 2>/dev/null")
+        os._exit(0)
+    
+    threading.Thread(target=do_exit, daemon=True).start()
+    return jsonify({"status": "success", "message": "Worker đang tắt an toàn để bảo lưu giờ GPU."}), 200
 
 @app.route("/api/analyze_vocal", methods=["POST"])
 def analyze_vocal():
@@ -129,7 +144,6 @@ def clone_voice():
             pass
 
 print("\n⚡ [3/4] Đang khởi động Flask Server và mở đường hầm Cloudflare...")
-import threading
 server_thread = threading.Thread(target=lambda: app.run(host="127.0.0.1", port=PORT, debug=False, use_reloader=False), daemon=True)
 server_thread.start()
 time.sleep(2)

@@ -2552,7 +2552,12 @@
                             <i class="fa-solid fa-play"></i> Chạy Colab GPU
                         </a>
                     </span>
-                    <span id="workerStatusBadge" style="font-size:10px; padding:2px 8px; border-radius:10px; background:rgba(100,116,139,0.2); color:#94a3b8;">Đang kiểm tra...</span>
+                    <span style="display:inline-flex; align-items:center; gap:6px;">
+                        <span id="workerStatusBadge" style="font-size:10px; padding:2px 8px; border-radius:10px; background:rgba(100,116,139,0.2); color:#94a3b8;">Đang kiểm tra...</span>
+                        <button type="button" id="btnStopWorker" onclick="event.stopPropagation(); shutdownWorkerFromUI();" style="display:none; background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; border:none; padding:3px 10px; border-radius:5px; font-size:10.5px; font-weight:700; cursor:pointer; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(239,68,68,0.35);" title="Tắt máy chủ GPU trên Kaggle ngay từ web để tiết kiệm giờ">
+                            <i class="fa-solid fa-power-off"></i> Tắt GPU (Tiết kiệm giờ)
+                        </button>
+                    </span>
                 </summary>
                 <div style="margin-top: 10px; font-size: 11.5px; color: #cbd5e1;">
                     <div style="margin-bottom: 6px;">URL kết nối Worker (Ngrok / Cloudflared):</div>
@@ -2569,7 +2574,7 @@
                         <a href="https://colab.research.google.com/github/sleep2k0965388977-png/sleep2k/blob/main/sleep2k_ai_worker.ipynb" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,0.18);border:1px solid rgba(249,115,22,0.4);color:#fdba74;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:11.5px;font-weight:600;">
                             <i class="fa-solid fa-bolt"></i> ⚡ Mở Google Colab T4 GPU
                         </a>
-                        <a href="https://www.kaggle.com/code" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(14,165,233,0.18);border:1px solid rgba(14,165,233,0.4);color:#7dd3fc;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:11.5px;font-weight:600;" title="Chạy ngầm 12 tiếng - Tắt tab đi ngủ thoải mái">
+                        <a href="https://www.kaggle.com/code/chillsleep/notebookebfc6db907/edit" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:rgba(14,165,233,0.18);border:1px solid rgba(14,165,233,0.4);color:#7dd3fc;padding:6px 12px;border-radius:6px;text-decoration:none;font-size:11.5px;font-weight:600;" title="Chạy ngầm 12 tiếng - Tắt tab đi ngủ thoải mái">
                             <i class="fa-solid fa-cloud"></i> 🌙 Mở Kaggle GPU (Chạy ngầm 12h - Đóng X thoải mái)
                         </a>
                     </div>
@@ -4809,21 +4814,42 @@
                     localStorage.setItem('sleep2k_clone_worker_url', data.worker_url);
                 }
 
+                const stopBtn = document.getElementById('btnStopWorker');
                 if (data.status === 'online') {
                     badge.style.background = 'rgba(16,185,129,0.2)';
                     badge.style.color = '#10b981';
                     badge.innerText = '🟢 Worker Online (' + (data.gpu || 'GPU') + ')';
+                    if (stopBtn) stopBtn.style.display = 'inline-flex';
                 } else if (data.status === 'offline') {
                     badge.style.background = 'rgba(239,68,68,0.2)';
                     badge.style.color = '#ef4444';
-                    badge.innerText = '🔴 Worker Offline (Máy cá nhân đã tắt)';
+                    badge.innerText = '🔴 Worker Offline (Chưa bật)';
+                    if (stopBtn) stopBtn.style.display = 'none';
                 } else {
                     badge.style.background = 'rgba(100,116,139,0.2)';
                     badge.style.color = '#94a3b8';
                     badge.innerText = '⚪ Chưa cấu hình';
+                    if (stopBtn) stopBtn.style.display = 'none';
                 }
             } catch (e) {
                 console.log('Worker status error:', e);
+            }
+        }
+
+        async function shutdownWorkerFromUI() {
+            if (!confirm('Bạn có chắc chắn muốn TẮT MÁY CHỦ GPU để tiết kiệm giờ không?\n(Tiến trình trên Kaggle sẽ được ngắt ngay lập tức để bảo lưu số giờ còn lại của tuần)')) {
+                return;
+            }
+            const btn = document.getElementById('btnStopWorker');
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tắt...';
+            try {
+                const resp = await fetch('/api/worker_shutdown', { method: 'POST' });
+                const res = await resp.json();
+                alert(res.message || 'Đã ngắt Worker để tiết kiệm giờ thành công!');
+                checkWorkerStatus();
+            } catch (err) {
+                alert('Lỗi khi gửi lệnh ngắt: ' + err);
+                checkWorkerStatus();
             }
         }
 

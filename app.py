@@ -2549,6 +2549,27 @@ def set_clone_worker():
     set_clone_worker_url(url)
     return jsonify({"status": "success", "worker_url": url})
 
+@app.route("/api/worker_shutdown", methods=["POST"])
+def api_worker_shutdown():
+    url = get_clone_worker_url()
+    if not url:
+        return jsonify({"status": "error", "message": "Chưa có Worker nào đang kết nối."}), 400
+    try:
+        clean_url = url.rstrip("/")
+        requests.post(
+            f"{clean_url}/api/shutdown",
+            headers={"X-API-Key": CLONE_API_KEY},
+            timeout=5
+        )
+    except Exception as ex:
+        logger.warning(f"Worker shutdown notice: {ex}")
+    finally:
+        set_clone_worker_url("")
+    return jsonify({
+        "status": "success",
+        "message": "Đã tắt Worker thành công! Giờ GPU trên Kaggle đã được dừng để bảo lưu tối đa quota."
+    })
+
 # ── Speech to Text (Audio/Video Transcription) Engine ──
 
 def format_timestamp_srt(seconds):
