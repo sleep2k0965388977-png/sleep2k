@@ -2490,6 +2490,12 @@ def cleanup_session_voices():
     to_delete = [vid for vid, v in list(TEMP_CUSTOM_VOICES.items()) if v.get("session_id") == session_id]
     for vid in to_delete:
         delete_custom_voice_entry(vid)
+    remaining = get_all_custom_voices()
+    if not remaining:
+        try:
+            api_worker_shutdown()
+        except Exception:
+            pass
     return jsonify({"status": "success", "deleted_count": len(to_delete)}), 200
 
 @app.route("/api/delete_custom_voice/<voice_id>", methods=["POST", "DELETE"])
@@ -2497,6 +2503,13 @@ def delete_custom_voice(voice_id):
     try:
         ok = delete_custom_voice_entry(voice_id)
         if ok:
+            # Tu dong ngat Worker GPU khi da xoa het cac giong clone
+            remaining = get_all_custom_voices()
+            if not remaining:
+                try:
+                    api_worker_shutdown()
+                except Exception:
+                    pass
             return jsonify({"status": "success", "message": "Đã xóa giọng thành công."})
         return jsonify({"status": "error", "message": "Không tìm thấy giọng để xóa."}), 404
     except Exception as e:
@@ -2548,6 +2561,22 @@ def set_clone_worker():
     url = data.get("worker_url", "").strip()
     set_clone_worker_url(url)
     return jsonify({"status": "success", "worker_url": url})
+
+@app.route("/api/client_leave", methods=["POST"])
+def client_leave():
+    """Nhan tin hieu khi nguoi dung tat trinh duyet / dong tab."""
+    # Neu tren local hoac nguoi dung dong het tab, kiem tra va ngat neu khong con giong clone
+    remaining = get_all_custom_voices()
+    if not remaining:
+        try:
+            api_worker_shutdown()
+        except Exception:
+            pass
+    return jsonify({"status": "ok"})
+
+@app.route("/api/client_ping", methods=["POST"])
+def client_ping():
+    return jsonify({"status": "ok"})
 
 @app.route("/api/worker_shutdown", methods=["POST"])
 def api_worker_shutdown():

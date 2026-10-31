@@ -1,7 +1,7 @@
 # ==============================================================================
 # SLEEP2K KAGGLE AI CLONE WORKER (48kHz ULTRA STUDIO GPU ENGINE)
-# Chạy ngầm 100% trên Kaggle NVIDIA T4 GPU - ĐÓNG DẤU X THOẢI MÁI SUỐT 12 TIẾNG
-# TỰ ĐỘNG ĐỒNG BỘ 100% VỚI WEBSITE - TÍCH HỢP NÚT TẮT TIẾT KIỆM GIỜ TỪ XA
+# Chạy ngầm 100% trên Kaggle NVIDIA T4 GPU - ĐÓNG DẤU X THOẢI MÁI
+# TỰ ĐỘNG ĐỒNG BỘ 100% VỚI WEBSITE - TỰ ĐỘNG TẮT KHI KHÔNG DÙNG ĐỂ TIẾT KIỆM GIỜ
 # ==============================================================================
 
 import os, sys, time, uuid, subprocess, re, json, urllib.request, threading
@@ -41,6 +41,14 @@ PORT = 5005
 WORK_DIR = Path("/tmp/kaggle_clone_work")
 WORK_DIR.mkdir(parents=True, exist_ok=True)
 
+# Đồng hồ tự động ngắt khi không dùng (15 phút không ai gọi -> tự tắt để bảo lưu giờ)
+LAST_ACTIVITY_TIME = time.time()
+IDLE_TIMEOUT_SECONDS = 900  # 15 phút
+
+def mark_active():
+    global LAST_ACTIVITY_TIME
+    LAST_ACTIVITY_TIME = time.time()
+
 @app.route("/", methods=["GET"])
 @app.route("/health", methods=["GET"])
 def health():
@@ -48,8 +56,9 @@ def health():
         "status": "online",
         "service": "sleep2k_kaggle_gpu_worker",
         "engine": f"VieNeu Studio ({sr}Hz Ultra)",
-        "gpu": f"{gpu_name} (Kaggle 12h)",
-        "sample_rate": sr
+        "gpu": f"{gpu_name} (Kaggle Auto-Save)",
+        "sample_rate": sr,
+        "idle_seconds": int(time.time() - LAST_ACTIVITY_TIME)
     }), 200
 
 @app.route("/api/shutdown", methods=["POST"])
@@ -69,6 +78,7 @@ def shutdown_worker():
 
 @app.route("/api/analyze_vocal", methods=["POST"])
 def analyze_vocal():
+    mark_active()
     if request.headers.get("X-API-Key") != API_SECRET_KEY:
         return jsonify({"error": "Unauthorized"}), 401
     return jsonify({
@@ -83,6 +93,7 @@ def analyze_vocal():
 
 @app.route("/api/clone", methods=["POST"])
 def clone_voice():
+    mark_active()
     if request.headers.get("X-API-Key") != API_SECRET_KEY:
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -205,12 +216,19 @@ if tunnel_url:
 
     sync_to_website(tunnel_url)
     print("✨ BÂY GIỜ BẠN CÓ THỂ ĐÓNG DẤU X TRÌNH DUYỆT, TẮT MÁY ĐI NGỦ THOẢI MÁI!")
-    print("   Worker trên Kaggle sẽ chạy ngầm liên tục suốt 12 tiếng!")
+    print("   Worker trên Kaggle sẽ chạy ngầm liên tục và tự ngắt nếu không ai dùng trong 15 phút!")
 
-    # Chạy vòng lặp duy trì liên tục 11.5 tiếng (Kaggle max 12 tiếng)
+    # Chạy vòng lặp duy trì liên tục tối đa 11.5 tiếng
     start_loop = time.time()
-    while time.time() - start_loop < 41400: # 11.5 tiếng
+    while time.time() - start_loop < 41400:
         time.sleep(25)
+        # Kiểm tra tự động tắt khi không ai dùng trong 15 phút
+        idle_time = time.time() - LAST_ACTIVITY_TIME
+        if idle_time > IDLE_TIMEOUT_SECONDS:
+            print(f"\n💤 [AUTO-IDLE] Không có yêu cầu tạo giọng nào trong 15 phút (idle {int(idle_time)}s).")
+            print("🛑 Tự động dừng Kaggle GPU để bảo lưu toàn bộ giờ còn lại cho bạn!")
+            os.system("pkill cloudflared 2>/dev/null")
+            os._exit(0)
         sync_to_website(tunnel_url)
 else:
     print("⚠️ Không lấy được URL Cloudflare tự động. Vui lòng kiểm tra lại cấu hình Internet ON trên Kaggle.")
