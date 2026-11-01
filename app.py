@@ -1253,6 +1253,7 @@ def stitch_audio_chunks(chunk_bytes_list, output_file_path):
     if not chunk_bytes_list:
         return False
 
+    output_file_path = Path(output_file_path)
     temp_dir = OUTPUT_DIR / f"temp_{uuid.uuid4().hex[:8]}"
     temp_dir.mkdir(exist_ok=True)
     try:
