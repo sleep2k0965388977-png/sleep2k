@@ -1607,8 +1607,8 @@ def generate_job():
             clone_chunk_limit = 4000 if user_choice == 5000 else 1600
 
             # Automatically restore custom voice from client localStorage if needed
-            custom_ref_b64 = data.get("custom_ref_b64")
-            custom_name = data.get("custom_name")
+            custom_ref_b64 = data.get("custom_ref_b64") or data.get("custom_audio_base64")
+            custom_name = data.get("custom_name") or data.get("voice_name")
             if custom_ref_b64:
                 restore_custom_voice_from_b64(voice, custom_ref_b64, custom_name)
 
@@ -2188,8 +2188,8 @@ def preview_voice():
 
         # Instant preview for custom cloned voices (play original sample vocal)
         if is_clone_voice(voice):
-            custom_ref_b64 = data.get("custom_ref_b64")
-            custom_name = data.get("custom_name")
+            custom_ref_b64 = data.get("custom_ref_b64") or data.get("custom_audio_base64")
+            custom_name = data.get("custom_name") or data.get("voice_name")
             if custom_ref_b64:
                 restore_custom_voice_from_b64(voice, custom_ref_b64, custom_name)
             vinfo = find_voice_info(voice)
