@@ -2445,29 +2445,25 @@ def health_check():
 
 @app.route("/api/debug_clone_step", methods=["GET"])
 def debug_clone_step():
-    steps = []
-    t0 = time.time()
+    step = request.args.get("step", "all")
     try:
-        steps.append(f"1. Start: {time.time()-t0:.2f}s")
-        vinfo = find_voice_info("clone_user_vocal_test")
-        steps.append(f"2. find_voice_info: {time.time()-t0:.2f}s, vinfo={bool(vinfo)}")
-        
-        ref_file = get_guaranteed_reference_audio()
-        steps.append(f"3. get_guaranteed_reference_audio: {time.time()-t0:.2f}s, ref_file={ref_file}, exists={ref_file.exists() if hasattr(ref_file, 'exists') else False}")
-        
-        worker_url = get_clone_worker_url()
-        steps.append(f"4. get_clone_worker_url: {time.time()-t0:.2f}s, url={worker_url}")
-        
-        aud = capcut_synthesize_fallback("Kiểm tra thử nghiệm một câu", is_male=False, rate="1.0")
-        steps.append(f"5. capcut_synthesize_fallback: {time.time()-t0:.2f}s, bytes={len(aud) if aud else 0}")
-        
-        res = synthesize_clone_audio("Kiểm tra thử nghiệm hai câu", "clone_user_vocal_test", rate="1.0")
-        steps.append(f"6. synthesize_clone_audio: {time.time()-t0:.2f}s, bytes={len(res) if res else 0}")
-        
-        return jsonify({"status": "ok", "steps": steps})
+        if step == "3":
+            ref_file = get_guaranteed_reference_audio()
+            return jsonify({"ref_file": str(ref_file), "exists": ref_file.exists() if hasattr(ref_file, 'exists') else False})
+        elif step == "4":
+            return jsonify({"worker_url": get_clone_worker_url()})
+        elif step == "5":
+            t0 = time.time()
+            aud = capcut_synthesize_fallback("Kiểm tra câu ngắn", is_male=False, rate="1.0")
+            return jsonify({"elapsed": round(time.time()-t0, 2), "bytes": len(aud) if aud else 0})
+        elif step == "6":
+            t0 = time.time()
+            res = synthesize_clone_audio("Kiểm tra câu ngắn hai", "clone_user_vocal_test", rate="1.0")
+            return jsonify({"elapsed": round(time.time()-t0, 2), "bytes": len(res) if res else 0})
+        return jsonify({"status": "ready", "available_steps": [3, 4, 5, 6]})
     except Exception as e:
         import traceback
-        return jsonify({"status": "error", "error": str(e), "traceback": traceback.format_exc(), "steps": steps}), 500
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 @app.route("/output/<filename>")
 def serve_audio(filename):
