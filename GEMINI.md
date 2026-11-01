@@ -25,3 +25,7 @@
 6. **Resilient Video Streaming & Weak Network Resumption:**
    - Always support HTTP Range requests (`Range: bytes=start-end`, returning `206 Partial Content`) in `/api/download_video_stream` so browser pause/resume and weak networks never fail.
    - In `templates/index.html`, never return `true` on download failure in `downloadVideoDirect`, and use resumable Range retries (up to 8 times) on network drops to prevent multi-download flooding.
+
+7. **Autonomous Error Auto-Repair:**
+   - Whenever any error, freeze, or unexpected behavior is reported or suspected, the agent MUST immediately invoke the self-healing skill and run `python .agents/skills/sleep2k-troubleshooting/scripts/auto_heal.py --sync` to autonomously diagnose, repair, and deploy the fix.
+
