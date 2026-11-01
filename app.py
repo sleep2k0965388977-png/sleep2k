@@ -2450,7 +2450,7 @@ def clone_worker_status():
     url = get_clone_worker_url()
     if url:
         try:
-            r = requests.get(f"{url.rstrip('/')}/health", timeout=3)
+            r = requests.get(f"{url.rstrip('/')}/health", timeout=4)
             if r.status_code == 200:
                 data = r.json()
                 return jsonify({
@@ -2461,8 +2461,21 @@ def clone_worker_status():
                     "voices": data.get("voices", 0),
                     "message": "Dedicated Worker đang hoạt động"
                 })
-        except Exception:
-            pass
+            else:
+                return jsonify({
+                    "status": "offline",
+                    "mode": "failed",
+                    "worker_url": url,
+                    "message": f"Worker trả về HTTP {r.status_code}"
+                })
+        except Exception as e:
+            return jsonify({
+                "status": "offline",
+                "mode": "failed",
+                "worker_url": url,
+                "error": str(e),
+                "message": f"Không thể kết nối tới Worker URL: {url}"
+            })
     # Luôn Online 24/7 trực tiếp trên Cloud VPS / Railway (Không phụ thuộc máy tính cá nhân)
     return jsonify({
         "status": "online",
