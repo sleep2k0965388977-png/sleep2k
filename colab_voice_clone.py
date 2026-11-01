@@ -15,7 +15,7 @@ try:
     if _v[0] > 1 or (_v[0] == 1 and _v[1] >= 18):
         print(f"🔧 Đang hạ onnxruntime {_ort.__version__} xuống 1.17.3 tương thích VieNeu...")
         os.system("pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-training >/dev/null 2>&1")
-        os.system("pip install -q onnxruntime-gpu==1.17.3")
+        os.system("pip install -q onnxruntime==1.17.3")
 except ImportError:
     pass
 
@@ -24,9 +24,9 @@ os.system("pip install -q vieneu flask soundfile imageio-ffmpeg")
 
 # ── ĐẢM BẢO ONNX / VIENEU TƯƠNG THÍCH ──────────────────────────────────────────
 # onnxruntime >= 1.18 chặn external data path, bắt buộc hạ xuống 1.17.3 sau khi cài vieneu
-print("🔧 [1.5/4] Đang cấu hình onnxruntime-gpu 1.17.3 tương thích VieNeu...")
+print("🔧 [1.5/4] Đang cấu hình onnxruntime 1.17.3 tương thích VieNeu...")
 os.system("pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-training >/dev/null 2>&1")
-os.system("pip install -q onnxruntime-gpu==1.17.3")
+os.system("pip install -q onnxruntime==1.17.3")
 
 # Tải Cloudflared binary cho Linux 64-bit
 if not os.path.exists("/usr/local/bin/cloudflared"):
