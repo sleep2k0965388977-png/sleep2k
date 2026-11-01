@@ -119,22 +119,23 @@ def clone_voice():
 
         subprocess.run([
             FFMPEG, "-y", "-i", str(raw_path),
+            "-af", "highpass=f=60,lowpass=f=12000,loudnorm=I=-16:TP=-1.5:LRA=11",
             "-ar", "24000", "-ac", "1",
             str(clean_wav)
         ], capture_output=True, check=True)
 
         t0 = time.time()
         # Tối ưu hóa siêu thực:
-        # - temperature=0.68: bám sát tuyệt đối ngữ điệu và cao độ F0 của file mẫu (không bị phiêu lệch)
-        # - top_p=0.90: loại bỏ artifact khẩu hình méo
-        # - silence_p=0.18: tạo khoảng lấy hơi tự nhiên chuẩn tiếng Việt giữa các vế câu
+        # - temperature=0.40: phát âm dứt khoát, chuẩn dấu thanh tiếng Việt, không bị nuốt âm
+        # - top_p=0.85: loại bỏ tạp âm khẩu hình
+        # - silence_p=0.20: tạo khoảng lấy hơi tự nhiên chuẩn tiếng Việt giữa các vế câu
         # - apply_watermark=False: giữ nguyên sóng âm 48kHz trong trẻo
         infer_kwargs = {
             "ref_audio": str(clean_wav),
             "speed": rate,
-            "temperature": 0.68,
-            "top_p": 0.90,
-            "silence_p": 0.18,
+            "temperature": 0.40,
+            "top_p": 0.85,
+            "silence_p": 0.20,
             "denoise": True,
             "use_ref_codes": True,
             "apply_watermark": False
