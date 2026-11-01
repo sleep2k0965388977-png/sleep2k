@@ -5483,7 +5483,7 @@ function renderVideoGrid() {
                 card.className = `dl-video-card ${isDownloaded ? 'is-downloaded' : ''}`;
                 card.id = `dl-card-${v.id}`;
 
-                const durationStr = formatDuration(v.duration);
+                const durationStr = formatVideoDuration(v.duration);
                 const thumb = v.thumbnail || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400";
 
                 card.innerHTML = `
@@ -5519,7 +5519,7 @@ function renderVideoGrid() {
             updateStatsBadges();
         }
 
-        function formatDuration(sec) {
+        function formatVideoDuration(sec) {
             if (!sec) return "00:00";
             const m = Math.floor(sec / 60);
             const s = Math.floor(sec % 60);
