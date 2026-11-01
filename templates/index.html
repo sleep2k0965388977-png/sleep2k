@@ -3304,8 +3304,12 @@
                             customName = savedCustom[selectedVoice].name;
                         }
                     } catch (e_g) {}
-                    // Auto-sync worker URL if stored in browser
-                    const cachedWorkerUrl = localStorage.getItem('sleep2k_clone_worker_url');
+                    // Auto-sync worker URL if stored in browser (sanitized)
+                    let cachedWorkerUrl = localStorage.getItem('sleep2k_clone_worker_url') || '';
+                    if (cachedWorkerUrl && (cachedWorkerUrl.includes('colab.research.google.com') || cachedWorkerUrl.includes('github.com'))) {
+                        localStorage.removeItem('sleep2k_clone_worker_url');
+                        cachedWorkerUrl = '';
+                    }
                     if (cachedWorkerUrl) {
                         fetch('/api/set_clone_worker_url', {
                             method: 'POST',
