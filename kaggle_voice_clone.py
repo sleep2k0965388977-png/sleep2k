@@ -131,26 +131,21 @@ def clone_voice():
         audio_file.save(str(raw_path))
 
         target_sr = getattr(tts, "sample_rate", 48000)
-        # Chuẩn hóa âm lượng EBU R128 + lọc tần số vocal để AI trích xuất formants sắc nét nhất
+        # Chuẩn hóa âm lượng EBU R128 + lọc tạp âm dải tần để AI trích xuất vocal tròn vành rõ chữ nhất
         subprocess.run([
             "ffmpeg", "-y", "-i", str(raw_path),
-            "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
+            "-af", "highpass=f=60,lowpass=f=12000,loudnorm=I=-16:TP=-1.5:LRA=11",
             "-ar", str(target_sr), "-ac", "1",
             str(clean_wav)
         ], capture_output=True, check=True)
 
         t0 = time.time()
-        # Bộ thông số tối ưu độ giống 96-98%:
-        # - temperature=0.68: ép bám chặt ngữ điệu, cao độ F0 và độ nhấn nhá của audio mẫu
-        # - top_p=0.90: giảm méo khẩu hình và artifact phụ âm
-        # - silence_p=0.18: tạo khoảng thở tự nhiên chuẩn nhịp ngắt tiếng Việt
-        # - apply_watermark=False: giữ dải tần 48kHz trong trẻo, không bị méo formant
         infer_kwargs = {
             "ref_audio": str(clean_wav),
             "speed": rate,
-            "temperature": 0.68,
-            "top_p": 0.90,
-            "silence_p": 0.18,
+            "temperature": 0.40,
+            "top_p": 0.85,
+            "silence_p": 0.20,
             "denoise": True,
             "use_ref_codes": True,
             "apply_watermark": False
