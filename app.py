@@ -215,32 +215,35 @@ def is_edge_tts_voice(voice_type):
 
 def capcut_synthesize_fallback(text, is_male=False, rate="1.0"):
     """Ultra-reliable CapCut Neural fallback (100% reliable on Cloud/Railway datacenter IPs)."""
-    try:
-        v = "BV075_streaming" if is_male else "BV421_vivn_streaming"
-        rid = "7102355803792740865" if is_male else "7252594014782755330"
-        c_res = client.create_tts_task(texts=text, voice=v, resource_id=rid, rate=rate)
-        tasks = (c_res.get("data") or {}).get("tasks") or []
-        if not tasks:
-            return None
-        t_id, token = tasks[0]["id"], tasks[0]["token"]
-        for _ in range(12):
-            time.sleep(0.35)
-            q = client.query_tts_task(t_id, token)
-            q_tasks = (q.get("data") or {}).get("tasks") or []
-            if q_tasks:
-                status = q_tasks[0].get("status")
-                if status in ("succeed", "success"):
-                    payload = json.loads(q_tasks[0].get("payload", "{}"))
-                    subs = payload.get("audio_subtitles", [])
-                    if subs and subs[0].get("speech_url"):
-                        r = requests.get(subs[0]["speech_url"], timeout=15)
-                        if r.status_code == 200 and len(r.content) > 500:
-                            return r.content
-                    break
-                elif status in ("failed", "error"):
-                    break
-    except Exception as ex:
-        logger.warning(f"CapCut fallback error: {ex}")
+    for retry in range(2):
+        try:
+            v = "BV075_streaming" if is_male else "BV421_vivn_streaming"
+            rid = "7102355803792740865" if is_male else "7252594014782755330"
+            c_res = client.create_tts_task(texts=text, voice=v, resource_id=rid, rate=rate)
+            tasks = (c_res.get("data") or {}).get("tasks") or []
+            if not tasks:
+                time.sleep(0.5)
+                continue
+            t_id, token = tasks[0]["id"], tasks[0]["token"]
+            for _ in range(20):
+                time.sleep(0.4)
+                q = client.query_tts_task(t_id, token)
+                q_tasks = (q.get("data") or {}).get("tasks") or []
+                if q_tasks:
+                    status = q_tasks[0].get("status")
+                    if status in ("succeed", "success"):
+                        payload = json.loads(q_tasks[0].get("payload", "{}"))
+                        subs = payload.get("audio_subtitles", [])
+                        if subs and subs[0].get("speech_url"):
+                            r = requests.get(subs[0]["speech_url"], timeout=15)
+                            if r.status_code == 200 and len(r.content) > 500:
+                                return r.content
+                        break
+                    elif status in ("failed", "error"):
+                        break
+        except Exception as ex:
+            logger.warning(f"CapCut fallback error (retry {retry+1}): {ex}")
+            time.sleep(0.5)
     return None
 
 def edge_tts_synthesize_audio(text, voice_type, rate="1.0", pitch="+0Hz", max_retries=1, timeout_sec=3.0):
@@ -901,13 +904,8 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     if cap_aud and len(cap_aud) > 500:
         return cap_aud
 
-    # 2. Edge-TTS with tailored vocal pitch (fallback when running locally / non-cloud)
-    if not IS_CLOUD_ENV:
-        fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-        fb_res = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, pitch=pitch_str, max_retries=1, timeout_sec=2.5)
-        if fb_res and len(fb_res) > 500:
-            return fb_res
-
+    # 2. Resilient fail-safe silence fallback (Guarantees zero job freezing, zero watchdog timeout)
+    logger.warning(f"CapCut fallback yielded no audio for '{text_chunk[:25]}', inserting seamless acoustic pause...")
     return generate_silent_mp3_bytes(300)
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
@@ -2434,6 +2432,7 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "SLEEP2K TTS & STT",
+        "version": "v2.5.2-resilient-capcut-48k",
         "timestamp": int(time.time()),
         "uptime": "ok",
         "disk": {
