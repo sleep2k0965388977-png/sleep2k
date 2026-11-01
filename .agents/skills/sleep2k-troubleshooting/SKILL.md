@@ -9,7 +9,24 @@ description: >-
 
 # SLEEP2K TTS & STT Troubleshooting & Self-Healing Skill
 
-This skill provides comprehensive operational runbooks and automated diagnostic procedures for the **SLEEP2K** Web App deployed on Railway / Docker.
+This skill provides comprehensive operational runbooks, automated diagnosis, and **autonomous self-healing** for the **SLEEP2K** Web App deployed on Render / Railway / Docker.
+
+## 🛠️ Autonomous Self-Healing Engine (Auto-Fix All Errors)
+Whenever any error, failure, freeze, or regression is reported, execute the self-healing script to automatically diagnose, fix, and synchronize:
+```bash
+python .agents/skills/sleep2k-troubleshooting/scripts/auto_heal.py --sync
+```
+### What the Auto-Healer Automatically Repairs:
+1. **Python Syntax AST:** Scans all python files for syntax breaks and pinpoint exact line.
+2. **Worker Config Sanitization:** Clears invalid `colab.research.google.com` or `github.com` URLs from `worker_config.json`, preventing 5% generation freezes.
+3. **Watchdog & Timeouts:** Ensures timeouts in `app.py` are set to safe values (watchdog >= 300s, clone worker <= 25s).
+4. **Concurrency Safety:** Enforces `--workers 1 --threads 8` in `Dockerfile` to prevent split-brain state.
+5. **Frontend Watchdog & Storage:** Clears stale Colab links in browser `localStorage`, sets robust stalled tick limits.
+6. **Colab / Kaggle Notebooks:** Replaces broken packages with stable `onnxruntime` and `--depth 1 git clone` cache bypass.
+7. **Live Production Health:** Probes production endpoints (`/health` and `/api/clone_worker_status`) and verifies healthy status.
+8. **Auto GitHub Push:** Pushes healed fixes directly to `main` and `master` using `sync_github.py`.
+
+---
 
 ## Automated Scanner
 Run the diagnostic script to quickly scan the codebase for regressions:
