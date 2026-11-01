@@ -588,26 +588,38 @@ STUDIO_PRESET_VOICES = [
     {
         "lan": "vi",
         "lang": "vi-VN",
-        "resource_id": "7637458789033151751",
-        "voice_type": "multi_female_peiqi_uranus_bigtts",
-        "display_name": "🌸 Nữ Tự Nhiên (Ngọt Ngào, Trong Sáng) ⭐⭐⭐⭐⭐",
-        "category": "studio_real_human",
-        "is_clone": False,
-        "is_studio": True,
-        "preview_url": "/static/preset_voices/preset_vn_girl.mp3",
-        "description": "Giọng nữ trẻ trong sáng, ngọt ngào tự nhiên, phong cách trò chuyện và vlog (Phòng thu CapCut chuẩn)"
-    },
-    {
-        "lan": "vi",
-        "lang": "vi-VN",
         "resource_id": "7637456432522218773",
         "voice_type": "multi_female_yangguangnv_uranus_bigtts",
-        "display_name": "🌸 Ban Mai (Dịu Dàng, Chuẩn Phát Thanh) ⭐⭐⭐⭐⭐",
+        "display_name": "🌸 Ban Mai (Dịu Dàng, Tự Nhiên - Chuẩn Phát Thanh) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
         "is_clone": False,
         "is_studio": True,
         "preview_url": "/static/preset_voices/preset_ban_mai.mp3",
-        "description": "Giọng nữ miền Bắc dịu dàng, phát thanh viên chuẩn, truyền cảm và ấm áp"
+        "description": "Giọng nữ miền Bắc dịu dàng, phát thanh viên chuẩn, truyền cảm và êm ái"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7637460351541447956",
+        "voice_type": "multi_female_richgirl_uranus_bigtts",
+        "display_name": "🌸 Review Truyện & Phim (Kể Chuyện, Cuốn Hút) ⭐⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": False,
+        "is_studio": True,
+        "preview_url": "/static/preset_voices/preset_review_new.mp3",
+        "description": "Giọng nữ phong cách review phim, tóm tắt truyện, nhịp điệu sâu lắng, lôi cuốn"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7483736254694035984",
+        "voice_type": "BV562_streaming",
+        "display_name": "🌸 Chị Mai (Ấm Áp, Truyền Cảm - Đọc Sách) ⭐⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": False,
+        "is_studio": True,
+        "preview_url": "/static/preset_voices/preset_mai_am_ap.mp3",
+        "description": "Giọng nữ ấm áp, đĩnh đạc, phong cách phát thanh tin tức và đọc sách sâu lắng"
     },
     {
         "lan": "vi",
@@ -624,30 +636,6 @@ STUDIO_PRESET_VOICES = [
     {
         "lan": "vi",
         "lang": "vi-VN",
-        "resource_id": "7637460351541447956",
-        "voice_type": "multi_female_richgirl_uranus_bigtts",
-        "display_name": "🌸 Review Truyện & Phim (Cuốn Hút) ⭐⭐⭐⭐⭐",
-        "category": "studio_real_human",
-        "is_clone": False,
-        "is_studio": True,
-        "preview_url": "/static/preset_voices/preset_review_new.mp3",
-        "description": "Giọng nữ phong cách review phim, tóm tắt truyện, nhịp điệu lôi cuốn"
-    },
-    {
-        "lan": "vi",
-        "lang": "vi-VN",
-        "resource_id": "7483736254694035984",
-        "voice_type": "BV562_streaming",
-        "display_name": "🌸 Chị Mai (Ấm Áp, Truyền Cảm) ⭐⭐⭐⭐",
-        "category": "studio_real_human",
-        "is_clone": False,
-        "is_studio": True,
-        "preview_url": "/static/preset_voices/preset_mai_am_ap.mp3",
-        "description": "Giọng nữ ấm áp, đĩnh đạc, phong cách phát thanh tin tức và đọc sách sâu lắng"
-    },
-    {
-        "lan": "vi",
-        "lang": "vi-VN",
         "resource_id": "7264854897953083905",
         "voice_type": "vi_female_huong",
         "display_name": "🌸 Nữ Phổ Thông (Trong Sáng, Rõ Chữ) ⭐⭐⭐⭐",
@@ -656,6 +644,18 @@ STUDIO_PRESET_VOICES = [
         "is_studio": True,
         "preview_url": "/static/preset_voices/preset_nu_pho_thong.mp3",
         "description": "Giọng nữ chuẩn phổ thông (Hương) rõ ràng từng chữ, thanh lịch, chuẩn mực"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7637458789033151751",
+        "voice_type": "multi_female_peiqi_uranus_bigtts",
+        "display_name": "🌸 Gái Mới Lớn (Trẻ Trung, Ngọt Ngào) ⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": False,
+        "is_studio": True,
+        "preview_url": "/static/preset_voices/preset_vn_girl.mp3",
+        "description": "Giọng nữ trẻ trong sáng, ngọt ngào tự nhiên, phong cách trò chuyện và vlog"
     },
     {
         "lan": "vi",
@@ -1599,8 +1599,11 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_si
         cleanup_all_temp_files()
 
         is_clone = is_clone_voice(voice)
-        # Giọng clone AI chia đoạn chuẩn 220-250 ký tự để phát âm tròn vành rõ chữ 100%, không bị nuốt âm hay méo tiếng
-        chunk_max_chars = 240 if is_clone else 450
+        # CapCut BigTTS voices (multi_female/multi_male) & Clone voices require <= 220 chars to prevent SAMI empty response (err_code 231048)
+        if str(voice).startswith("multi_") or is_clone:
+            chunk_max_chars = 220
+        else:
+            chunk_max_chars = 400
         chunks = split_text_into_chunks(text, max_chars=chunk_max_chars)
         total_chunks = len(chunks)
 
@@ -1816,10 +1819,10 @@ def generate_job():
         if not text:
             return jsonify({"status": "error", "message": "Vui lòng nhập văn bản cần đọc."}), 400
 
-        clone_chunk_limit = 240
+        clone_chunk_limit = 220 if (str(voice).startswith("multi_") or is_clone_voice(voice)) else 400
         if is_clone_voice(voice):
-            # Tối ưu hóa âm học: Giữ các câu 220-250 ký tự để mô hình AI phát âm tròn vành rõ chữ nhất
-            clone_chunk_limit = 240
+            # Tối ưu hóa âm học: Giữ các câu 200-220 ký tự để mô hình AI phát âm tròn vành rõ chữ nhất
+            clone_chunk_limit = 220
 
             # Automatically restore custom voice from client localStorage if needed
             custom_ref_b64 = data.get("custom_ref_b64") or data.get("custom_audio_base64")
