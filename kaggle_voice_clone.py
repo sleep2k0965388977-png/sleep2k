@@ -14,6 +14,12 @@ print("=" * 70)
 # Cài đặt thư viện âm thanh
 os.system("pip install -q vieneu flask soundfile imageio-ffmpeg")
 
+# ── ĐẢM BẢO ONNX / VIENEU TƯƠNG THÍCH ──────────────────────────────────────────
+# onnxruntime >= 1.18 chặn external data path, bắt buộc hạ xuống 1.17.3 sau khi cài vieneu
+print("🔧 Đang cấu hình onnxruntime-gpu 1.17.3 tương thích VieNeu...")
+os.system("pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-training >/dev/null 2>&1")
+os.system("pip install -q onnxruntime-gpu==1.17.3")
+
 # Tải Cloudflared binary cho Linux
 CF_BIN = "/tmp/cloudflared"
 if not os.path.exists(CF_BIN):
