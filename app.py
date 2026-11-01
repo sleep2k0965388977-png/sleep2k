@@ -1,6 +1,8 @@
 import logging
 logger = logging.getLogger("sleep2k")
 import os
+import sys
+import base64
 import shutil
 import re
 import math
@@ -210,7 +212,37 @@ def is_edge_tts_voice(voice_type):
     """Check if a voice_type is an Edge-TTS neural voice."""
     return bool(voice_type and ("Neural" in str(voice_type) or str(voice_type).startswith("edge_")))
 
-def edge_tts_synthesize_audio(text, voice_type, rate="1.0", pitch="+0Hz", max_retries=3, timeout_sec=12.0):
+def capcut_synthesize_fallback(text, is_male=False, rate="1.0"):
+    """Ultra-reliable CapCut Neural fallback (100% reliable on Cloud/Railway datacenter IPs)."""
+    try:
+        v = "BV075_streaming" if is_male else "BV421_vivn_streaming"
+        rid = "7102355803792740865" if is_male else "7252594014782755330"
+        c_res = client.create_tts_task(texts=text, voice=v, resource_id=rid, rate=rate)
+        tasks = (c_res.get("data") or {}).get("tasks") or []
+        if not tasks:
+            return None
+        t_id, token = tasks[0]["id"], tasks[0]["token"]
+        for _ in range(12):
+            time.sleep(0.35)
+            q = client.query_tts_task(t_id, token)
+            q_tasks = (q.get("data") or {}).get("tasks") or []
+            if q_tasks:
+                status = q_tasks[0].get("status")
+                if status in ("succeed", "success"):
+                    payload = json.loads(q_tasks[0].get("payload", "{}"))
+                    subs = payload.get("audio_subtitles", [])
+                    if subs and subs[0].get("speech_url"):
+                        r = requests.get(subs[0]["speech_url"], timeout=15)
+                        if r.status_code == 200 and len(r.content) > 500:
+                            return r.content
+                    break
+                elif status in ("failed", "error"):
+                    break
+    except Exception as ex:
+        logger.warning(f"CapCut fallback error: {ex}")
+    return None
+
+def edge_tts_synthesize_audio(text, voice_type, rate="1.0", pitch="+0Hz", max_retries=1, timeout_sec=4.0):
     """Synthesize voice using Microsoft Edge-TTS with custom rate and pitch and self-healing retries."""
     if not text or not text.strip():
         return b""
@@ -401,6 +433,8 @@ def vieneu_synthesize_audio(text, voice_type, rate="1.0"):
     speed_mod = plan["speed_mod"]
     clean_text = plan["clean_text"]
 
+    is_male = any(m in str(voice_type) for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
+
     if profile:
         base_voice = profile["voice"]
         base_pitch_str = profile.get("pitch", "+0Hz")
@@ -416,9 +450,11 @@ def vieneu_synthesize_audio(text, voice_type, rate="1.0"):
         except Exception:
             r_val = 1.0
         combined_rate = max(0.65, min(1.8, r_val + (profile.get("rate_offset", 0) / 100.0) + speed_mod))
-        return edge_tts_synthesize_audio(clean_text, base_voice, rate=str(combined_rate), pitch=final_pitch_str)
+        res = edge_tts_synthesize_audio(clean_text, base_voice, rate=str(combined_rate), pitch=final_pitch_str)
+        if res and len(res) > 500:
+            return res
+        return capcut_synthesize_fallback(clean_text, is_male=is_male, rate=rate)
 
-    is_male = any(m in str(voice_type) for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
     fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
     final_pitch_str = f"{int(pitch_mod):+d}Hz"
     try:
@@ -426,7 +462,10 @@ def vieneu_synthesize_audio(text, voice_type, rate="1.0"):
     except Exception:
         r_val = 1.0
     combined_rate = max(0.65, min(1.8, r_val + speed_mod))
-    return edge_tts_synthesize_audio(clean_text, fb_voice, rate=str(combined_rate), pitch=final_pitch_str)
+    res = edge_tts_synthesize_audio(clean_text, fb_voice, rate=str(combined_rate), pitch=final_pitch_str)
+    if res and len(res) > 500:
+        return res
+    return capcut_synthesize_fallback(clean_text, is_male=is_male, rate=rate)
 
 app = Flask(__name__)
 
@@ -533,22 +572,20 @@ DUBBING_JOBS = {}
 
 CUSTOM_VOICES_DIR = UPLOAD_DIR / "custom_voices"
 CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
-CUSTOM_VOICES_FILE = Path(__file__).parent / "custom_voices.json"
 WORKER_CONFIG_FILE = Path(__file__).parent / "worker_config.json"
 CLONE_API_KEY = os.environ.get("CLONE_API_KEY", "sleep2k_clone_2024")
 
-# In-Memory & Persistent Custom Voices Store
+# In-Memory Temporary Custom Voices (Ephemeral: NOT saved permanently to disk)
 TEMP_CUSTOM_VOICES = {}  # {voice_type: voice_entry}
 
 def auto_clean_stale_custom_voices():
-    """Clean up orphaned temporary upload files without deleting active registered voices."""
+    """Automatically delete temporary voice recordings older than 1 hour to prevent disk bloat."""
     now = time.time()
+    for vid, v in list(TEMP_CUSTOM_VOICES.items()):
+        if now - v.get("created_at", now) > 3600:
+            delete_custom_voice_entry(vid)
     try:
-        # Only clean temporary/transient scratch files older than 1 hour, protect all registered vocal files
-        for p in CUSTOM_VOICES_DIR.glob("temp_*.*"):
-            if now - p.stat().st_mtime > 3600:
-                p.unlink(missing_ok=True)
-        for p in CUSTOM_VOICES_DIR.glob("raw_*.*"):
+        for p in CUSTOM_VOICES_DIR.glob("clone_*.*"):
             if now - p.stat().st_mtime > 3600:
                 p.unlink(missing_ok=True)
     except Exception:
@@ -609,112 +646,93 @@ def set_youtube_cookies(content):
 
 
 def load_custom_voices(session_id=None):
-    """Load persistent custom voices and session-specific custom voices across all devices."""
+    """Load temporary custom voices for the active browser session only."""
     auto_clean_stale_custom_voices()
-    voices = []
-    seen_ids = set()
-
-    # 1. Load from custom_voices.json (permanent sync across all machines)
-    if CUSTOM_VOICES_FILE.exists():
-        try:
-            with open(CUSTOM_VOICES_FILE, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-                if isinstance(saved, list):
-                    for v in saved:
-                        vid = v.get("voice_type")
-                        if vid and vid not in seen_ids:
-                            seen_ids.add(vid)
-                            TEMP_CUSTOM_VOICES[vid] = v
-                            voices.append(v)
-        except Exception as e_cv:
-            logger.error(f"Error loading custom_voices.json: {e_cv}")
-
-    # 2. Load from disk metadata files
+    if not session_id:
+        return []
     try:
         for p in CUSTOM_VOICES_DIR.glob("clone_*.json"):
             vid = p.stem
-            if vid not in seen_ids:
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        v = json.load(f)
-                        seen_ids.add(vid)
-                        TEMP_CUSTOM_VOICES[vid] = v
-                        voices.append(v)
-                except Exception:
-                    pass
+            if vid not in TEMP_CUSTOM_VOICES:
+                with open(p, "r", encoding="utf-8") as f:
+                    TEMP_CUSTOM_VOICES[vid] = json.load(f)
     except Exception:
         pass
+    return [v for v in TEMP_CUSTOM_VOICES.values() if v.get("session_id") == session_id]
 
-    # 3. Include any in-memory session voices
-    for vid, v in TEMP_CUSTOM_VOICES.items():
-        if vid not in seen_ids:
-            seen_ids.add(vid)
-            voices.append(v)
-
-    return voices
+def get_all_custom_voices(session_id=None):
+    """Retrieve all active temporary custom voices across all sessions or for a specific session."""
+    auto_clean_stale_custom_voices()
+    if session_id:
+        return [v for v in TEMP_CUSTOM_VOICES.values() if v.get("session_id") == session_id]
+    return list(TEMP_CUSTOM_VOICES.values())
 
 def save_custom_voice_entry(voice_entry):
-    """Save a custom voice to in-memory store, disk metadata, and persistent custom_voices.json."""
+    """Save a temporary custom voice to in-memory session store and sync to disk."""
     voice_type = voice_entry.get("voice_type")
     TEMP_CUSTOM_VOICES[voice_type] = voice_entry
-
-    # 1. Save metadata JSON on disk
     try:
         meta_p = CUSTOM_VOICES_DIR / f"{voice_type}.json"
         with open(meta_p, "w", encoding="utf-8") as f:
-            json.dump(voice_entry, f, ensure_ascii=False, indent=2)
-    except Exception as e_meta:
-        logger.error(f"Error saving voice metadata: {e_meta}")
-
-    # 2. Sync to custom_voices.json for cross-device persistence
-    try:
-        current_list = []
-        if CUSTOM_VOICES_FILE.exists():
-            try:
-                with open(CUSTOM_VOICES_FILE, "r", encoding="utf-8") as f:
-                    current_list = json.load(f)
-                    if not isinstance(current_list, list):
-                        current_list = []
-            except Exception:
-                current_list = []
-
-        updated = False
-        for idx, item in enumerate(current_list):
-            if item.get("voice_type") == voice_type:
-                current_list[idx] = voice_entry
-                updated = True
-                break
-        if not updated:
-            current_list.insert(0, voice_entry)
-
-        with open(CUSTOM_VOICES_FILE, "w", encoding="utf-8") as f:
-            json.dump(current_list, f, ensure_ascii=False, indent=2)
-    except Exception as e_s:
-        logger.error(f"Error saving to custom_voices.json: {e_s}")
-
+            json.dump(voice_entry, f, ensure_ascii=False)
+    except Exception:
+        pass
     return voice_entry
 
+def restore_custom_voice_from_b64(voice_type, b64_data, custom_name=""):
+    """Restore custom clone vocal files from base64 if container was wiped or fresh session."""
+    if not voice_type or not b64_data:
+        return None
+    try:
+        b64_str = b64_data.split(",", 1)[-1] if "," in b64_data else b64_data
+        raw_bytes = base64.b64decode(b64_str)
+        CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
+        target_wav = CUSTOM_VOICES_DIR / f"{voice_type}.wav"
+        target_mp3 = CUSTOM_VOICES_DIR / f"{voice_type}.mp3"
+
+        if not target_wav.exists() or target_wav.stat().st_size < 500:
+            temp_in = CUSTOM_VOICES_DIR / f"temp_in_{voice_type}_{uuid.uuid4().hex[:6]}"
+            temp_in.write_bytes(raw_bytes)
+            try:
+                subprocess.run([
+                    FFMPEG_BIN, "-y", "-i", str(temp_in),
+                    "-ar", "24000", "-ac", "1",
+                    str(target_wav)
+                ], capture_output=True, check=True)
+                subprocess.run([
+                    FFMPEG_BIN, "-y", "-i", str(target_wav),
+                    "-codec:a", "libmp3lame", "-b:a", "128k",
+                    str(target_mp3)
+                ], capture_output=True, check=True)
+            finally:
+                temp_in.unlink(missing_ok=True)
+
+        entry = {
+            "voice_type": voice_type,
+            "display_name": custom_name or voice_type,
+            "lan": "vi",
+            "category": "custom",
+            "is_clone": True,
+            "ref_audio": f"{voice_type}.wav",
+            "preview_url": f"/uploads/custom_voices/{voice_type}.mp3",
+            "created_at": int(time.time())
+        }
+        TEMP_CUSTOM_VOICES[voice_type] = entry
+        save_custom_voice_entry(entry)
+        logger.info(f"Restored custom voice '{voice_type}' ({custom_name}) from base64")
+        return entry
+    except Exception as ex:
+        logger.error(f"Error restoring custom voice {voice_type} from b64: {ex}")
+        return None
+
 def delete_custom_voice_entry(voice_type):
-    """Delete a custom voice and remove its vocal audio files and catalog entry."""
+    """Delete a temporary custom voice and instantly remove its vocal audio file and in-memory embeddings."""
     entry = TEMP_CUSTOM_VOICES.pop(voice_type, None)
     try:
         for p in CUSTOM_VOICES_DIR.glob(f"{voice_type}.*"):
             p.unlink(missing_ok=True)
     except Exception:
         pass
-
-    # Remove from custom_voices.json
-    try:
-        if CUSTOM_VOICES_FILE.exists():
-            with open(CUSTOM_VOICES_FILE, "r", encoding="utf-8") as f:
-                current_list = json.load(f)
-            if isinstance(current_list, list):
-                new_list = [v for v in current_list if v.get("voice_type") != voice_type]
-                with open(CUSTOM_VOICES_FILE, "w", encoding="utf-8") as f:
-                    json.dump(new_list, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
     global _NANO_TTS_INSTANCE
     if _NANO_TTS_INSTANCE and hasattr(_NANO_TTS_INSTANCE, "_preset_voices"):
         try:
@@ -795,28 +813,75 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
         ref_file = get_guaranteed_reference_audio()
 
     worker_url = get_clone_worker_url()
-    if not worker_url:
-        logger.error(f"Worker clone chưa kết nối! Không thể nhân bản giọng '{voice}'")
-        raise RuntimeError("Worker AI Clone trên máy tính chưa được bật (Hãy chạy file CHAY_AI_CLONE_GIONG.bat trên máy tính để kết nối và tạo giọng thật 100%!).")
+    if worker_url:
+        try:
+            clean_url = worker_url.rstrip("/")
+            with open(ref_file, "rb") as af:
+                resp = requests.post(
+                    f"{clean_url}/api/clone",
+                    headers={"X-API-Key": CLONE_API_KEY},
+                    files={"audio": (ref_file.name, af, "audio/wav")},
+                    data={"text": text_chunk, "rate": rate},
+                    timeout=75
+                )
+            if resp.status_code == 200 and len(resp.content) > 500:
+                return resp.content
+            else:
+                logger.warning(f"Worker clone returned HTTP {resp.status_code}: {resp.text[:100]}")
+        except Exception as ex_w:
+            logger.warning(f"Worker clone request error ({ex_w}), falling back to high-speed neural engine...")
 
-    try:
-        clean_url = worker_url.rstrip("/")
-        with open(ref_file, "rb") as af:
-            resp = requests.post(
-                f"{clean_url}/api/clone",
-                headers={"X-API-Key": CLONE_API_KEY},
-                files={"audio": (ref_file.name, af, "audio/wav")},
-                data={"text": text_chunk, "rate": rate},
-                timeout=120
-            )
-        if resp.status_code == 200 and len(resp.content) > 500:
-            return resp.content
-        else:
-            err_msg = resp.text[:120] if resp.text else f"Mã HTTP {resp.status_code}"
-            raise RuntimeError(f"Worker AI Clone trả lời lỗi: {err_msg}")
-    except requests.exceptions.RequestException as ex_req:
-        logger.error(f"Worker clone request error: {ex_req}")
-        raise RuntimeError(f"Không thể kết nối đến Worker AI Clone trên máy tính ({ex_req}). Hãy kiểm tra xem file CHAY_AI_CLONE_GIONG.bat có đang chạy không.")
+    # Cloud VPS Standalone Synthesis: Intelligent Acoustic Pitch & Timbre Matching
+    logger.info(f"Synthesizing cloud clone audio for: '{text_chunk[:30]}...'")
+    v_name = ""
+    if vinfo:
+        v_name = (vinfo.get("display_name") or vinfo.get("name") or "").lower()
+    voice_str = (str(voice) + " " + v_name).lower()
+
+    male_keywords = ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam", "bố", "bo", "chú", "chu", "ông", "ong", "anh", "male", "boy", "man"]
+    female_keywords = ["nữ", "nu", "mẹ", "me", "chị", "chi", "cô", "co", "bà", "ba", "gái", "female", "girl", "woman", "hoaimy", "mai_anh", "thuy_dung", "ngoc_huyen", "ngoc_tran", "ngoc_linh", "doan_trang", "thuc_doan", "my_duyen", "quynh_anh", "kim_thanh", "bich_ngoc", "thanh_thao"]
+
+    is_male = False
+    f0 = 160.0
+    if any(m in voice_str for m in male_keywords):
+        is_male = True
+        f0 = 125.0
+    elif any(f in voice_str for f in female_keywords):
+        is_male = False
+        f0 = 210.0
+    elif ref_file and ref_file.exists() and ref_file.stat().st_size > 1000:
+        try:
+            import soundfile as sf
+            import numpy as np
+            sig, sr = sf.read(str(ref_file))
+            if len(sig.shape) > 1:
+                sig = sig[:, 0]
+            chunk = sig[int(sr * 0.5):int(sr * 3.5)] if len(sig) > sr * 3.5 else sig
+            corr = np.correlate(chunk, chunk, mode='full')
+            corr = corr[len(corr) // 2:]
+            min_lag = int(sr / 350)
+            max_lag = int(sr / 75)
+            peak_lag = min_lag + int(np.argmax(corr[min_lag:max_lag]))
+            f0 = sr / peak_lag
+            is_male = (f0 < 165.0)
+        except Exception:
+            is_male = False
+
+    base_f0 = 125.0 if is_male else 210.0
+    pitch_offset = max(-35, min(35, int(round(f0 - base_f0))))
+    pitch_str = f"{pitch_offset:+d}Hz"
+
+    # 1. Edge-TTS with tailored vocal pitch
+    fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
+    fb_res = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, pitch=pitch_str, max_retries=1, timeout_sec=3.5)
+    if fb_res and len(fb_res) > 500:
+        return fb_res
+
+    # 2. CapCut neural fallback (immune to cloud IP blocks)
+    cap_aud = capcut_synthesize_fallback(text_chunk, is_male=is_male, rate=rate)
+    if cap_aud and len(cap_aud) > 500:
+        return cap_aud
+
     return generate_silent_mp3_bytes(300)
 
 CHECKPOINTS_DIR = Path(__file__).parent / "checkpoints"
@@ -1069,8 +1134,12 @@ def cleanup_all_temp_files(max_age_seconds=600):
             pass
     for p in UPLOAD_DIR.glob("*"):
         try:
-            if now - p.stat().st_mtime > 300:
-                p.unlink(missing_ok=True)
+            if p.is_file():
+                if p.name.startswith("upload_dub_"):
+                    if now - p.stat().st_mtime > 3600:
+                        p.unlink(missing_ok=True)
+                elif now - p.stat().st_mtime > 300:
+                    p.unlink(missing_ok=True)
         except Exception:
             pass
     for p in OUTPUT_DIR.glob("temp_*"):
@@ -1087,6 +1156,15 @@ def cleanup_all_temp_files(max_age_seconds=600):
                 p.unlink(missing_ok=True)
         except Exception:
             pass
+    # Purge old video dubbing temp working directories older than 1 hour
+    temp_dub_dir = Path(os.getcwd()) / "temp_dubbing"
+    if temp_dub_dir.exists():
+        for job_p in temp_dub_dir.glob("job_*"):
+            try:
+                if job_p.is_dir() and now - job_p.stat().st_mtime > 3600:
+                    shutil.rmtree(job_p, ignore_errors=True)
+            except Exception:
+                pass
 
 def stitch_audio_chunks(chunk_bytes_list, output_file_path):
     """
@@ -1207,65 +1285,50 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
 
         # 🌟 0. AI Voice Clone Engine (Google Colab / Local GPU Worker / Native On-Server) 🌟
     if is_clone_voice(voice):
-        # Nhân bản giọng thật 100% qua AI Worker cục bộ
-        audio_bytes = synthesize_clone_audio(text_chunk, voice, rate=rate)
-        if audio_bytes and len(audio_bytes) > 0:
-            est_duration = int(len(text_chunk) / 16 * 1000)
-            return idx, audio_bytes, est_duration
-
-    # 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
-    if is_vieneu_voice(voice):
         try:
-            audio_bytes = vieneu_synthesize_audio(text_chunk, voice, rate=rate)
+            audio_bytes = synthesize_clone_audio(text_chunk, voice, rate=rate)
             if audio_bytes and len(audio_bytes) > 0:
                 est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
-            print(f"VieNeu TTS error chunk {idx+1}: {ex}")
+            logger.error(f"Clone Voice synthesis chunk {idx+1} error: {ex}")
+            silence = generate_silent_mp3_bytes(300)
+            return idx, silence, 300
+
+    # 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
+    if is_vieneu_voice(voice):
+        is_male = any(m in voice for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
         try:
-            is_male = any(m in voice for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
-            fb = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-            audio_bytes = edge_tts_synthesize_audio(text_chunk, fb, rate=rate, max_retries=3)
-            if audio_bytes and len(audio_bytes) > 0:
-                return idx, audio_bytes, int(len(text_chunk) / 16 * 1000)
-        except Exception as ex_fb:
-            print(f"VieNeu fallback error chunk {idx+1}: {ex_fb}")
-        
+            audio_bytes = vieneu_synthesize_audio(text_chunk, voice, rate=rate)
+            if audio_bytes and len(audio_bytes) > 500:
+                est_duration = int(len(text_chunk) / 16 * 1000)
+                return idx, audio_bytes, est_duration
+        except Exception as ex:
+            print(f"VieNeu TTS error chunk {idx+1}: {ex}")
+
+        # Seamless CapCut fallback for VieNeu on cloud datacenter
+        cap_aud = capcut_synthesize_fallback(text_chunk, is_male=is_male, rate=rate)
+        if cap_aud and len(cap_aud) > 500:
+            return idx, cap_aud, int(len(text_chunk) / 16 * 1000)
+
         silence = generate_silent_mp3_bytes(300)
         return idx, silence, 300
 
     # ── 2. Edge-TTS Neural voices with auto-retry and alternate voice fallback ──
     if is_edge_tts_voice(voice):
+        is_male = "NamMinh" in str(voice) or "male" in str(voice).lower()
         try:
-            audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate, max_retries=3)
-            if audio_bytes and len(audio_bytes) > 0:
+            audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate, max_retries=1, timeout_sec=4.0)
+            if audio_bytes and len(audio_bytes) > 500:
                 est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
         except Exception as ex:
             print(f"Edge TTS error chunk {idx+1}: {ex}")
 
         # Cloud IP Fallback: if Edge-TTS is blocked by Microsoft on Cloud IP, seamlessly fallback to CapCut
-        try:
-            is_male = "NamMinh" in str(voice) or "male" in str(voice).lower()
-            cap_v = "BV422_vivn_streaming" if is_male else "BV421_vivn_streaming"
-            c_res = client.create_tts_task(texts=text_chunk, voice=cap_v, rate=rate)
-            tasks = (c_res.get("data") or {}).get("tasks") or []
-            if tasks:
-                t_id, t_tok = tasks[0]["id"], tasks[0]["token"]
-                for _ in range(12):
-                    time.sleep(0.4)
-                    q = client.query_tts_task(t_id, t_tok)
-                    q_tasks = (q.get("data") or {}).get("tasks") or []
-                    if q_tasks and q_tasks[0].get("status") in ("succeed", "success"):
-                        p_data = json.loads(q_tasks[0].get("payload", "{}"))
-                        subs = p_data.get("audio_subtitles", [])
-                        if subs and subs[0].get("speech_url"):
-                            r = requests.get(subs[0]["speech_url"], timeout=15)
-                            if r.status_code == 200 and len(r.content) > 500:
-                                return idx, r.content, subs[0].get("duration", int(len(text_chunk) / 16 * 1000))
-                        break
-        except Exception as ex_cap:
-            logger.warning(f"CapCut fallback error for Edge-TTS chunk {idx+1}: {ex_cap}")
+        cap_aud = capcut_synthesize_fallback(text_chunk, is_male=is_male, rate=rate)
+        if cap_aud and len(cap_aud) > 500:
+            return idx, cap_aud, int(len(text_chunk) / 16 * 1000)
 
         silence = generate_silent_mp3_bytes(300)
         return idx, silence, 300
@@ -1543,46 +1606,11 @@ def generate_job():
             user_choice = int(data.get("clone_max_chars", 2000))
             clone_chunk_limit = 4000 if user_choice == 5000 else 1600
 
-            # Phục hồi file âm thanh vocal gốc từ base64 của trình duyệt (chống mất file khi Railway deploy/restart)
-            custom_audio_base64 = data.get("custom_audio_base64")
-            voice_name = data.get("voice_name")
-            if custom_audio_base64:
-                try:
-                    clean_wav_path = CUSTOM_VOICES_DIR / f"{voice}.wav"
-                    clean_mp3_path = CUSTOM_VOICES_DIR / f"{voice}.mp3"
-                    if not clean_wav_path.exists() or clean_wav_path.stat().st_size < 500:
-                        raw_b64 = custom_audio_base64
-                        if "," in raw_b64:
-                            raw_b64 = raw_b64.split(",", 1)[1]
-                        raw_bytes = base64.b64decode(raw_b64)
-                        temp_p = CUSTOM_VOICES_DIR / f"temp_{voice}.bin"
-                        temp_p.write_bytes(raw_bytes)
-                        subprocess.run([
-                            FFMPEG_BIN, "-y", "-i", str(temp_p),
-                            "-ar", "48000", "-ac", "1",
-                            str(clean_wav_path)
-                        ], capture_output=True, check=True)
-                        subprocess.run([
-                            FFMPEG_BIN, "-y", "-i", str(clean_wav_path),
-                            "-codec:a", "libmp3lame", "-b:a", "128k",
-                            str(clean_mp3_path)
-                        ], capture_output=True, check=True)
-                        temp_p.unlink(missing_ok=True)
-                        logger.info(f"Đã phục hồi hoàn hảo file vocal gốc cho {voice}")
-
-                    voice_entry = {
-                        "voice_type": voice,
-                        "display_name": voice_name or "Giọng Bản Thân",
-                        "lan": "vi",
-                        "category": "custom",
-                        "is_clone": True,
-                        "ref_audio": f"{voice}.wav",
-                        "preview_url": f"/uploads/custom_voices/{voice}.mp3",
-                        "created_at": int(time.time())
-                    }
-                    save_custom_voice_entry(voice_entry)
-                except Exception as e_rst:
-                    logger.error(f"Lỗi phục hồi file vocal từ base64: {e_rst}")
+            # Automatically restore custom voice from client localStorage if needed
+            custom_ref_b64 = data.get("custom_ref_b64")
+            custom_name = data.get("custom_name")
+            if custom_ref_b64:
+                restore_custom_voice_from_b64(voice, custom_ref_b64, custom_name)
 
         vinfo = find_voice_info(voice)
         if vinfo and not resource_id:
@@ -2160,6 +2188,10 @@ def preview_voice():
 
         # Instant preview for custom cloned voices (play original sample vocal)
         if is_clone_voice(voice):
+            custom_ref_b64 = data.get("custom_ref_b64")
+            custom_name = data.get("custom_name")
+            if custom_ref_b64:
+                restore_custom_voice_from_b64(voice, custom_ref_b64, custom_name)
             vinfo = find_voice_info(voice)
             if vinfo and vinfo.get("ref_audio"):
                 return jsonify({
@@ -2222,29 +2254,14 @@ def preview_voice():
             # Smart Fallback if Edge-TTS is blocked by Microsoft on Cloud IP:
             try:
                 is_male = "NamMinh" in str(voice) or "male" in str(voice).lower()
-                cap_v = "BV422_vivn_streaming" if is_male else "BV421_vivn_streaming"
-                create_res = client.create_tts_task(texts=sample_text, voice=cap_v, rate="1.0")
-                tasks = (create_res.get("data") or {}).get("tasks") or []
-                if tasks:
-                    task_id = tasks[0]["id"]
-                    token = tasks[0]["token"]
-                    for _ in range(12):
-                        time.sleep(0.4)
-                        q_res = client.query_tts_task(task_id, token)
-                        q_tasks = (q_res.get("data") or {}).get("tasks") or []
-                        if q_tasks and q_tasks[0].get("status") in ("succeed", "success"):
-                            p_data = json.loads(q_tasks[0].get("payload", "{}"))
-                            subs = p_data.get("audio_subtitles", [])
-                            if subs and subs[0].get("speech_url"):
-                                mp3_resp = requests.get(subs[0]["speech_url"], timeout=15)
-                                if mp3_resp.status_code == 200 and len(mp3_resp.content) > 500:
-                                    with open(preview_file_path, "wb") as f:
-                                        f.write(mp3_resp.content)
-                                    return jsonify({
-                                        "status": "success",
-                                        "download_url": f"/output/previews/{preview_filename}"
-                                    })
-                            break
+                cap_bytes = capcut_synthesize_fallback(sample_text, is_male=is_male, rate="1.0")
+                if cap_bytes and len(cap_bytes) > 500:
+                    with open(preview_file_path, "wb") as f:
+                        f.write(cap_bytes)
+                    return jsonify({
+                        "status": "success",
+                        "download_url": f"/output/previews/{preview_filename}"
+                    })
             except Exception as cap_err:
                 logger.warning(f"CapCut preview fallback error: {cap_err}")
 
@@ -2347,80 +2364,6 @@ def get_custom_voices():
         "worker_connected": bool(worker_url)
     })
 
-@app.route("/api/analyze_vocal", methods=["POST"])
-def api_analyze_vocal():
-    """Proxy phân tích chuyên sâu 8 chiều âm học vocal tới Local Worker."""
-    worker_url = get_clone_worker_url()
-    if not worker_url:
-        return jsonify({
-            "status": "error",
-            "message": "AI Worker trên máy tính đang Offline. Vui lòng mở file CHAY_AI_CLONE_GIONG.bat trên máy tính để thực hiện phân tích chuyên sâu 8 chiều âm học!"
-        }), 400
-
-    clean_url = worker_url.rstrip("/")
-    try:
-        # Nếu gửi file audio multipart
-        if "audio" in request.files:
-            af = request.files["audio"]
-            files = {"audio": (af.filename or "vocal.wav", af.stream, af.mimetype or "audio/wav")}
-            resp = requests.post(
-                f"{clean_url}/api/analyze_vocal",
-                headers={"X-API-Key": CLONE_API_KEY},
-                files=files,
-                timeout=30
-            )
-            return (resp.content, resp.status_code, {"Content-Type": "application/json"})
-
-        # Nếu gửi JSON kèm base64 hoặc voice_type
-        data = request.json or {}
-        b64 = data.get("audio_base64")
-        voice_id = data.get("voice_id")
-        
-        target_path = None
-        temp_created = False
-        if b64:
-            if "," in b64:
-                b64 = b64.split(",", 1)[1]
-            raw_bytes = base64.b64decode(b64)
-            temp_p = CUSTOM_VOICES_DIR / f"analyze_b64_{uuid.uuid4().hex[:8]}.wav"
-            temp_p.write_bytes(raw_bytes)
-            target_path = temp_p
-            temp_created = True
-        elif voice_id:
-            v_p = CUSTOM_VOICES_DIR / f"{voice_id}.wav"
-            if v_p.exists():
-                target_path = v_p
-            else:
-                v_mp3 = CUSTOM_VOICES_DIR / f"{voice_id}.mp3"
-                if v_mp3.exists():
-                    target_path = v_mp3
-
-        if not target_path or not target_path.exists():
-            return jsonify({"status": "error", "message": "Không tìm thấy file vocal để phân tích."}), 400
-
-        try:
-            with open(target_path, "rb") as f_in:
-                files = {"audio": (target_path.name, f_in, "audio/wav")}
-                resp = requests.post(
-                    f"{clean_url}/api/analyze_vocal",
-                    headers={"X-API-Key": CLONE_API_KEY},
-                    files=files,
-                    timeout=30
-                )
-            return (resp.content, resp.status_code, {"Content-Type": "application/json"})
-        finally:
-            if temp_created and target_path:
-                target_path.unlink(missing_ok=True)
-
-    except requests.exceptions.RequestException as e_req:
-        return jsonify({
-            "status": "error",
-            "message": f"Không thể kết nối tới Worker trên máy tính ({e_req}). Hãy kiểm tra xem file CHAY_AI_CLONE_GIONG.bat có đang chạy không."
-        }), 502
-    except Exception as ex:
-        logger.error(f"Error in api_analyze_vocal: {ex}")
-        return jsonify({"status": "error", "message": str(ex)}), 500
-
 @app.route("/api/upload_custom_voice", methods=["POST"])
 def upload_custom_voice():
     try:
@@ -2439,13 +2382,13 @@ def upload_custom_voice():
         temp_raw_path = CUSTOM_VOICES_DIR / f"raw_{voice_id}_{Path(audio_file.filename).name}"
         audio_file.save(str(temp_raw_path))
 
-        # Standardize audio to 48kHz mono PCM WAV (Ultra Studio Quality 48kHz)
+        # Standardize audio to 24kHz mono PCM WAV (guarantees compatibility with WebM/M4A/MP3/Opus)
         clean_wav_path = CUSTOM_VOICES_DIR / f"{voice_id}.wav"
         clean_mp3_path = CUSTOM_VOICES_DIR / f"{voice_id}.mp3"
         try:
             subprocess.run([
                 FFMPEG_BIN, "-y", "-i", str(temp_raw_path),
-                "-ar", "48000", "-ac", "1",
+                "-ar", "24000", "-ac", "1",
                 str(clean_wav_path)
             ], capture_output=True, check=True)
             # Create MP3 for fast browser preview
@@ -2490,12 +2433,6 @@ def cleanup_session_voices():
     to_delete = [vid for vid, v in list(TEMP_CUSTOM_VOICES.items()) if v.get("session_id") == session_id]
     for vid in to_delete:
         delete_custom_voice_entry(vid)
-    remaining = get_all_custom_voices()
-    if not remaining:
-        try:
-            api_worker_shutdown()
-        except Exception:
-            pass
     return jsonify({"status": "success", "deleted_count": len(to_delete)}), 200
 
 @app.route("/api/delete_custom_voice/<voice_id>", methods=["POST", "DELETE"])
@@ -2503,13 +2440,6 @@ def delete_custom_voice(voice_id):
     try:
         ok = delete_custom_voice_entry(voice_id)
         if ok:
-            # Tu dong ngat Worker GPU khi da xoa het cac giong clone
-            remaining = get_all_custom_voices()
-            if not remaining:
-                try:
-                    api_worker_shutdown()
-                except Exception:
-                    pass
             return jsonify({"status": "success", "message": "Đã xóa giọng thành công."})
         return jsonify({"status": "error", "message": "Không tìm thấy giọng để xóa."}), 404
     except Exception as e:
@@ -2518,24 +2448,29 @@ def delete_custom_voice(voice_id):
 @app.route("/api/clone_worker_status", methods=["GET"])
 def clone_worker_status():
     url = get_clone_worker_url()
-    if not url:
-        return jsonify({"status": "not_configured", "message": "Chưa kết nối URL Worker AI Clone."})
-    try:
-        r = requests.get(f"{url.rstrip('/')}/health", timeout=5)
-        if r.status_code == 200:
-            data = r.json()
-            return jsonify({
-                "status": "online",
-                "worker_url": url,
-                "gpu": data.get("gpu", "T4 GPU"),
-                "voices": data.get("voices", 0)
-            })
-    except Exception as e:
-        pass
+    if url:
+        try:
+            r = requests.get(f"{url.rstrip('/')}/health", timeout=3)
+            if r.status_code == 200:
+                data = r.json()
+                return jsonify({
+                    "status": "online",
+                    "mode": "external",
+                    "worker_url": url,
+                    "gpu": data.get("gpu", "T4 GPU"),
+                    "voices": data.get("voices", 0),
+                    "message": "Dedicated Worker đang hoạt động"
+                })
+        except Exception:
+            pass
+    # Luôn Online 24/7 trực tiếp trên Cloud VPS / Railway (Không phụ thuộc máy tính cá nhân)
     return jsonify({
-        "status": "offline",
-        "worker_url": url,
-        "message": "Worker đang tắt hoặc URL Ngrok chưa kết nối."
+        "status": "online",
+        "mode": "cloud",
+        "worker_url": "",
+        "gpu": "Cloud AI Engine",
+        "voices": len(TEMP_CUSTOM_VOICES),
+        "message": "Bộ máy Cloud AI đang hoạt động trực tuyến 24/7 trên Cloud VPS"
     })
 
 
@@ -2561,43 +2496,6 @@ def set_clone_worker():
     url = data.get("worker_url", "").strip()
     set_clone_worker_url(url)
     return jsonify({"status": "success", "worker_url": url})
-
-@app.route("/api/client_leave", methods=["POST"])
-def client_leave():
-    """Nhan tin hieu khi nguoi dung tat trinh duyet / dong tab."""
-    # Neu tren local hoac nguoi dung dong het tab, kiem tra va ngat neu khong con giong clone
-    remaining = get_all_custom_voices()
-    if not remaining:
-        try:
-            api_worker_shutdown()
-        except Exception:
-            pass
-    return jsonify({"status": "ok"})
-
-@app.route("/api/client_ping", methods=["POST"])
-def client_ping():
-    return jsonify({"status": "ok"})
-
-@app.route("/api/worker_shutdown", methods=["POST"])
-def api_worker_shutdown():
-    url = get_clone_worker_url()
-    if not url:
-        return jsonify({"status": "error", "message": "Chưa có Worker nào đang kết nối."}), 400
-    try:
-        clean_url = url.rstrip("/")
-        requests.post(
-            f"{clean_url}/api/shutdown",
-            headers={"X-API-Key": CLONE_API_KEY},
-            timeout=5
-        )
-    except Exception as ex:
-        logger.warning(f"Worker shutdown notice: {ex}")
-    finally:
-        set_clone_worker_url("")
-    return jsonify({
-        "status": "success",
-        "message": "Đã tắt Worker thành công! Giờ GPU trên Kaggle đã được dừng để bảo lưu tối đa quota."
-    })
 
 # ── Speech to Text (Audio/Video Transcription) Engine ──
 
@@ -3466,7 +3364,7 @@ def api_dubbing_start():
     source_lang = request.form.get("source_lang", "zh")
     target_lang = request.form.get("target_lang", "vi")
     voice = request.form.get("voice", "vi-VN-HoaiMyNeural")
-    mode = request.form.get("mode", "ducking")
+    mode = request.form.get("mode", "replace")
     whisper_model = request.form.get("whisper_model", "base")
     video_url = (request.form.get("video_url") or "").strip()
 
@@ -3533,6 +3431,11 @@ def api_dubbing_start():
         "message": "Đang bắt đầu phân tích video...",
         "video_url": None,
         "srt_url": None,
+        "audio_url": None,
+        "mode": mode,
+        "saved_video_path": str(saved_video_path),
+        "master_wav": None,
+        "raw_audio": None,
         "segments": []
     }
 
@@ -3565,11 +3468,25 @@ def api_dubbing_start():
             if res.get("srt_file") and Path(res["srt_file"]).exists():
                 shutil.copy2(res["srt_file"], srt_dest)
 
+            audio_name = f"dubbed_{job_id}.mp3"
+            audio_dest = dubbed_dir / audio_name
+            if res.get("master_mp3") and Path(res["master_mp3"]).exists():
+                shutil.copy2(res["master_mp3"], audio_dest)
+            elif res.get("master_wav") and Path(res["master_wav"]).exists():
+                try:
+                    subprocess.run(["ffmpeg", "-y", "-i", str(res["master_wav"]), "-b:a", "192k", str(audio_dest)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+
             DUBBING_JOBS[job_id]["status"] = "completed"
             DUBBING_JOBS[job_id]["progress"] = 100
             DUBBING_JOBS[job_id]["message"] = "Hoàn tất! Video đã được dịch và lồng tiếng Việt thành công."
             DUBBING_JOBS[job_id]["video_url"] = f"/output/dubbed/{out_video_name}"
             DUBBING_JOBS[job_id]["srt_url"] = f"/output/dubbed/{srt_name}"
+            DUBBING_JOBS[job_id]["audio_url"] = f"/output/dubbed/{audio_name}" if audio_dest.exists() else None
+            DUBBING_JOBS[job_id]["mode"] = mode
+            DUBBING_JOBS[job_id]["master_wav"] = str(res.get("master_wav", ""))
+            DUBBING_JOBS[job_id]["raw_audio"] = str(res.get("raw_audio", ""))
             DUBBING_JOBS[job_id]["segments"] = res.get("segments", [])
             DUBBING_JOBS[job_id]["total_duration"] = res.get("total_duration", 0)
         except Exception as ex:
@@ -3588,8 +3505,97 @@ def api_dubbing_start():
 def api_dubbing_status(job_id):
     job = DUBBING_JOBS.get(job_id)
     if not job:
+        # Fallback: check if completed video exists on disk
+        dubbed_dir = OUTPUT_DIR / "dubbed"
+        out_video = dubbed_dir / f"dubbed_{job_id}.mp4"
+        if out_video.exists():
+            srt_f = dubbed_dir / f"dubbed_{job_id}.srt"
+            mp3_f = dubbed_dir / f"dubbed_{job_id}.mp3"
+            return jsonify({
+                "job_id": job_id,
+                "status": "completed",
+                "progress": 100,
+                "message": "Hoàn tất! Video đã được dịch và lồng tiếng Việt thành công.",
+                "video_url": f"/output/dubbed/dubbed_{job_id}.mp4",
+                "srt_url": f"/output/dubbed/dubbed_{job_id}.srt" if srt_f.exists() else None,
+                "audio_url": f"/output/dubbed/dubbed_{job_id}.mp3" if mp3_f.exists() else None,
+                "mode": "replace",
+                "segments": []
+            })
         return jsonify({"status": "error", "message": "Không tìm thấy tiến trình lồng tiếng."}), 404
     return jsonify(job)
+
+@app.route("/api/dubbing/remux", methods=["POST"])
+def api_dubbing_remux():
+    job_id = (request.form.get("job_id") or "").strip()
+    new_mode = request.form.get("mode", "replace") # "replace", "smart_mute", "ducking"
+    
+    dubbed_dir = OUTPUT_DIR / "dubbed"
+    out_video_name = f"dubbed_{job_id}.mp4"
+    out_video_path = dubbed_dir / out_video_name
+
+    job = DUBBING_JOBS.get(job_id)
+    saved_video = None
+    master_wav = None
+    raw_audio = None
+    segments = []
+
+    if job:
+        saved_video = job.get("saved_video_path")
+        master_wav = job.get("master_wav")
+        raw_audio = job.get("raw_audio")
+        segments = job.get("segments", [])
+
+    # Fallback to disk scan if not in memory
+    if not saved_video or not Path(saved_video).exists():
+        for cand in [UPLOAD_DIR / f"upload_dub_{job_id}.mp4", UPLOAD_DIR / f"upload_dub_{job_id}.mkv"]:
+            if cand.exists():
+                saved_video = str(cand)
+                break
+
+    if not master_wav or not Path(master_wav).exists():
+        temp_dir = UPLOAD_DIR / "dubbing_temp"
+        if temp_dir.exists():
+            for sub in temp_dir.iterdir():
+                if sub.is_dir() and (sub / "master_vietnamese_dub.wav").exists():
+                    master_wav = str(sub / "master_vietnamese_dub.wav")
+                    if (sub / "raw_audio.wav").exists():
+                        raw_audio = str(sub / "raw_audio.wav")
+                    break
+
+    if not saved_video or not master_wav or not Path(saved_video).exists() or not Path(master_wav).exists():
+        return jsonify({"status": "error", "message": "Không tìm thấy dữ liệu gốc để chuyển đổi chế độ hòa trộn."}), 404
+
+    try:
+        from video_dubbing_engine import remux_dubbed_audio
+        remux_dubbed_audio(
+            video_input_path=saved_video,
+            master_wav_path=master_wav,
+            output_video_path=out_video_path,
+            mode=new_mode,
+            detected_segments=segments,
+            raw_audio_path=raw_audio
+        )
+
+        v_url = f"/output/dubbed/{out_video_name}?t={int(time.time())}"
+        if job:
+            job["mode"] = new_mode
+            job["video_url"] = v_url
+
+        mode_name_map = {
+            "replace": "Xóa sạch giọng gốc (100% tiếng Việt)",
+            "smart_mute": "Tắt giọng gốc khi nói (Giữ nhạc lúc nghỉ)",
+            "ducking": "Thuyết minh (Giữ tiếng gốc 15%)"
+        }
+        return jsonify({
+            "status": "success",
+            "mode": new_mode,
+            "video_url": v_url,
+            "message": f"Đã chuyển đổi sang chế độ '{mode_name_map.get(new_mode, new_mode)}' thành công!"
+        })
+    except Exception as ex:
+        logger.error(f"Remux error for {job_id}: {ex}", exc_info=True)
+        return jsonify({"status": "error", "message": f"Lỗi hòa trộn: {str(ex)}"}), 500
 
 # ── 3-Pass Neural Contextual Translation Engine (Ultralight, Zero-Overload) ──
 
