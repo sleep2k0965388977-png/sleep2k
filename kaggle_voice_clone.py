@@ -7,6 +7,11 @@
 import os, sys, time, uuid, subprocess, re, json, urllib.request, threading, hashlib
 from pathlib import Path
 
+# Vô hiệu hóa CUDA graph capture lỗi trên PyTorch Colab/Kaggle
+os.environ["VIENEU_FUSED_FRAME"] = "0"
+os.environ["TORCH_CUDA_GRAPH"] = "0"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 print("=" * 70)
 print("🚀 [1/4] SLEEP2K KAGGLE WORKER: Đang cài đặt thư viện AI 48kHz...")
 print("=" * 70)
@@ -159,6 +164,15 @@ def clone_voice():
             wav_data = tts.infer(text, **infer_kwargs)
         except TypeError:
             wav_data = tts.infer(text, ref_audio=str(clean_wav), speed=rate, denoise=True)
+        except Exception as e_inf:
+            print(f"⚠️ CUDA infer warning ({e_inf}), đang chuyển sang chế độ suy luận an toàn...")
+            try:
+                wav_data = tts.infer(text, ref_audio=str(clean_wav), speed=rate)
+            except Exception as e_inf2:
+                print(f"⚠️ Đang nạp engine ONNX siêu ổn định ({e_inf2})...")
+                if not hasattr(app, "_onnx_engine"):
+                    app._onnx_engine = Vieneu(backend="onnx")
+                wav_data = app._onnx_engine.infer(text, ref_audio=str(clean_wav), speed=rate)
 
         infer_time = time.time() - t0
         print(f"✨ [Kaggle GPU] Tạo xong '{text[:30]}...' trong {infer_time:.2f}s!")
