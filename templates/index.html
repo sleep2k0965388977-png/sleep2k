@@ -2543,14 +2543,19 @@
                 </summary>
                 <div style="margin-top: 10px; font-size: 11.5px; color: #cbd5e1;">
                     <div style="margin-bottom: 6px;">URL kết nối Worker (Ngrok / Cloudflared):</div>
-                    <div style="display:flex; gap:6px;">
-                        <input type="text" id="cloneWorkerUrlInput" placeholder="VD: https://xxxx.ngrok-free.app hoặc https://xxxx.trycloudflare.com" style="flex:1; background:rgba(0,0,0,0.4); border:1px solid rgba(168,85,247,0.4); border-radius:6px; padding:7px 10px; color:#fff; font-size:12px; outline:none;" title="Dán link Worker GPU của bạn vào đây">
-                        <button type="button" onclick="saveWorkerUrlFromUI()" style="background:linear-gradient(135deg,#10b981,#059669); color:#fff; border:none; padding:7px 14px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;">
-                            <i class="fa-solid fa-floppy-disk"></i> Lưu URL
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <input type="text" id="cloneWorkerUrlInput" placeholder="VD: https://xxxx.trycloudflare.com hoặc https://xxxx.ngrok-free.app" style="flex:1; min-width:200px; background:rgba(0,0,0,0.4); border:1px solid rgba(168,85,247,0.4); border-radius:6px; padding:8px 10px; color:#fff; font-size:12px; outline:none;" title="Dán link Worker GPU của bạn vào đây">
+                        <button type="button" id="btnTestWorkerConnection" onclick="testWorkerConnectionFromUI()" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8); color:#fff; border:none; padding:8px 15px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; box-shadow:0 2px 8px rgba(59,130,246,0.4);">
+                            <i class="fa-solid fa-plug-circle-bolt" id="connectWorkerIcon"></i> <span id="connectWorkerBtnText">Kiểm Tra & Kết Nối Worker</span>
+                        </button>
+                        <button type="button" onclick="saveWorkerUrlFromUI()" style="background:linear-gradient(135deg,#10b981,#059669); color:#fff; border:none; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;">
+                            <i class="fa-solid fa-floppy-disk"></i> Lưu
                         </button>
                     </div>
-                    <div style="font-size: 10.5px; color: #94a3b8; margin-top: 6px; line-height: 1.4;">
-                        ☁️ Bộ máy Cloud AI hoạt động trực tiếp 24/7 trên VPS (không cần bật máy tính cá nhân). Tùy chọn: Bạn có thể kết nối thêm Worker cá nhân (GPU T4/RTX) qua URL nếu muốn tăng tốc xử lý.
+                    <!-- Live Connection Feedback Box -->
+                    <div id="workerConnectionResult" style="display:none; margin-top:8px; padding:9px 12px; border-radius:6px; font-size:11.5px; line-height:1.4;"></div>
+                    <div style="font-size: 10.5px; color: #94a3b8; margin-top: 8px; line-height: 1.4;">
+                        💡 <b>Cách kết nối:</b> Bấm <b>"Mở Google Colab T4 GPU"</b> bên dưới ➔ Bấm nút <b>Chạy (▶️)</b> trên Colab ➔ Chờ hiện <b>"KẾT NỐI THÀNH CÔNG"</b> ➔ Quay lại đây bấm nút <b>"Kiểm Tra & Kết Nối Worker"</b> để kích hoạt GPU tạo giọng 48kHz!
                     </div>
                     <!-- Nút mở GPU Worker miễn phí -->
                     <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
@@ -3299,6 +3304,15 @@
                             customName = savedCustom[selectedVoice].name;
                         }
                     } catch (e_g) {}
+                    // Auto-sync worker URL if stored in browser
+                    const cachedWorkerUrl = localStorage.getItem('sleep2k_clone_worker_url');
+                    if (cachedWorkerUrl) {
+                        fetch('/api/set_clone_worker_url', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ worker_url: cachedWorkerUrl })
+                        }).catch(() => {});
+                    }
                 }
                 const resp = await fetch("/api/generate_job", { 
                     method:"POST", 
@@ -4819,21 +4833,122 @@
                     localStorage.setItem('sleep2k_clone_worker_url', data.worker_url);
                 }
 
-                if (data.status === 'online') {
-                    badge.style.background = 'rgba(16,185,129,0.2)';
-                    badge.style.color = '#10b981';
-                    if (data.mode === 'external') {
+                if (badge) {
+                    if (data.mode === 'external' && data.status === 'online') {
+                        badge.style.background = 'rgba(16,185,129,0.2)';
+                        badge.style.color = '#10b981';
                         badge.innerText = '🟢 Dedicated Worker (' + (data.gpu || 'GPU') + ')';
+                    } else if (data.mode === 'failed' || data.status === 'offline') {
+                        badge.style.background = 'rgba(239,68,68,0.2)';
+                        badge.style.color = '#f87171';
+                        badge.innerText = '🔴 Worker Mất Kết Nối';
                     } else {
+                        badge.style.background = 'rgba(16,185,129,0.2)';
+                        badge.style.color = '#10b981';
                         badge.innerText = '🟢 Cloud AI Online (Trực tuyến 24/7)';
                     }
-                } else {
-                    badge.style.background = 'rgba(16,185,129,0.2)';
-                    badge.style.color = '#10b981';
-                    badge.innerText = '🟢 Cloud AI Online (Trực tuyến 24/7)';
                 }
             } catch (e) {
                 console.log('Worker status error:', e);
+            }
+        }
+
+        async function testWorkerConnectionFromUI() {
+            const btn = document.getElementById('btnTestWorkerConnection');
+            const icon = document.getElementById('connectWorkerIcon');
+            const textSpan = document.getElementById('connectWorkerBtnText');
+            const input = document.getElementById('cloneWorkerUrlInput');
+            const badge = document.getElementById('workerStatusBadge');
+            const resultBox = document.getElementById('workerConnectionResult');
+
+            if (btn) btn.disabled = true;
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
+            if (textSpan) textSpan.innerText = 'Đang kiểm tra kết nối...';
+
+            const inputUrl = input ? input.value.trim() : '';
+
+            try {
+                // Nếu người dùng có nhập URL, lưu và gửi lên server trước
+                if (inputUrl) {
+                    localStorage.setItem('sleep2k_clone_worker_url', inputUrl);
+                    await fetch('/api/set_clone_worker_url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ worker_url: inputUrl })
+                    }).catch(() => {});
+                } else {
+                    const cachedUrl = localStorage.getItem('sleep2k_clone_worker_url') || '';
+                    if (cachedUrl) {
+                        await fetch('/api/set_clone_worker_url', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ worker_url: cachedUrl })
+                        }).catch(() => {});
+                    }
+                }
+
+                const resp = await fetch('/api/clone_worker_status');
+                const data = await resp.json();
+
+                if (resultBox) resultBox.style.display = 'block';
+
+                if (data.mode === 'external' && data.status === 'online') {
+                    if (input && data.worker_url) {
+                        input.value = data.worker_url;
+                        localStorage.setItem('sleep2k_clone_worker_url', data.worker_url);
+                    }
+                    if (badge) {
+                        badge.style.background = 'rgba(16,185,129,0.2)';
+                        badge.style.color = '#10b981';
+                        badge.innerText = '🟢 Worker Online (' + (data.gpu || 'GPU') + ')';
+                    }
+                    if (resultBox) {
+                        resultBox.style.background = 'rgba(16,185,129,0.15)';
+                        resultBox.style.border = '1px solid rgba(16,185,129,0.4)';
+                        resultBox.style.color = '#34d399';
+                        resultBox.innerHTML = '<i class="fa-solid fa-circle-check" style="font-size:14px; margin-right:4px;"></i> <b>ĐÃ KẾT NỐI THÀNH CÔNG VỚI GOOGLE COLAB!</b><br><span style="margin-top:4px; display:inline-block;">⚡ <b>Phần cứng:</b> ' + (data.gpu || 'NVIDIA T4') + '</span><br><span style="font-size:11px; opacity:0.9;">🔗 <b>URL:</b> ' + (data.worker_url || '') + '</span><br><span style="color:#6ee7b7; font-weight:600; margin-top:2px; display:inline-block;">Mô hình VieNeu 48kHz đã sẵn sàng tạo giọng siêu thực!</span>';
+                    }
+                    showToast('Đã kết nối thành công với Worker GPU (' + (data.gpu || 'Colab') + ')!', 'success');
+                } else if (data.mode === 'failed' || data.status === 'offline') {
+                    if (badge) {
+                        badge.style.background = 'rgba(239,68,68,0.2)';
+                        badge.style.color = '#f87171';
+                        badge.innerText = '🔴 Worker Mất Kết Nối';
+                    }
+                    if (resultBox) {
+                        resultBox.style.background = 'rgba(239,68,68,0.15)';
+                        resultBox.style.border = '1px solid rgba(239,68,68,0.4)';
+                        resultBox.style.color = '#f87171';
+                        resultBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="font-size:14px; margin-right:4px;"></i> <b>Không thể kết nối tới Worker URL:</b><br><span style="font-family:monospace; word-break:break-all;">' + (data.worker_url || inputUrl) + '</span><br><div style="margin-top:6px; color:#cbd5e1; font-size:11px;">⚠️ <b>Khắc phục:</b> Hãy quay lại tab Colab: xem ô code có đang chạy không. Nếu bạn vừa chạy lại ô code, hãy copy đường dẫn <code>https://xxxx.trycloudflare.com</code> mới từ Colab dán vào ô trên rồi bấm nút này lại.</div>';
+                    }
+                    showToast('Không thể kết nối tới Worker URL. Vui lòng kiểm tra tab Colab!', 'warning');
+                } else {
+                    // mode === 'cloud'
+                    if (badge) {
+                        badge.style.background = 'rgba(16,185,129,0.2)';
+                        badge.style.color = '#10b981';
+                        badge.innerText = '🟢 Cloud AI Online (Trực tuyến 24/7)';
+                    }
+                    if (resultBox) {
+                        resultBox.style.background = 'rgba(245,158,11,0.15)';
+                        resultBox.style.border = '1px solid rgba(245,158,11,0.4)';
+                        resultBox.style.color = '#fbbf24';
+                        resultBox.innerHTML = '<i class="fa-solid fa-circle-info" style="font-size:14px; margin-right:4px;"></i> <b>Chưa phát hiện Worker Colab/Kaggle!</b><br><div style="margin-top:4px; color:#e2e8f0; font-size:11px; line-height:1.5;"><b>1.</b> Hãy chắc chắn bạn đã mở Colab và bấm nút <b>Chạy (▶️)</b> trên ô code.<br><b>2.</b> Chờ ~2 phút đến khi ô code Colab in ra dòng <code>🎉 KẾT NỐI THÀNH CÔNG!</code>.<br><b>3.</b> Sau đó bấm lại nút <b>"Kiểm Tra & Kết Nối Worker"</b> này.<br><i>(Hoặc bạn có thể copy link Cloudflare từ Colab dán vào ô rồi bấm Lưu)</i></div>';
+                    }
+                    showToast('Chưa phát hiện Worker Colab. Hãy bật ô code trên Colab trước!', 'info');
+                }
+            } catch (err) {
+                if (resultBox) {
+                    resultBox.style.display = 'block';
+                    resultBox.style.background = 'rgba(239,68,68,0.15)';
+                    resultBox.style.border = '1px solid rgba(239,68,68,0.4)';
+                    resultBox.style.color = '#f87171';
+                    resultBox.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Lỗi kiểm tra kết nối: ' + err.message;
+                }
+            } finally {
+                if (btn) btn.disabled = false;
+                if (icon) icon.className = 'fa-solid fa-plug-circle-bolt';
+                if (textSpan) textSpan.innerText = 'Kiểm Tra & Kết Nối Worker';
             }
         }
 
@@ -4856,9 +4971,15 @@
                 });
                 const data = await resp.json();
                 if (data.status === 'success') {
-                    alert('Đã lưu URL Worker AI! Trình duyệt sẽ ghi nhớ URL này vĩnh viễn không bao giờ bị mất.');
-                    checkWorkerStatusUI();
+                    showToast('Đã lưu URL Worker AI vào trình duyệt!', 'success');
+                    testWorkerConnectionFromUI();
+                } else {
+                    alert('Lỗi lưu worker: ' + (data.message || 'Không xác định'));
                 }
+            } catch (e) {
+                alert('Lỗi lưu worker: ' + e.message);
+            }
+        }
             } catch (e) {
                 alert('Lỗi lưu worker: ' + e.message);
             }
