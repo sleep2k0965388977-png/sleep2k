@@ -870,34 +870,10 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     female_keywords = ["nữ", "nu", "mẹ", "me", "chị", "chi", "cô", "co", "bà", "ba", "gái", "female", "girl", "woman", "hoaimy", "mai_anh", "thuy_dung", "ngoc_huyen", "ngoc_tran", "ngoc_linh", "doan_trang", "thuc_doan", "my_duyen", "quynh_anh", "kim_thanh", "bich_ngoc", "thanh_thao"]
 
     is_male = False
-    f0 = 160.0
     if any(m in voice_str for m in male_keywords):
         is_male = True
-        f0 = 125.0
     elif any(f in voice_str for f in female_keywords):
         is_male = False
-        f0 = 210.0
-    elif ref_file and ref_file.exists() and ref_file.stat().st_size > 1000:
-        try:
-            import soundfile as sf
-            import numpy as np
-            sig, sr = sf.read(str(ref_file))
-            if len(sig.shape) > 1:
-                sig = sig[:, 0]
-            chunk = sig[int(sr * 0.5):int(sr * 3.5)] if len(sig) > sr * 3.5 else sig
-            corr = np.correlate(chunk, chunk, mode='full')
-            corr = corr[len(corr) // 2:]
-            min_lag = int(sr / 350)
-            max_lag = int(sr / 75)
-            peak_lag = min_lag + int(np.argmax(corr[min_lag:max_lag]))
-            f0 = sr / peak_lag
-            is_male = (f0 < 165.0)
-        except Exception:
-            is_male = False
-
-    base_f0 = 125.0 if is_male else 210.0
-    pitch_offset = max(-35, min(35, int(round(f0 - base_f0))))
-    pitch_str = f"{pitch_offset:+d}Hz"
 
     # 1. CapCut Neural Voice Synthesis (Fast, studio quality, 100% reliable on Cloud/Datacenter IPs)
     cap_aud = capcut_synthesize_fallback(text_chunk, is_male=is_male, rate=rate)
