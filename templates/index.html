@@ -1618,7 +1618,7 @@
                             </span>
                         </div>
                         <div style="font-size:11.5px; color:#a1a1aa; line-height:1.45;">
-                            Tự ngắt câu thông minh mỗi 1.000 – 1.600 ký tự. 🟢 <em>Tối ưu tuyệt đối cho mọi độ dài văn bản, không sợ gián đoạn.</em>
+                            Tự ngắt câu thông minh chuẩn 240 ký tự. 🟢 <em>Tối ưu phát âm tròn vành rõ chữ 100%, không bị nuốt âm.</em>
                         </div>
                     </div>
 
@@ -2774,19 +2774,19 @@
             const text = (ta ? ta.value : "") || "";
             const charLen = text.length;
 
-            const chunkSize = cloneCharLimit === 2000 ? 1600 : 4000;
+            const chunkSize = 240;
             const estChunks = charLen > 0 ? Math.ceil(charLen / chunkSize) : 0;
 
             const curSpan = document.getElementById("cloneCurrentChars");
             const estChunksEl = document.getElementById("cloneEstimatedChunks");
             if (curSpan) curSpan.innerText = charLen.toLocaleString();
-            if (estChunksEl) estChunksEl.innerText = `(~${estChunks} đoạn)`;
+            if (estChunksEl) estChunksEl.innerText = `(~${estChunks} đoạn chuẩn 240 ký tự)`;
 
             if (badge) {
                 if (charLen === 0) {
                     badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giọng Clone: 0 ký tự (~0 đoạn)`;
                 } else {
-                    badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giọng Clone: ${charLen.toLocaleString()} ký tự (~${estChunks} đoạn x ${cloneCharLimit === 2000 ? '1.600' : '4.000'})`;
+                    badge.innerHTML = `<i class="fa-solid fa-sparkles"></i> Giọng Clone: ${charLen.toLocaleString()} ký tự (~${estChunks} đoạn x 240 ký tự tròn chữ)`;
                 }
                 badge.style.color = '#c084fc';
                 badge.style.fontWeight = '700';
