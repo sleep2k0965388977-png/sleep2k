@@ -7,31 +7,22 @@
 import os, sys, time, uuid, subprocess, re, json, urllib.request
 from pathlib import Path
 
-# ── BẢO VỆ ONNX / VIENEU TƯƠNG THÍCH ──────────────────────────────────────────
-# onnxruntime >= 1.18 chặn external data path, cần hạ xuống 1.17.3
-try:
-    import onnxruntime as _ort
-    _v = [int(x) for x in _ort.__version__.split('.')[:2]]
-    if _v[0] > 1 or (_v[0] == 1 and _v[1] >= 18):
-        print(f"🔧 Đang hạ onnxruntime {_ort.__version__} xuống 1.17.3 tương thích VieNeu...")
-        os.system("pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-training >/dev/null 2>&1")
-        os.system("pip install -q onnxruntime==1.17.3")
-except ImportError:
-    pass
-
-print("🚀 [1/4] Đang cài đặt thư viện AI âm thanh 48kHz & Cloudflare Tunnel...")
-os.system("pip install -q vieneu flask soundfile imageio-ffmpeg")
-
-# ── ĐẢM BẢO ONNX / VIENEU TƯƠNG THÍCH ──────────────────────────────────────────
-# onnxruntime >= 1.18 chặn external data path, bắt buộc hạ xuống 1.17.3 sau khi cài vieneu
-print("🔧 [1.5/4] Đang cấu hình onnxruntime 1.17.3 tương thích VieNeu...")
-os.system("pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-training >/dev/null 2>&1")
-os.system("pip install -q onnxruntime==1.17.3")
+print("🚀 [1/3] Đang cài đặt thư viện AI VieNeu 48kHz Studio & Cloudflare Tunnel...")
+os.system("pip install -q vieneu onnxruntime flask soundfile imageio-ffmpeg")
 
 # Tải Cloudflared binary cho Linux 64-bit
 if not os.path.exists("/usr/local/bin/cloudflared"):
     os.system("curl -sLo /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64")
     os.system("chmod +x /usr/local/bin/cloudflared")
+
+# Đảm bảo onnxruntime luôn có sẵn cho Speaker Encoder
+try:
+    import onnxruntime as _ort
+    print(f"✅ ONNX Runtime Engine đã sẵn sàng: phiên bản {_ort.__version__}")
+except ImportError:
+    print("🔧 Đang bổ sung onnxruntime...")
+    os.system("pip install onnxruntime")
+    import onnxruntime as _ort
 
 print("💎 [2/4] Đang nạp mô hình AI VieNeu Studio 48kHz trên GPU...")
 import soundfile as sf
@@ -42,7 +33,11 @@ from flask import Flask, request, jsonify, send_file
 gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "GPU"
 print(f"✅ Card đồ họa phát hiện: {gpu_name}")
 
-tts = Vieneu()
+try:
+    tts = Vieneu()
+except Exception as e_load:
+    print(f"⚠️ Đang thử nạp lại qua backend PyTorch: {e_load}")
+    tts = Vieneu(backend="pytorch")
 sr = getattr(tts, "sample_rate", 48000)
 print(f"✅ Mô hình AI 48kHz Studio (Sample Rate: {sr}Hz) đã nạp thành công!")
 
