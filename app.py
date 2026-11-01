@@ -47,6 +47,7 @@ def get_ffmpeg_exe():
     return "ffmpeg"
 
 FFMPEG_BIN = get_ffmpeg_exe()
+IS_CLOUD_ENV = bool(os.environ.get("RENDER") or os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("PORT") or Path("/.dockerenv").exists())
 
 # ── 🔒 SECURITY: API Protection + Anti-Bot/DDOS ──
 # Không cần đăng nhập — app mở cho mọi người
@@ -242,7 +243,7 @@ def capcut_synthesize_fallback(text, is_male=False, rate="1.0"):
         logger.warning(f"CapCut fallback error: {ex}")
     return None
 
-def edge_tts_synthesize_audio(text, voice_type, rate="1.0", pitch="+0Hz", max_retries=1, timeout_sec=4.0):
+def edge_tts_synthesize_audio(text, voice_type, rate="1.0", pitch="+0Hz", max_retries=1, timeout_sec=3.0):
     """Synthesize voice using Microsoft Edge-TTS with custom rate and pitch and self-healing retries."""
     if not text or not text.strip():
         return b""
@@ -270,11 +271,16 @@ def edge_tts_synthesize_audio(text, voice_type, rate="1.0", pitch="+0Hz", max_re
             if res and len(res) > 0:
                 return res
         except Exception as ex:
-            print(f"Edge-TTS attempt {attempt}/{max_retries} failed for voice {voice_type}: {ex}")
+            logger.warning(f"Edge-TTS attempt {attempt}/{max_retries} failed for voice {voice_type}: {ex}")
             if attempt < max_retries:
-                time.sleep(0.3 * attempt)
+                time.sleep(0.2 * attempt)
         finally:
             try:
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
                 loop.close()
             except Exception:
                 pass
@@ -890,16 +896,17 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     pitch_offset = max(-35, min(35, int(round(f0 - base_f0))))
     pitch_str = f"{pitch_offset:+d}Hz"
 
-    # 1. Edge-TTS with tailored vocal pitch
-    fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
-    fb_res = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, pitch=pitch_str, max_retries=1, timeout_sec=3.5)
-    if fb_res and len(fb_res) > 500:
-        return fb_res
-
-    # 2. CapCut neural fallback (immune to cloud IP blocks)
+    # 1. CapCut Neural Voice Synthesis (Fast, studio quality, 100% reliable on Cloud/Datacenter IPs)
     cap_aud = capcut_synthesize_fallback(text_chunk, is_male=is_male, rate=rate)
     if cap_aud and len(cap_aud) > 500:
         return cap_aud
+
+    # 2. Edge-TTS with tailored vocal pitch (fallback when running locally / non-cloud)
+    if not IS_CLOUD_ENV:
+        fb_voice = "vi-VN-NamMinhNeural" if is_male else "vi-VN-HoaiMyNeural"
+        fb_res = edge_tts_synthesize_audio(text_chunk, fb_voice, rate=rate, pitch=pitch_str, max_retries=1, timeout_sec=2.5)
+        if fb_res and len(fb_res) > 500:
+            return fb_res
 
     return generate_silent_mp3_bytes(300)
 
@@ -1388,6 +1395,11 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     # 1. VieNeu AI voices with distinct acoustic profiles & neural fallback ──
     if is_vieneu_voice(voice):
         is_male = any(m in voice for m in ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son"])
+        if IS_CLOUD_ENV:
+            cap_aud = capcut_synthesize_fallback(text_chunk, is_male=is_male, rate=rate)
+            if cap_aud and len(cap_aud) > 500:
+                return idx, cap_aud, int(len(text_chunk) / 16 * 1000)
+
         try:
             audio_bytes = vieneu_synthesize_audio(text_chunk, voice, rate=rate)
             if audio_bytes and len(audio_bytes) > 500:
@@ -1407,8 +1419,13 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     # ── 2. Edge-TTS Neural voices with auto-retry and alternate voice fallback ──
     if is_edge_tts_voice(voice):
         is_male = "NamMinh" in str(voice) or "male" in str(voice).lower()
+        if IS_CLOUD_ENV:
+            cap_aud = capcut_synthesize_fallback(text_chunk, is_male=is_male, rate=rate)
+            if cap_aud and len(cap_aud) > 500:
+                return idx, cap_aud, int(len(text_chunk) / 16 * 1000)
+
         try:
-            audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate, max_retries=1, timeout_sec=4.0)
+            audio_bytes = edge_tts_synthesize_audio(text_chunk, voice, rate=rate, max_retries=1, timeout_sec=3.0)
             if audio_bytes and len(audio_bytes) > 500:
                 est_duration = int(len(text_chunk) / 16 * 1000)
                 return idx, audio_bytes, est_duration
@@ -1501,8 +1518,8 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_si
         durations = [0] * total_chunks
         completed_count = 0
 
-        # Run chunk requests: 1 worker at a time for Clone voices (GPU/CPU stability), 3 workers for cloud voices
-        pool_workers = 1 if is_clone else 3
+        # Run chunk requests in parallel (3 workers for optimal throughput and zero delays)
+        pool_workers = 3
         with ThreadPoolExecutor(max_workers=pool_workers) as executor:
             futures = [
                 executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate, lan)
