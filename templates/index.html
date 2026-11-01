@@ -3347,7 +3347,7 @@
                         const sr = await fetch(`/api/job_status/${jobId}`);
                         if (!sr.ok) {
                             consecutiveErrors++;
-                            if (consecutiveErrors >= 50) {
+                            if (consecutiveErrors >= 100) {
                                 clearInterval(pollInterval);
                                 window._activeTtsInterval = null;
                                 progressCard.classList.remove("show");
