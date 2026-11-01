@@ -120,16 +120,16 @@ def check_and_heal_app():
     txt = APP_PY.read_text(encoding="utf-8", errors="ignore")
     modified = False
 
-    # Check timeout for worker clone (avoid freeze on slow worker)
+    # Check timeout for worker clone (keep between 45s and 90s for high-quality neural voice synthesis)
     m_timeout = re.search(r'requests\.post\(\s*f"\{clean_url\}/api/clone".*?timeout=(\d+)', txt, re.DOTALL)
-    if m_timeout and int(m_timeout.group(1)) > 30:
+    if m_timeout and int(m_timeout.group(1)) > 90:
         txt = re.sub(
             r'(requests\.post\(\s*f"\{clean_url\}/api/clone".*?timeout=)(\d+)',
-            r'\g<1>25',
+            r'\g<1>75',
             txt
         )
         modified = True
-        log_heal("Đã giảm timeout Worker clone từ >30s xuống 25s trong app.py (tránh đứng ở 5%)")
+        log_heal("Đã cân chỉnh timeout Worker clone trong app.py về 75s an toàn")
 
     # Check watchdog timeout
     m_watchdog = re.search(r'time\.time\(\)\s*-\s*started\s*>\s*(\d+)', txt)
