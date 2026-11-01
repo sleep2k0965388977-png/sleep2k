@@ -595,21 +595,27 @@ def get_clone_worker_url():
     """Retrieve the AI Clone Worker URL from environment or persistent config file."""
     env_url = os.environ.get("CLONE_WORKER_URL", "").strip()
     if env_url:
-        return env_url
+        if "colab.research.google.com" not in env_url and "github.com" not in env_url:
+            return env_url
     if WORKER_CONFIG_FILE.exists():
         try:
             with open(WORKER_CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data.get("worker_url", "").strip()
+                u = data.get("worker_url", "").strip()
+                if "colab.research.google.com" not in u and "github.com" not in u:
+                    return u
         except Exception:
             pass
     return ""
 
 def set_clone_worker_url(url):
     """Save the AI Clone Worker URL to persistent config file."""
+    clean = url.strip()
+    if "colab.research.google.com" in clean or "github.com" in clean:
+        clean = ""
     try:
         with open(WORKER_CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump({"worker_url": url.strip()}, f, ensure_ascii=False, indent=2)
+            json.dump({"worker_url": clean}, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
         print(f"Error saving worker URL: {e}")
@@ -822,7 +828,7 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
                     headers={"X-API-Key": CLONE_API_KEY},
                     files={"audio": (ref_file.name, af, "audio/wav")},
                     data={"text": text_chunk, "rate": rate},
-                    timeout=75
+                    timeout=25
                 )
             if resp.status_code == 200 and len(resp.content) > 500:
                 return resp.content
