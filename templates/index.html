@@ -4815,7 +4815,12 @@
                 const badge = document.getElementById('workerStatusBadge');
 
                 // 1. Phục hồi ngay từ localStorage nếu server bị restart
-                const cachedUrl = localStorage.getItem('sleep2k_clone_worker_url') || '';
+                let cachedUrl = localStorage.getItem('sleep2k_clone_worker_url') || '';
+                if (cachedUrl && (cachedUrl.includes('colab.research.google.com') || cachedUrl.includes('github.com'))) {
+                    localStorage.removeItem('sleep2k_clone_worker_url');
+                    cachedUrl = '';
+                    if (input) input.value = '';
+                }
                 if (cachedUrl && input && !input.value) {
                     input.value = cachedUrl;
                     fetch('/api/set_clone_worker_url', {
@@ -4866,6 +4871,17 @@
             if (textSpan) textSpan.innerText = 'Đang kiểm tra kết nối...';
 
             const inputUrl = input ? input.value.trim() : '';
+
+            if (inputUrl && (inputUrl.includes('colab.research.google.com') || inputUrl.includes('github.com'))) {
+                showToast('⚠️ Link Colab không phải là URL kết nối Worker! Vui lòng bấm nút Play (▶️) trên Colab để nhận link trycloudflare.com.', 'warning', 10000);
+                if (input) input.value = '';
+                localStorage.removeItem('sleep2k_clone_worker_url');
+                fetch('/api/set_clone_worker_url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ worker_url: '' }) }).catch(() => {});
+                if (btn) btn.disabled = false;
+                if (icon) icon.className = 'fa-solid fa-plug-circle-bolt';
+                if (textSpan) textSpan.innerText = 'Kiểm Tra & Kết Nối Worker';
+                return;
+            }
 
             try {
                 // Nếu người dùng có nhập URL, lưu và gửi lên server trước
