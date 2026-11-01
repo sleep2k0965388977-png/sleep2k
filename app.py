@@ -581,6 +581,115 @@ DUBBING_JOBS = {}
 
 CUSTOM_VOICES_DIR = UPLOAD_DIR / "custom_voices"
 CUSTOM_VOICES_DIR.mkdir(parents=True, exist_ok=True)
+PRESET_VOICES_DIR = Path(__file__).parent / "static" / "preset_voices"
+PRESET_VOICES_DIR.mkdir(parents=True, exist_ok=True)
+
+STUDIO_PRESET_VOICES = [
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7252594014782755330",
+        "voice_type": "preset_vn_girl",
+        "display_name": "🌸 Nữ Tự Nhiên (Ngọt Ngào, Trong Trẻo) ⭐⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": True,
+        "is_studio": True,
+        "ref_audio": "preset_vn_girl.wav",
+        "preview_url": "/static/preset_voices/preset_vn_girl.mp3",
+        "description": "Giọng nữ trẻ, thanh thoát, ngọt ngào, giàu cảm xúc tự sự và kể chuyện (Dataset 2H người thật)"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7252594014782755330",
+        "voice_type": "preset_ban_mai",
+        "display_name": "🌸 Ban Mai (Dịu Dàng, Chuẩn Phát Thanh) ⭐⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": True,
+        "is_studio": True,
+        "ref_audio": "preset_ban_mai.wav",
+        "preview_url": "/static/preset_voices/preset_ban_mai.mp3",
+        "description": "Giọng nữ miền Bắc dịu dàng, chuẩn phát thanh viên, rất truyền cảm (CCVoice & Wyoming)"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7252594014782755330",
+        "voice_type": "preset_nho_ngot_ngao",
+        "display_name": "🌸 Nhỏ Ngọt Ngào (Miền Nam Ngọt Êm) ⭐⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": True,
+        "is_studio": True,
+        "ref_audio": "preset_nho_ngot_ngao.wav",
+        "preview_url": "/static/preset_voices/preset_nho_ngot_ngao.mp3",
+        "description": "Giọng nữ miền Nam ngọt ngào, êm ái, dễ thương, tự nhiên (CCVoice NhoNgotNgao)"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7252594014782755330",
+        "voice_type": "preset_mai_chi",
+        "display_name": "🌸 Mai Chi (Nữ Bắc Thân Thiện, Tự Nhiên) ⭐⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": True,
+        "is_studio": True,
+        "ref_audio": "preset_mai_chi.wav",
+        "preview_url": "/static/preset_voices/preset_mai_chi.mp3",
+        "description": "Giọng nữ miền Bắc nhẹ nhàng, thân thiện, tự nhiên như trò chuyện ngoài đời thực (Wyoming ZeroTTS)"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7252594014782755330",
+        "voice_type": "preset_mai_phuong",
+        "display_name": "🌸 Mai Phương (Nữ Bắc Ấm Áp Đọc Sách) ⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": True,
+        "is_studio": True,
+        "ref_audio": "preset_mai_phuong.wav",
+        "preview_url": "/static/preset_voices/preset_mai_phuong.mp3",
+        "description": "Giọng nữ miền Bắc nhẹ nhàng, ấm áp, sâu lắng, chuyên đọc sách và tin tức dài"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7252594014782755330",
+        "voice_type": "preset_mai_am_ap",
+        "display_name": "🌸 Chị Mai (Ấm Áp, Truyền Cảm) ⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": True,
+        "is_studio": True,
+        "ref_audio": "preset_mai_am_ap.wav",
+        "preview_url": "/static/preset_voices/preset_mai_am_ap.mp3",
+        "description": "Giọng nữ ấm áp, đĩnh đạc, phong cách phát thanh tin tức (CCVoice Mai)"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7252594014782755330",
+        "voice_type": "preset_review_new",
+        "display_name": "🌸 Review Truyện & Phim (Cuốn Hút) ⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": True,
+        "is_studio": True,
+        "ref_audio": "preset_review_new.wav",
+        "preview_url": "/static/preset_voices/preset_review_new.mp3",
+        "description": "Giọng nữ phong cách review phim, tóm tắt truyện, nhịp điệu cuốn hút (CCVoice ReviewNew)"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7252594014782755330",
+        "voice_type": "preset_nu_pho_thong",
+        "display_name": "🌸 Nữ Phổ Thông (Trong Sáng, Rõ Chữ) ⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": True,
+        "is_studio": True,
+        "ref_audio": "preset_nu_pho_thong.wav",
+        "preview_url": "/static/preset_voices/preset_nu_pho_thong.mp3",
+        "description": "Giọng nữ phổ thông tự nhiên, rõ chữ, thanh lịch (CCVoice NuPhoThong)"
+    }
+]
 WORKER_CONFIG_FILE = Path(__file__).parent / "worker_config.json"
 CLONE_API_KEY = os.environ.get("CLONE_API_KEY", "sleep2k_clone_2024")
 
@@ -758,7 +867,7 @@ def delete_custom_voice_entry(voice_type):
     return True
 
 def is_clone_voice(voice):
-    return str(voice or "").startswith("clone_")
+    return str(voice or "").startswith("clone_") or str(voice or "").startswith("preset_")
 
 _NANO_TTS_INSTANCE = None
 _NANO_LOCK = threading.Lock()
@@ -819,7 +928,11 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     """
     vinfo = find_voice_info(voice)
     ref_filename = (vinfo.get("ref_audio") if vinfo else None) or f"{voice}.wav"
-    ref_file = CUSTOM_VOICES_DIR / ref_filename
+    ref_file = PRESET_VOICES_DIR / ref_filename
+    if not ref_file.exists():
+        ref_file = CUSTOM_VOICES_DIR / ref_filename
+    if not ref_file.exists():
+        ref_file = PRESET_VOICES_DIR / f"{voice}.wav"
     if not ref_file.exists():
         ref_file = CUSTOM_VOICES_DIR / f"{voice}.wav"
     
@@ -989,6 +1102,8 @@ def run_stt_with_adaptive_queue(job_id, saved_path, language):
 
 def load_voices(session_id=None):
     voices = []
+    # 0. High Quality Real Human Studio Preset Voices (Always available, top priority)
+    voices.extend(STUDIO_PRESET_VOICES)
     # 1. Temporary Custom Cloned Voices for this browser session only!
     if session_id:
         custom_v = load_custom_voices(session_id=session_id)
@@ -998,9 +1113,23 @@ def load_voices(session_id=None):
     if VOICE_JSON_PATH.exists():
         with open(VOICE_JSON_PATH, "r", encoding="utf-8") as f:
             voices.extend(json.load(f))
-    return voices
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for v in voices:
+        vt = v.get("voice_type")
+        if vt and vt not in seen:
+            seen.add(vt)
+            deduped.append(v)
+        elif not vt:
+            deduped.append(v)
+    return deduped
 
 def find_voice_info(voice_type):
+    # Check studio preset voices first
+    for v in STUDIO_PRESET_VOICES:
+        if v.get("voice_type") == voice_type or v.get("display_name") == voice_type:
+            return v
     # Check temporary custom voices first
     if voice_type in TEMP_CUSTOM_VOICES:
         return TEMP_CUSTOM_VOICES[voice_type]
@@ -2275,10 +2404,10 @@ def preview_voice():
             if custom_ref_b64:
                 restore_custom_voice_from_b64(voice, custom_ref_b64, custom_name)
             vinfo = find_voice_info(voice)
-            if vinfo and vinfo.get("ref_audio"):
+            if vinfo and (vinfo.get("preview_url") or vinfo.get("ref_audio")):
                 return jsonify({
                     "status": "success",
-                    "download_url": vinfo.get("preview_url") or f"/uploads/custom_voices/{vinfo.get('ref_audio')}"
+                    "download_url": vinfo.get("preview_url") or f"/static/preset_voices/{vinfo.get('ref_audio')}" or f"/uploads/custom_voices/{vinfo.get('ref_audio')}"
                 })
         lan = (data.get("lan") or "vi").lower()
 
