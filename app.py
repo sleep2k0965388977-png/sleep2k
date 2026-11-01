@@ -588,106 +588,98 @@ STUDIO_PRESET_VOICES = [
     {
         "lan": "vi",
         "lang": "vi-VN",
-        "resource_id": "7252594014782755330",
-        "voice_type": "preset_vn_girl",
-        "display_name": "🌸 Nữ Tự Nhiên (Ngọt Ngào, Trong Trẻo) ⭐⭐⭐⭐⭐",
+        "resource_id": "7637458789033151751",
+        "voice_type": "multi_female_peiqi_uranus_bigtts",
+        "display_name": "🌸 Nữ Tự Nhiên (Ngọt Ngào, Trong Sáng) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
-        "is_clone": True,
+        "is_clone": False,
         "is_studio": True,
-        "ref_audio": "preset_vn_girl.wav",
         "preview_url": "/static/preset_voices/preset_vn_girl.mp3",
-        "description": "Giọng nữ trẻ, thanh thoát, ngọt ngào, giàu cảm xúc tự sự và kể chuyện (Dataset 2H người thật)"
+        "description": "Giọng nữ trẻ trong sáng, ngọt ngào tự nhiên, phong cách trò chuyện và vlog (Phòng thu CapCut chuẩn)"
     },
     {
         "lan": "vi",
         "lang": "vi-VN",
-        "resource_id": "7252594014782755330",
-        "voice_type": "preset_ban_mai",
+        "resource_id": "7637456432522218773",
+        "voice_type": "multi_female_yangguangnv_uranus_bigtts",
         "display_name": "🌸 Ban Mai (Dịu Dàng, Chuẩn Phát Thanh) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
-        "is_clone": True,
+        "is_clone": False,
         "is_studio": True,
-        "ref_audio": "preset_ban_mai.wav",
         "preview_url": "/static/preset_voices/preset_ban_mai.mp3",
-        "description": "Giọng nữ miền Bắc dịu dàng, chuẩn phát thanh viên, rất truyền cảm (CCVoice & Wyoming)"
+        "description": "Giọng nữ miền Bắc dịu dàng, phát thanh viên chuẩn, truyền cảm và ấm áp"
     },
     {
         "lan": "vi",
         "lang": "vi-VN",
         "resource_id": "7252594014782755330",
-        "voice_type": "preset_nho_ngot_ngao",
+        "voice_type": "BV421_vivn_streaming",
         "display_name": "🌸 Nhỏ Ngọt Ngào (Miền Nam Ngọt Êm) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
-        "is_clone": True,
+        "is_clone": False,
         "is_studio": True,
-        "ref_audio": "preset_nho_ngot_ngao.wav",
         "preview_url": "/static/preset_voices/preset_nho_ngot_ngao.mp3",
-        "description": "Giọng nữ miền Nam ngọt ngào, êm ái, dễ thương, tự nhiên (CCVoice NhoNgotNgao)"
+        "description": "Giọng nữ miền Nam ngọt ngào, êm ái, dễ thương, tình cảm"
     },
     {
         "lan": "vi",
         "lang": "vi-VN",
-        "resource_id": "7252594014782755330",
-        "voice_type": "preset_mai_chi",
-        "display_name": "🌸 Mai Chi (Nữ Bắc Thân Thiện, Tự Nhiên) ⭐⭐⭐⭐⭐",
+        "resource_id": "7637460351541447956",
+        "voice_type": "multi_female_richgirl_uranus_bigtts",
+        "display_name": "🌸 Review Truyện & Phim (Cuốn Hút) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
-        "is_clone": True,
+        "is_clone": False,
         "is_studio": True,
-        "ref_audio": "preset_mai_chi.wav",
-        "preview_url": "/static/preset_voices/preset_mai_chi.mp3",
-        "description": "Giọng nữ miền Bắc nhẹ nhàng, thân thiện, tự nhiên như trò chuyện ngoài đời thực (Wyoming ZeroTTS)"
+        "preview_url": "/static/preset_voices/preset_review_new.mp3",
+        "description": "Giọng nữ phong cách review phim, tóm tắt truyện, nhịp điệu lôi cuốn"
     },
     {
         "lan": "vi",
         "lang": "vi-VN",
-        "resource_id": "7252594014782755330",
-        "voice_type": "preset_mai_phuong",
-        "display_name": "🌸 Mai Phương (Nữ Bắc Ấm Áp Đọc Sách) ⭐⭐⭐⭐",
-        "category": "studio_real_human",
-        "is_clone": True,
-        "is_studio": True,
-        "ref_audio": "preset_mai_phuong.wav",
-        "preview_url": "/static/preset_voices/preset_mai_phuong.mp3",
-        "description": "Giọng nữ miền Bắc nhẹ nhàng, ấm áp, sâu lắng, chuyên đọc sách và tin tức dài"
-    },
-    {
-        "lan": "vi",
-        "lang": "vi-VN",
-        "resource_id": "7252594014782755330",
-        "voice_type": "preset_mai_am_ap",
+        "resource_id": "7483736254694035984",
+        "voice_type": "BV562_streaming",
         "display_name": "🌸 Chị Mai (Ấm Áp, Truyền Cảm) ⭐⭐⭐⭐",
         "category": "studio_real_human",
-        "is_clone": True,
+        "is_clone": False,
         "is_studio": True,
-        "ref_audio": "preset_mai_am_ap.wav",
         "preview_url": "/static/preset_voices/preset_mai_am_ap.mp3",
-        "description": "Giọng nữ ấm áp, đĩnh đạc, phong cách phát thanh tin tức (CCVoice Mai)"
+        "description": "Giọng nữ ấm áp, đĩnh đạc, phong cách phát thanh tin tức và đọc sách sâu lắng"
     },
     {
         "lan": "vi",
         "lang": "vi-VN",
-        "resource_id": "7252594014782755330",
-        "voice_type": "preset_review_new",
-        "display_name": "🌸 Review Truyện & Phim (Cuốn Hút) ⭐⭐⭐⭐",
-        "category": "studio_real_human",
-        "is_clone": True,
-        "is_studio": True,
-        "ref_audio": "preset_review_new.wav",
-        "preview_url": "/static/preset_voices/preset_review_new.mp3",
-        "description": "Giọng nữ phong cách review phim, tóm tắt truyện, nhịp điệu cuốn hút (CCVoice ReviewNew)"
-    },
-    {
-        "lan": "vi",
-        "lang": "vi-VN",
-        "resource_id": "7252594014782755330",
-        "voice_type": "preset_nu_pho_thong",
+        "resource_id": "7264854897953083905",
+        "voice_type": "vi_female_huong",
         "display_name": "🌸 Nữ Phổ Thông (Trong Sáng, Rõ Chữ) ⭐⭐⭐⭐",
         "category": "studio_real_human",
-        "is_clone": True,
+        "is_clone": False,
         "is_studio": True,
-        "ref_audio": "preset_nu_pho_thong.wav",
         "preview_url": "/static/preset_voices/preset_nu_pho_thong.mp3",
-        "description": "Giọng nữ phổ thông tự nhiên, rõ chữ, thanh lịch (CCVoice NuPhoThong)"
+        "description": "Giọng nữ chuẩn phổ thông (Hương) rõ ràng từng chữ, thanh lịch, chuẩn mực"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7637457995882089749",
+        "voice_type": "multi_female_kiwi_uranus_bigtts",
+        "display_name": "🌸 Sunny (Tươi Vui, Ngọt Ngào) ⭐⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": False,
+        "is_studio": True,
+        "preview_url": "/static/preset_voices/preset_mai_chi.mp3",
+        "description": "Giọng nữ trẻ trung, tươi sáng, ngọt ngào, truyền năng lượng tích cực"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7102355709945188865",
+        "voice_type": "BV074_streaming",
+        "display_name": "🌸 Cô Gái Hoạt Ngôn (Linh Hoạt, Sinh Động) ⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": False,
+        "is_studio": True,
+        "preview_url": "/static/preset_voices/preset_mai_phuong.mp3",
+        "description": "Giọng nữ hoạt bát, sinh động, giàu sắc thái cảm xúc"
     }
 ]
 WORKER_CONFIG_FILE = Path(__file__).parent / "worker_config.json"
@@ -867,7 +859,7 @@ def delete_custom_voice_entry(voice_type):
     return True
 
 def is_clone_voice(voice):
-    return str(voice or "").startswith("clone_") or str(voice or "").startswith("preset_")
+    return str(voice or "").startswith("clone_")
 
 _NANO_TTS_INSTANCE = None
 _NANO_LOCK = threading.Lock()
@@ -979,14 +971,26 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
         v_name = (vinfo.get("display_name") or vinfo.get("name") or "").lower()
     voice_str = (str(voice) + " " + v_name).lower()
 
-    male_keywords = ["minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", "duc_tri", "adam", "quang_son", "nam", "bố", "bo", "chú", "chu", "ông", "ong", "anh", "male", "boy", "man"]
-    female_keywords = ["nữ", "nu", "mẹ", "me", "chị", "chi", "cô", "co", "bà", "ba", "gái", "female", "girl", "woman", "hoaimy", "mai_anh", "thuy_dung", "ngoc_huyen", "ngoc_tran", "ngoc_linh", "doan_trang", "thuc_doan", "my_duyen", "quynh_anh", "kim_thanh", "bich_ngoc", "thanh_thao"]
+    female_keywords = [
+        "nữ", "nu", "mẹ", "me", "chị", "chi", "cô", "co", "bà", "ba", "gái", "gai", 
+        "female", "girl", "woman", "hoaimy", "mai_anh", "thuy_dung", "ngoc_huyen", 
+        "ngoc_tran", "ngoc_linh", "doan_trang", "thuc_doan", "my_duyen", "quynh_anh", 
+        "kim_thanh", "bich_ngoc", "thanh_thao", "ban_mai", "mai", "huong", "yangguangnv", 
+        "peiqi", "richgirl", "kiwi", "vivn", "sweet", "ngọt", "trong trẻo", "tự nhiên"
+    ]
+    male_keywords = [
+        "minh_duc", "pham_tuyen", "thanh_binh", "thai_son", "xuan_vinh", "minh_triet", 
+        "duc_tri", "adam", "quang_son", "nam_minh", "alex", "felipe", "kenndy", "demon"
+    ]
 
     is_male = False
-    if any(m in voice_str for m in male_keywords):
-        is_male = True
-    elif any(f in voice_str for f in female_keywords):
+    # Check female keywords first to prevent substrings like 'ong' in 'trong trẻo' matching male
+    if any(f in voice_str for f in female_keywords):
         is_male = False
+    elif any(m in voice_str for m in male_keywords):
+        is_male = True
+    elif re.search(r'\b(nam|anh|ông|bố|chú|male|man|boy)\b', voice_str, re.IGNORECASE):
+        is_male = True
 
     # 1. CapCut Neural Voice Synthesis (Fast, studio quality, 100% reliable on Cloud/Datacenter IPs)
     cap_aud = capcut_synthesize_fallback(text_chunk, is_male=is_male, rate=rate)
