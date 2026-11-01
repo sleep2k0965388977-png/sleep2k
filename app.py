@@ -590,31 +590,31 @@ STUDIO_PRESET_VOICES = [
         "lang": "vi-VN",
         "resource_id": "7637456432522218773",
         "voice_type": "multi_female_yangguangnv_uranus_bigtts",
-        "display_name": "🌸 Ban Mai (Dịu Dàng, Tự Nhiên - Chuẩn Phát Thanh) ⭐⭐⭐⭐⭐",
+        "display_name": "🌸 Ban Mai (Dịu Dàng, Tự Nhiên) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
         "is_clone": False,
         "is_studio": True,
         "preview_url": "/static/preset_voices/preset_ban_mai.mp3",
-        "description": "Giọng nữ miền Bắc dịu dàng, phát thanh viên chuẩn, truyền cảm và êm ái"
+        "description": "Giọng nữ miền Bắc dịu dàng, tự nhiên, chuẩn phát thanh viên, rất truyền cảm và êm ái"
     },
     {
         "lan": "vi",
         "lang": "vi-VN",
         "resource_id": "7637460351541447956",
         "voice_type": "multi_female_richgirl_uranus_bigtts",
-        "display_name": "🌸 Review Truyện & Phim (Kể Chuyện, Cuốn Hút) ⭐⭐⭐⭐⭐",
+        "display_name": "🌸 Review Truyện & Phim (ReviewNew - Cuốn Hút) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
         "is_clone": False,
         "is_studio": True,
         "preview_url": "/static/preset_voices/preset_review_new.mp3",
-        "description": "Giọng nữ phong cách review phim, tóm tắt truyện, nhịp điệu sâu lắng, lôi cuốn"
+        "description": "Giọng nữ phong cách review phim, tóm tắt truyện, nhịp điệu cuốn hút, lôi cuốn"
     },
     {
         "lan": "vi",
         "lang": "vi-VN",
         "resource_id": "7483736254694035984",
         "voice_type": "BV562_streaming",
-        "display_name": "🌸 Chị Mai (Ấm Áp, Truyền Cảm - Đọc Sách) ⭐⭐⭐⭐⭐",
+        "display_name": "🌸 Mai (Ấm Áp, Phong Cách Phát Thanh) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
         "is_clone": False,
         "is_studio": True,
@@ -626,7 +626,7 @@ STUDIO_PRESET_VOICES = [
         "lang": "vi-VN",
         "resource_id": "7252594014782755330",
         "voice_type": "BV421_vivn_streaming",
-        "display_name": "🌸 Nhỏ Ngọt Ngào (Miền Nam Ngọt Êm) ⭐⭐⭐⭐⭐",
+        "display_name": "🌸 Nhỏ Ngọt Ngào (Miền Nam Ngọt Ngào) ⭐⭐⭐⭐⭐",
         "category": "studio_real_human",
         "is_clone": False,
         "is_studio": True,
@@ -648,38 +648,26 @@ STUDIO_PRESET_VOICES = [
     {
         "lan": "vi",
         "lang": "vi-VN",
-        "resource_id": "7637458789033151751",
-        "voice_type": "multi_female_peiqi_uranus_bigtts",
-        "display_name": "🌸 Gái Mới Lớn (Trẻ Trung, Ngọt Ngào) ⭐⭐⭐⭐",
-        "category": "studio_real_human",
-        "is_clone": False,
-        "is_studio": True,
-        "preview_url": "/static/preset_voices/preset_vn_girl.mp3",
-        "description": "Giọng nữ trẻ trong sáng, ngọt ngào tự nhiên, phong cách trò chuyện và vlog"
-    },
-    {
-        "lan": "vi",
-        "lang": "vi-VN",
-        "resource_id": "7637457995882089749",
-        "voice_type": "multi_female_kiwi_uranus_bigtts",
-        "display_name": "🌸 Sunny (Tươi Vui, Ngọt Ngào) ⭐⭐⭐⭐⭐",
-        "category": "studio_real_human",
-        "is_clone": False,
-        "is_studio": True,
-        "preview_url": "/static/preset_voices/preset_mai_chi.mp3",
-        "description": "Giọng nữ trẻ trung, tươi sáng, ngọt ngào, truyền năng lượng tích cực"
-    },
-    {
-        "lan": "vi",
-        "lang": "vi-VN",
         "resource_id": "7102355709945188865",
         "voice_type": "BV074_streaming",
-        "display_name": "🌸 Cô Gái Hoạt Ngôn (Linh Hoạt, Sinh Động) ⭐⭐⭐⭐",
+        "display_name": "🌸 Hoạt Ngôn (Linh Hoạt, Sinh Động) ⭐⭐⭐⭐",
         "category": "studio_real_human",
         "is_clone": False,
         "is_studio": True,
         "preview_url": "/static/preset_voices/preset_mai_phuong.mp3",
         "description": "Giọng nữ hoạt bát, sinh động, giàu sắc thái cảm xúc"
+    },
+    {
+        "lan": "vi",
+        "lang": "vi-VN",
+        "resource_id": "7102355709945188865",
+        "voice_type": "BV074_streaming_dsp",
+        "display_name": "🌸 Giọng Bé (Hồn Nhiên, Đáng Yêu) ⭐⭐⭐⭐",
+        "category": "studio_real_human",
+        "is_clone": False,
+        "is_studio": True,
+        "preview_url": "/static/preset_voices/preset_vn_girl.mp3",
+        "description": "Giọng trẻ em hồn nhiên, ngộ nghĩnh, đáng yêu"
     }
 ]
 WORKER_CONFIG_FILE = Path(__file__).parent / "worker_config.json"
