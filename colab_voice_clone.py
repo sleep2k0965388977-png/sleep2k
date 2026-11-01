@@ -4,7 +4,7 @@
 # TỰ ĐỘNG ĐỒNG BỘ 100% VỚI WEBSITE - KHÔNG CẦN COPY/DÁN THỦ CÔNG
 # ==============================================================================
 
-import os, sys, time, uuid, subprocess, re, json, urllib.request
+import os, sys, time, uuid, subprocess, re, json, urllib.request, hashlib
 from pathlib import Path
 
 print("🚀 [1/3] Đang cài đặt thư viện AI VieNeu 48kHz Studio & Cloudflare Tunnel...")
@@ -89,22 +89,27 @@ def clone_voice():
     task_id = uuid.uuid4().hex[:8]
     work_dir = Path("/tmp/clone_work") / f"task_{task_id}"
     work_dir.mkdir(parents=True, exist_ok=True)
-
-    raw_path = work_dir / f"raw_{audio_file.filename}"
-    clean_wav = work_dir / "clean_vocal.wav"
     out_mp3 = work_dir / "cloned_ultra.mp3"
 
     try:
-        audio_file.save(str(raw_path))
+        audio_bytes = audio_file.read()
+        audio_hash = hashlib.md5(audio_bytes).hexdigest()[:12]
+        cache_dir = Path("/tmp/clone_work/ref_cache")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cached_clean_wav = cache_dir / f"clean_{audio_hash}.wav"
 
-        target_sr = getattr(tts, "sample_rate", 48000)
-        # Chuẩn hóa âm lượng EBU R128 + lọc tạp âm dải tần để AI trích xuất vocal tròn vành rõ chữ nhất
-        subprocess.run([
-            "ffmpeg", "-y", "-i", str(raw_path),
-            "-af", "highpass=f=60,lowpass=f=12000,loudnorm=I=-16:TP=-1.5:LRA=11",
-            "-ar", str(target_sr), "-ac", "1",
-            str(clean_wav)
-        ], capture_output=True, check=True)
+        if not cached_clean_wav.exists() or cached_clean_wav.stat().st_size < 500:
+            raw_path = work_dir / f"raw_{audio_hash}.wav"
+            raw_path.write_bytes(audio_bytes)
+            target_sr = getattr(tts, "sample_rate", 48000)
+            subprocess.run([
+                "ffmpeg", "-y", "-i", str(raw_path),
+                "-af", "highpass=f=60,lowpass=f=12000,loudnorm=I=-16:TP=-1.5:LRA=11",
+                "-ar", str(target_sr), "-ac", "1",
+                str(cached_clean_wav)
+            ], capture_output=True, check=True)
+            raw_path.unlink(missing_ok=True)
+        clean_wav = cached_clean_wav
 
         t0 = time.time()
         # Bộ thông số tối ưu độ giống & phát âm tròn vành rõ chữ:
