@@ -821,7 +821,15 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
     worker_url = get_clone_worker_url()
     if worker_url:
         clean_url = worker_url.rstrip("/")
-        for attempt in range(1, 3):
+        # Fast 2.5s pre-flight probe: nếu Worker chết hoặc đường hầm Cloudflare hết hạn, lập tức reset về Cloud AI
+        worker_alive = False
+        try:
+            hp = requests.get(f"{clean_url}/health", timeout=2.5)
+            worker_alive = (hp.status_code == 200)
+        except Exception:
+            worker_alive = False
+
+        if worker_alive:
             try:
                 with open(ref_file, "rb") as af:
                     resp = requests.post(
@@ -829,17 +837,18 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
                         headers={"X-API-Key": CLONE_API_KEY},
                         files={"audio": (ref_file.name, af, "audio/wav")},
                         data={"text": text_chunk, "rate": rate},
-                        timeout=75
+                        timeout=30
                     )
                 if resp.status_code == 200 and len(resp.content) > 500:
                     logger.info(f"✨ Worker clone thành công cho '{text_chunk[:25]}...' ({len(resp.content)} bytes)")
                     return resp.content
                 else:
-                    logger.warning(f"Worker clone attempt {attempt} returned HTTP {resp.status_code}: {resp.text[:100]}")
+                    logger.warning(f"Worker clone returned HTTP {resp.status_code}: {resp.text[:100]}")
             except Exception as ex_w:
-                logger.warning(f"Worker clone attempt {attempt} error ({ex_w})")
-            if attempt < 2:
-                time.sleep(1.0)
+                logger.warning(f"Worker clone request error ({ex_w}), falling back to high-speed neural engine...")
+        else:
+            logger.warning(f"Worker URL '{clean_url}' không phản hồi (health timeout 2.5s) -> tự động chuyển sang Cloud AI!")
+            set_clone_worker_url("")
 
     # Cloud VPS Standalone Synthesis: Intelligent Acoustic Pitch & Timbre Matching
     logger.info(f"Synthesizing cloud clone audio for: '{text_chunk[:30]}...'")
