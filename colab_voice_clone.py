@@ -22,6 +22,12 @@ except ImportError:
 print("🚀 [1/4] Đang cài đặt thư viện AI âm thanh 48kHz & Cloudflare Tunnel...")
 os.system("pip install -q vieneu flask soundfile imageio-ffmpeg")
 
+# ── ĐẢM BẢO ONNX / VIENEU TƯƠNG THÍCH ──────────────────────────────────────────
+# onnxruntime >= 1.18 chặn external data path, bắt buộc hạ xuống 1.17.3 sau khi cài vieneu
+print("🔧 [1.5/4] Đang cấu hình onnxruntime-gpu 1.17.3 tương thích VieNeu...")
+os.system("pip uninstall -y onnxruntime onnxruntime-gpu onnxruntime-training >/dev/null 2>&1")
+os.system("pip install -q onnxruntime-gpu==1.17.3")
+
 # Tải Cloudflared binary cho Linux 64-bit
 if not os.path.exists("/usr/local/bin/cloudflared"):
     os.system("curl -sLo /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64")
