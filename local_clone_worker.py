@@ -28,7 +28,7 @@ def _fix_onnxruntime_if_needed():
                 capture_output=True
             )
             r = subprocess.run(
-                [sys.executable, '-m', 'pip', 'install', '-q', 'onnxruntime-gpu==1.17.3'],
+                [sys.executable, '-m', 'pip', 'install', '-q', 'onnxruntime==1.17.3'],
                 capture_output=True, text=True
             )
             if r.returncode != 0:
