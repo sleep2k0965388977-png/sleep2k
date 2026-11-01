@@ -7,7 +7,7 @@ import sys, io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-import os, time, uuid, subprocess, tempfile
+import os, time, uuid, subprocess, tempfile, hashlib
 from pathlib import Path
 
 # ── AUTO-FIX: onnxruntime >= 1.18 blocks vieneu external data path ──────────
@@ -115,14 +115,23 @@ def clone_voice():
     out_mp3 = temp_dir / "cloned_result.mp3"
 
     try:
-        audio_file.save(str(raw_path))
+        audio_bytes = audio_file.read()
+        audio_hash = hashlib.md5(audio_bytes).hexdigest()[:12]
+        cache_dir = Path(tempfile.gettempdir()) / "sleep2k_ref_cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cached_clean_wav = cache_dir / f"clean_{audio_hash}.wav"
 
-        subprocess.run([
-            FFMPEG, "-y", "-i", str(raw_path),
-            "-af", "highpass=f=60,lowpass=f=12000,loudnorm=I=-16:TP=-1.5:LRA=11",
-            "-ar", "24000", "-ac", "1",
-            str(clean_wav)
-        ], capture_output=True, check=True)
+        if not cached_clean_wav.exists() or cached_clean_wav.stat().st_size < 500:
+            raw_path = temp_dir / f"raw_{audio_hash}.wav"
+            raw_path.write_bytes(audio_bytes)
+            subprocess.run([
+                FFMPEG, "-y", "-i", str(raw_path),
+                "-af", "highpass=f=60,lowpass=f=12000,loudnorm=I=-16:TP=-1.5:LRA=11",
+                "-ar", "24000", "-ac", "1",
+                str(cached_clean_wav)
+            ], capture_output=True, check=True)
+            raw_path.unlink(missing_ok=True)
+        clean_wav = cached_clean_wav
 
         t0 = time.time()
         # Tối ưu hóa siêu thực:
