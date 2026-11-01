@@ -820,23 +820,26 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
 
     worker_url = get_clone_worker_url()
     if worker_url:
-        try:
-            clean_url = worker_url.rstrip("/")
-            with open(ref_file, "rb") as af:
-                resp = requests.post(
-                    f"{clean_url}/api/clone",
-                    headers={"X-API-Key": CLONE_API_KEY},
-                    files={"audio": (ref_file.name, af, "audio/wav")},
-                    data={"text": text_chunk, "rate": rate},
-                    timeout=75
-                )
-            if resp.status_code == 200 and len(resp.content) > 500:
-                logger.info(f"✨ Worker clone thành công cho '{text_chunk[:25]}...' ({len(resp.content)} bytes)")
-                return resp.content
-            else:
-                logger.warning(f"Worker clone returned HTTP {resp.status_code}: {resp.text[:100]}")
-        except Exception as ex_w:
-            logger.warning(f"Worker clone request error ({ex_w}), falling back to high-speed neural engine...")
+        clean_url = worker_url.rstrip("/")
+        for attempt in range(1, 3):
+            try:
+                with open(ref_file, "rb") as af:
+                    resp = requests.post(
+                        f"{clean_url}/api/clone",
+                        headers={"X-API-Key": CLONE_API_KEY},
+                        files={"audio": (ref_file.name, af, "audio/wav")},
+                        data={"text": text_chunk, "rate": rate},
+                        timeout=75
+                    )
+                if resp.status_code == 200 and len(resp.content) > 500:
+                    logger.info(f"✨ Worker clone thành công cho '{text_chunk[:25]}...' ({len(resp.content)} bytes)")
+                    return resp.content
+                else:
+                    logger.warning(f"Worker clone attempt {attempt} returned HTTP {resp.status_code}: {resp.text[:100]}")
+            except Exception as ex_w:
+                logger.warning(f"Worker clone attempt {attempt} error ({ex_w})")
+            if attempt < 2:
+                time.sleep(1.0)
 
     # Cloud VPS Standalone Synthesis: Intelligent Acoustic Pitch & Timbre Matching
     logger.info(f"Synthesizing cloud clone audio for: '{text_chunk[:30]}...'")
@@ -1030,6 +1033,49 @@ def find_voice_info(voice_type):
             return v
     return None
 
+VI_UNITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
+
+def _read_three_digits_vi(n, full=False):
+    h = n // 100
+    t = (n % 100) // 10
+    u = n % 10
+    res = []
+    if h > 0 or full:
+        res.append(VI_UNITS[h] + ' trăm')
+    if t > 1:
+        res.append(VI_UNITS[t] + ' mươi')
+        if u == 1: res.append('mốt')
+        elif u == 5: res.append('lăm')
+        elif u > 0: res.append(VI_UNITS[u])
+    elif t == 1:
+        res.append('mười')
+        if u == 5: res.append('lăm')
+        elif u > 0: res.append(VI_UNITS[u])
+    elif t == 0:
+        if (h > 0 or full) and u > 0:
+            res.append('lẻ ' + VI_UNITS[u])
+        elif (h == 0 and not full) and u >= 0:
+            res.append(VI_UNITS[u])
+    return ' '.join(res)
+
+def vietnamese_int_to_words(num):
+    if num == 0: return 'không'
+    scales = ['', 'nghìn', 'triệu', 'tỉ', 'nghìn tỉ', 'triệu tỉ']
+    parts = []
+    scale_idx = 0
+    full = False
+    temp = abs(num)
+    while temp > 0:
+        chunk = temp % 1000
+        if chunk > 0:
+            words = _read_three_digits_vi(chunk, full=(temp >= 1000 and full))
+            parts.append(words + (' ' + scales[scale_idx] if scales[scale_idx] else ''))
+        scale_idx += 1
+        temp //= 1000
+        full = True
+    res = ' '.join(reversed(parts)).strip()
+    return ('âm ' if num < 0 else '') + res
+
 def normalize_text_input(text):
     """Clean and normalize input text for robust, expressive human-like TTS generation."""
     if not text:
@@ -1041,6 +1087,27 @@ def normalize_text_input(text):
     text = text.replace("[cười]", " haha, ").replace("[cười nhẹ]", " hihi, ")
     text = text.replace("[thở dài]", " (thở dài), ").replace("[hắng giọng]", " ừm, ")
     text = text.replace("[nghỉ 1s]", ". ").replace("[nghỉ]", ", ")
+
+    # Expand Vietnamese symbols & abbreviations to natural phonemes
+    text = re.sub(r'(\d+)\s*%', r'\1 phần trăm', text)
+    text = re.sub(r'\$\s*(\d+)', r'\1 đô la', text)
+    text = re.sub(r'(\d+)\s*\$', r'\1 đô la', text)
+    text = text.replace('&', ' và ')
+    text = text.replace('+', ' cộng ')
+    text = text.replace('@', ' a còng ')
+    text = text.replace('=', ' bằng ')
+    text = re.sub(r'(\d+)h(\d+)', r'\1 giờ \2 phút', text)
+    text = re.sub(r'(\d+)h\b', r'\1 giờ', text)
+    text = re.sub(r'(\d+)p\b', r'\1 phút', text)
+
+    # Convert standalone integers (including thousand dots like 11.117) to fluent Vietnamese words
+    text = re.sub(r'(\d+)\.(\d{3})\b', r'\1\2', text)
+    def _num_repl(match):
+        val = int(match.group(0))
+        if val <= 999999999:
+            return vietnamese_int_to_words(val)
+        return match.group(0)
+    text = re.sub(r'\b\d+\b', _num_repl, text)
 
     # Normalize excessive punctuation (prevent AI stuttering or saying punctuation marks aloud)
     text = re.sub(r'\.{4,}', '...', text)
@@ -1120,6 +1187,9 @@ def split_text_into_chunks(text, max_chars=450):
             continue
         has_letters = bool(re.search(r'[a-zA-Z0-9\u00C0-\u1EF9]', c))
         if has_letters:
+            # Đảm bảo mỗi đoạn kết thúc bằng dấu câu tự nhiên để mô hình AI phát âm tròn vành rõ chữ, không bị nuốt âm hay gắt giọng
+            if c[-1] not in ('.', '!', '?', '…', ',', ';', ':'):
+                c += '.'
             final_chunks.append(c)
         else:
             if final_chunks:
@@ -1199,7 +1269,26 @@ def stitch_audio_chunks(chunk_bytes_list, output_file_path):
                     fc.write(chunk_bytes)
                 f_list.write(f"file '{chunk_file.resolve().as_posix()}'\n")
 
-        # 1. Blazing-fast lossless stream copy concat (speed > 200x, 0 latency, 0 stutter)
+        # 1. Ghép nối chuẩn hóa tần số âm học 48kHz (Unified Resampling Concat)
+        # Bắt buộc ép toàn bộ các đoạn âm thanh về cùng chuẩn 48.000Hz / 192kbps để loại bỏ triệt để
+        # hiện tượng đoạn thì đọc nhanh méo tiếng, đoạn thì đọc chậm hoặc nuốt âm do lệch tần số lấy mẫu giữa các nguồn
+        cmd_encode = [
+            FFMPEG_BIN, "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_list_file),
+            "-af", "aresample=48000:first_pts=0",
+            "-c:a", "libmp3lame",
+            "-b:a", "192k",
+            "-ar", "48000",
+            "-ac", "1",
+            str(output_file_path)
+        ]
+        proc_encode = subprocess.run(cmd_encode, capture_output=True, timeout=180)
+        if proc_encode.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
+            return True
+
+        # 2. Lossless copy fallback (nếu re-encode gặp sự cố)
         cmd_copy = [
             FFMPEG_BIN, "-y",
             "-f", "concat",
@@ -1210,22 +1299,6 @@ def stitch_audio_chunks(chunk_bytes_list, output_file_path):
         ]
         proc_copy = subprocess.run(cmd_copy, capture_output=True, timeout=120)
         if proc_copy.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
-            return True
-
-        # 2. Re-encode fallback if chunks have differing sample rates
-        cmd_encode = [
-            FFMPEG_BIN, "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", str(concat_list_file),
-            "-c:a", "libmp3lame",
-            "-ar", "24000",
-            "-ac", "1",
-            "-b:a", "128k",
-            str(output_file_path)
-        ]
-        proc_encode = subprocess.run(cmd_encode, capture_output=True, timeout=300)
-        if proc_encode.returncode == 0 and output_file_path.exists() and output_file_path.stat().st_size > 0:
             return True
     except Exception as ex:
         print(f"FFmpeg clean concat warning: {ex}")
