@@ -2419,28 +2419,6 @@ def health_check():
         }
     }), 200
 
-@app.route("/api/debug_clone_step", methods=["GET"])
-def debug_clone_step():
-    step = request.args.get("step", "all")
-    try:
-        if step == "3":
-            ref_file = get_guaranteed_reference_audio()
-            return jsonify({"ref_file": str(ref_file), "exists": ref_file.exists() if hasattr(ref_file, 'exists') else False})
-        elif step == "4":
-            return jsonify({"worker_url": get_clone_worker_url()})
-        elif step == "5":
-            t0 = time.time()
-            aud = capcut_synthesize_fallback("Kiểm tra câu ngắn", is_male=False, rate="1.0")
-            return jsonify({"elapsed": round(time.time()-t0, 2), "bytes": len(aud) if aud else 0})
-        elif step == "6":
-            t0 = time.time()
-            res = synthesize_clone_audio("Kiểm tra câu ngắn hai", "clone_user_vocal_test", rate="1.0")
-            return jsonify({"elapsed": round(time.time()-t0, 2), "bytes": len(res) if res else 0})
-        return jsonify({"status": "ready", "available_steps": [3, 4, 5, 6]})
-    except Exception as e:
-        import traceback
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
-
 @app.route("/output/<filename>")
 def serve_audio(filename):
     return send_from_directory(OUTPUT_DIR, filename)
