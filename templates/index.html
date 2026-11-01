@@ -3351,7 +3351,10 @@
                         const sr = await fetch(`/api/job_status/${jobId}`);
                         if (!sr.ok) {
                             consecutiveErrors++;
-                            if (consecutiveErrors >= 100) {
+                            if (consecutiveErrors >= 5 && consecutiveErrors < 150 && statusEl) {
+                                statusEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--accent-amber);"></i> Đang kết nối lại máy chủ (' + consecutiveErrors + '/150)...';
+                            }
+                            if (consecutiveErrors >= 150) {
                                 clearInterval(pollInterval);
                                 window._activeTtsInterval = null;
                                 progressCard.classList.remove("show");
@@ -3359,7 +3362,7 @@
                                 btn.innerHTML = '<i class="fa-solid fa-circle-play"></i> Tạo Giọng Đọc MP3';
                                 if (!window._hasAlertedPollError) {
                                     window._hasAlertedPollError = true;
-                                    alert("Không thể kết nối với máy chủ hoặc tiến trình đã quá hạn. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
+                                    alert("Máy chủ vừa khởi động lại cập nhật hoặc mạng bị gián đoạn. Vui lòng bấm Tạo Giọng Đọc MP3 để thử lại!");
                                 }
                                 return;
                             }
