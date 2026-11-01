@@ -137,9 +137,9 @@ class VoiceInfo:
 
     voice_type: str
     display_name: str
-    resource_id: str
-    lang: str
-    lan: str
+    resource_id: str = ""
+    lang: str = "vi-VN"
+    lan: str = "vi"
     captured_at: Optional[str] = None
     engine: Optional[str] = None
 
