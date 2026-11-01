@@ -828,9 +828,10 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
                     headers={"X-API-Key": CLONE_API_KEY},
                     files={"audio": (ref_file.name, af, "audio/wav")},
                     data={"text": text_chunk, "rate": rate},
-                    timeout=25
+                    timeout=75
                 )
             if resp.status_code == 200 and len(resp.content) > 500:
+                logger.info(f"✨ Worker clone thành công cho '{text_chunk[:25]}...' ({len(resp.content)} bytes)")
                 return resp.content
             else:
                 logger.warning(f"Worker clone returned HTTP {resp.status_code}: {resp.text[:100]}")
@@ -1386,12 +1387,13 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     silence = generate_silent_mp3_bytes(300)
     return idx, silence, 300
 
-def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_size=1600):
+def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_size=240):
     try:
         cleanup_all_temp_files()
 
         is_clone = is_clone_voice(voice)
-        chunk_max_chars = clone_chunk_size if is_clone else 450
+        # Giọng clone AI chia đoạn chuẩn 220-250 ký tự để phát âm tròn vành rõ chữ 100%, không bị nuốt âm hay méo tiếng
+        chunk_max_chars = 240 if is_clone else 450
         chunks = split_text_into_chunks(text, max_chars=chunk_max_chars)
         total_chunks = len(chunks)
 
@@ -1607,10 +1609,10 @@ def generate_job():
         if not text:
             return jsonify({"status": "error", "message": "Vui lòng nhập văn bản cần đọc."}), 400
 
-        clone_chunk_limit = 1600
+        clone_chunk_limit = 240
         if is_clone_voice(voice):
-            user_choice = int(data.get("clone_max_chars", 2000))
-            clone_chunk_limit = 4000 if user_choice == 5000 else 1600
+            # Tối ưu hóa âm học: Giữ các câu 220-250 ký tự để mô hình AI phát âm tròn vành rõ chữ nhất
+            clone_chunk_limit = 240
 
             # Automatically restore custom voice from client localStorage if needed
             custom_ref_b64 = data.get("custom_ref_b64") or data.get("custom_audio_base64")
