@@ -8,11 +8,11 @@ echo   Tan dung RAM & GPU tren may de nhan ban giong chuan 100%%
 echo   TU DONG KET NOI VOI WEB - KHONG CAN DAN URL THU CONG!
 echo ================================================================
 echo.
-if exist "D:\sleep2k-deploy\run_clone_system.py" (
-    cd /d "D:\sleep2k-deploy"
+cd /d "%~dp0"
+if exist "run_clone_system.py" (
     python run_clone_system.py
 ) else (
-    cd /d "D:\tự động tạo gmail"
+    cd /d "D:\tune chuyển văn bản thành giọng nói"
     python run_clone_system.py
 )
 pause
