@@ -853,17 +853,20 @@ _NANO_TTS_INSTANCE = None
 _NANO_LOCK = threading.Lock()
 
 def get_nano_tts():
-    """Lazy initialize VieNeu v3 Nano ONNX Engine on CPU (torch-free, lightweight)."""
+    """Lazy initialize VieNeu AI Voice Clone Engine on CPU/GPU."""
     global _NANO_TTS_INSTANCE
     if _NANO_TTS_INSTANCE is None:
         with _NANO_LOCK:
             if _NANO_TTS_INSTANCE is None:
-                try:
-                    from vieneu import Vieneu
-                    _NANO_TTS_INSTANCE = Vieneu(mode="v3nano")
-                    print("✅ Native VieNeu v3 Nano ONNX Clone Engine initialized successfully!")
-                except Exception as ex:
-                    print(f"VieNeu v3 Nano init warning: {ex}")
+                for mode in ["v3turbo", "v3nano"]:
+                    try:
+                        from vieneu import Vieneu
+                        _NANO_TTS_INSTANCE = Vieneu(mode=mode)
+                        sr = getattr(_NANO_TTS_INSTANCE, "sample_rate", 48000)
+                        print(f"✅ Native VieNeu {mode} Clone Engine initialized successfully ({sr}Hz)!")
+                        break
+                    except Exception as ex:
+                        print(f"VieNeu {mode} init warning: {ex}")
     return _NANO_TTS_INSTANCE
 
 def wav_to_mp3_bytes(wav_array, sample_rate=24000):
@@ -951,6 +954,30 @@ def synthesize_clone_audio(text_chunk, voice, rate="1.0"):
         else:
             logger.warning(f"Worker URL '{clean_url}' không phản hồi (health timeout 2.5s) -> tự động chuyển sang Cloud AI!")
             set_clone_worker_url("")
+
+    # 🌟 Priority 2: Native VieNeu AI Voice Clone Engine (Runs directly on local machine) 🌟
+    local_tts = get_nano_tts()
+    if local_tts and ref_file and ref_file.exists() and ref_file.stat().st_size > 500:
+        try:
+            logger.info(f"🎙️ Đang dùng Native VieNeu AI nhân bản giọng từ: {ref_file.name} cho '{text_chunk[:25]}...'")
+            t0 = time.time()
+            try:
+                speed_val = float(rate) if rate else 1.0
+            except Exception:
+                speed_val = 1.0
+
+            wav_data = local_tts.infer(
+                text_chunk,
+                ref_audio=str(ref_file),
+                speed=speed_val
+            )
+            sr = getattr(local_tts, "sample_rate", 48000)
+            mp3_bytes = wav_to_mp3_bytes(wav_data, sample_rate=sr)
+            if mp3_bytes and len(mp3_bytes) > 500:
+                logger.info(f"✨ Native VieNeu clone thành công trong {time.time()-t0:.2f}s ({len(mp3_bytes)} bytes)")
+                return mp3_bytes
+        except Exception as ex_local:
+            logger.error(f"Native VieNeu clone error: {ex_local}")
 
     # Cloud VPS Standalone Synthesis: Intelligent Acoustic Pitch & Timbre Matching
     logger.info(f"Synthesizing cloud clone audio for: '{text_chunk[:30]}...'")
