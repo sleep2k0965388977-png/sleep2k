@@ -48,11 +48,15 @@ print("  💡 Đã tự động mở trình duyệt! Bạn có thể bắt đầ
 print("  ❌ Để tắt máy chủ: Đóng cửa sổ này hoặc nhấn Ctrl + C.")
 print("=" * 72 + "\n")
 
-# Run app via waitress
-try:
-    from app import app
-    from waitress import serve
-    serve(app, host="127.0.0.1", port=5000, threads=8, channel_timeout=1800)
-except ImportError:
-    from app import app
-    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+# Run app via waitress with auto-restart resilience
+while True:
+    try:
+        from app import app
+        from waitress import serve
+        serve(app, host="127.0.0.1", port=5000, threads=8, channel_timeout=3600)
+    except KeyboardInterrupt:
+        print("\n[!] Máy chủ đã dừng bởi người dùng.")
+        break
+    except Exception as e:
+        print(f"\n[⚠️] Lỗi máy chủ: {e}. Đang tự động khởi động lại sau 2 giây...")
+        time.sleep(2)
