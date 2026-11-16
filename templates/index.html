@@ -568,6 +568,48 @@
             box-shadow: 0 0 15px rgba(239, 68, 68, 0.35) !important;
         }
 
+        /* Podcast & Poetry Pause Styles */
+        .reading-preset-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1.5px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 8px 10px;
+            text-align: left;
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .reading-preset-btn:hover {
+            background: rgba(168, 85, 247, 0.12);
+            border-color: rgba(168, 85, 247, 0.4);
+            transform: translateY(-1px);
+        }
+        .reading-preset-btn.active {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(59, 130, 246, 0.18)) !important;
+            border-color: #a855f7 !important;
+            box-shadow: 0 0 14px rgba(168, 85, 247, 0.3) !important;
+        }
+        .reading-preset-btn.active div:first-child {
+            color: #f3e8ff;
+        }
+        .btn-quick-pause {
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: #7dd3fc;
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-quick-pause:hover {
+            background: rgba(56, 189, 248, 0.22);
+            border-color: #38bdf8;
+            color: #ffffff;
+            transform: scale(1.04);
+        }
+
         /* STT Upload Dropzone CSS */
         .upload-dropzone {
             border: 2px dashed rgba(139, 92, 246, 0.4);
@@ -1641,6 +1683,101 @@
 
                 <!-- Hộp Cảnh báo khi vượt quá ký tự -->
                 <div id="cloneLimitAlertBox" style="display:none; margin-top:10px; background:rgba(239,68,68,0.14); border:1px solid rgba(239,68,68,0.4); border-radius:10px; padding:10px 14px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                </div>
+            </div>
+
+            <!-- BỘ CÔNG CỤ NGẮT NGHỈ CÂU CHUẨN (PODCAST, ĐỌC THƠ, KỂ CHUYỆN) -->
+            <div class="pause-control-box" style="margin-top:14px; margin-bottom:12px; background:linear-gradient(135deg, rgba(24,24,27,0.75), rgba(15,23,42,0.85)); border:1.5px solid rgba(168,85,247,0.35); border-radius:14px; padding:12px 16px; box-shadow:0 4px 20px rgba(0,0,0,0.25);">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:8px; background:rgba(168,85,247,0.2); color:#c084fc;">
+                            <i class="fa-solid fa-feather-pointed" style="font-size:14px;"></i>
+                        </span>
+                        <span style="font-weight:700; color:#f1f5f9; font-size:13.5px;">Nhịp Thở & Ngắt Nghỉ Câu</span>
+                        <span style="font-size:11px; background:rgba(168,85,247,0.18); color:#d8b4fe; border:1px solid rgba(168,85,247,0.4); border-radius:6px; padding:2px 8px; font-weight:600;">
+                            🎙️ Chuẩn Podcast & Đọc Thơ
+                        </span>
+                    </div>
+                    <button type="button" onclick="togglePauseCustomSettings()" id="btnToggleCustomPause" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:#cbd5e1; border-radius:8px; padding:4px 10px; font-size:11.5px; cursor:pointer; display:flex; align-items:center; gap:5px; transition:all 0.2s;">
+                        <i class="fa-solid fa-sliders"></i> Tùy chỉnh chi tiết <i class="fa-solid fa-chevron-down" id="iconPauseChevron" style="font-size:10px; transition:transform 0.2s;"></i>
+                    </button>
+                </div>
+
+                <!-- Các Chế độ Phong Cách Đọc Nhanh (Presets) -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin-bottom:10px;">
+                    <button type="button" onclick="selectReadingPreset('podcast', this)" class="reading-preset-btn active" id="presetBtnPodcast">
+                        <div style="font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px;">
+                            <span>🎙️</span> Podcast / Tản Văn
+                        </div>
+                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 1.0s • Đoạn 1.8s</div>
+                    </button>
+
+                    <button type="button" onclick="selectReadingPreset('poetry', this)" class="reading-preset-btn" id="presetBtnPoetry">
+                        <div style="font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px;">
+                            <span>📜</span> Đọc Thơ / Vần Điệu
+                        </div>
+                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu thơ 0.9s • Khổ 2.2s</div>
+                    </button>
+
+                    <button type="button" onclick="selectReadingPreset('story', this)" class="reading-preset-btn" id="presetBtnStory">
+                        <div style="font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px;">
+                            <span>📖</span> Kể Chuyện / AudioBook
+                        </div>
+                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 0.8s • Đoạn 1.5s</div>
+                    </button>
+
+                    <button type="button" onclick="selectReadingPreset('standard', this)" class="reading-preset-btn" id="presetBtnStandard">
+                        <div style="font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px;">
+                            <span>⚡</span> Tiêu Chuẩn / Tin Tức
+                        </div>
+                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 0.4s • Đoạn 0.8s</div>
+                    </button>
+                </div>
+
+                <!-- Thanh chèn nhanh thẻ ngắt nghỉ tại con trỏ văn bản -->
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.1);">
+                    <div style="font-size:11.5px; color:#94a3b8; display:flex; align-items:center; gap:5px;">
+                        <i class="fa-solid fa-hourglass-half" style="color:#38bdf8;"></i> Chèn nhịp dừng cảm xúc tại con trỏ:
+                    </div>
+                    <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                        <button type="button" onclick="insertPauseTag('0.5')" class="btn-quick-pause" title="Chèn ngừng nghỉ 0.5 giây">+ Nghỉ 0.5s</button>
+                        <button type="button" onclick="insertPauseTag('1.0')" class="btn-quick-pause" title="Chèn ngừng nghỉ 1.0 giây">+ Nghỉ 1.0s</button>
+                        <button type="button" onclick="insertPauseTag('1.5')" class="btn-quick-pause" title="Chèn ngừng nghỉ 1.5 giây">+ Nghỉ 1.5s</button>
+                        <button type="button" onclick="insertPauseTag('2.0')" class="btn-quick-pause" title="Chèn ngừng nghỉ 2.0 giây">+ Nghỉ 2.0s</button>
+                        <button type="button" onclick="insertPauseTag('3.0')" class="btn-quick-pause" title="Chèn ngừng nghỉ 3.0 giây">+ Nghỉ 3.0s</button>
+                    </div>
+                </div>
+
+                <!-- Bảng Thanh Trượt Tùy Chỉnh Chi Tiết (Mặc định ẩn) -->
+                <div id="customPauseSliderPanel" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(0,0,0,0.2); border-radius:8px; padding:10px 12px;">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                        <!-- Slider 1: Hết câu (. ! ?) -->
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#cbd5e1; margin-bottom:4px;">
+                                <span>🕒 Nghỉ hết câu (Dấu chấm . ! ? …)</span>
+                                <strong id="valPauseSentence" style="color:#c084fc;">1.0s</strong>
+                            </div>
+                            <input type="range" id="sliderPauseSentence" min="100" max="3000" step="100" value="1000" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#c084fc; cursor:pointer;">
+                        </div>
+
+                        <!-- Slider 2: Hết khổ thơ / Đoạn văn (\n\n) -->
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#cbd5e1; margin-bottom:4px;">
+                                <span>📜 Nghỉ hết khổ thơ / Đoạn mới (\n\n)</span>
+                                <strong id="valPauseParagraph" style="color:#38bdf8;">1.8s</strong>
+                            </div>
+                            <input type="range" id="sliderPauseParagraph" min="300" max="4000" step="100" value="1800" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#38bdf8; cursor:pointer;">
+                        </div>
+
+                        <!-- Slider 3: Xuống dòng thơ (\n) -->
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#cbd5e1; margin-bottom:4px;">
+                                <span>✍️ Nghỉ giữa các dòng thơ (\n)</span>
+                                <strong id="valPauseLine" style="color:#34d399;">1.0s</strong>
+                            </div>
+                            <input type="range" id="sliderPauseLine" min="100" max="3000" step="100" value="1000" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#34d399; cursor:pointer;">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -2907,6 +3044,75 @@
             updateTextStats();
         }
 
+        // ── PODCAST & POETRY READING PRESETS & PAUSE ENGINE ──
+        let currentReadingMode = "podcast";
+        const READING_PRESETS = {
+            podcast: { sentence: 1000, paragraph: 1800, line: 1000 },
+            poetry: { sentence: 900, paragraph: 2200, line: 900 },
+            story: { sentence: 800, paragraph: 1500, line: 800 },
+            standard: { sentence: 400, paragraph: 800, line: 400 }
+        };
+
+        function selectReadingPreset(mode, btnEl) {
+            currentReadingMode = mode;
+            document.querySelectorAll(".reading-preset-btn").forEach(el => el.classList.remove("active"));
+            if (btnEl) btnEl.classList.add("active");
+
+            const p = READING_PRESETS[mode] || READING_PRESETS.podcast;
+            const sSent = document.getElementById("sliderPauseSentence");
+            const sPara = document.getElementById("sliderPauseParagraph");
+            const sLine = document.getElementById("sliderPauseLine");
+            if (sSent) sSent.value = p.sentence;
+            if (sPara) sPara.value = p.paragraph;
+            if (sLine) sLine.value = p.line;
+            updatePauseSliderLabels();
+        }
+
+        function updatePauseSliderLabels() {
+            const sSent = document.getElementById("sliderPauseSentence");
+            const sPara = document.getElementById("sliderPauseParagraph");
+            const sLine = document.getElementById("sliderPauseLine");
+            const vSent = document.getElementById("valPauseSentence");
+            const vPara = document.getElementById("valPauseParagraph");
+            const vLine = document.getElementById("valPauseLine");
+
+            if (sSent && vSent) vSent.innerText = (parseFloat(sSent.value) / 1000).toFixed(1) + "s";
+            if (sPara && vPara) vPara.innerText = (parseFloat(sPara.value) / 1000).toFixed(1) + "s";
+            if (sLine && vLine) vLine.innerText = (parseFloat(sLine.value) / 1000).toFixed(1) + "s";
+        }
+
+        function onCustomPauseSliderChange() {
+            updatePauseSliderLabels();
+            document.querySelectorAll(".reading-preset-btn").forEach(el => el.classList.remove("active"));
+            currentReadingMode = "custom";
+        }
+
+        function togglePauseCustomSettings() {
+            const panel = document.getElementById("customPauseSliderPanel");
+            const chevron = document.getElementById("iconPauseChevron");
+            if (!panel) return;
+            if (panel.style.display === "none" || !panel.style.display) {
+                panel.style.display = "block";
+                if (chevron) chevron.style.transform = "rotate(180deg)";
+            } else {
+                panel.style.display = "none";
+                if (chevron) chevron.style.transform = "rotate(0deg)";
+            }
+        }
+
+        function insertPauseTag(sec) {
+            const tag = ` [nghỉ ${sec}s] `;
+            const ta = document.getElementById("textInput");
+            if (!ta) return;
+            const start = ta.selectionStart !== undefined ? ta.selectionStart : ta.value.length;
+            const end = ta.selectionEnd !== undefined ? ta.selectionEnd : ta.value.length;
+            const text = ta.value;
+            ta.value = text.substring(0, start) + tag + text.substring(end);
+            ta.selectionStart = ta.selectionEnd = start + tag.length;
+            ta.focus();
+            updateTextStats();
+        }
+
         function autoScanAndApplyEmotions() {
             const ta = document.getElementById("textInput");
             let text = ta.value;
@@ -3357,6 +3563,11 @@
                         }).catch(() => {});
                     }
                 }
+                const pauseSentence = parseInt(document.getElementById("sliderPauseSentence")?.value || 1000);
+                const pauseParagraph = parseInt(document.getElementById("sliderPauseParagraph")?.value || 1800);
+                const pauseLine = parseInt(document.getElementById("sliderPauseLine")?.value || 1000);
+                const readingMode = currentReadingMode || "podcast";
+
                 const resp = await fetch("/api/generate_job", { 
                     method:"POST", 
                     headers:{"Content-Type":"application/json"}, 
@@ -3367,7 +3578,11 @@
                         rate, 
                         clone_max_chars: cloneCharLimit,
                         custom_audio_base64: customB64,
-                        voice_name: customName
+                        voice_name: customName,
+                        pause_sentence: pauseSentence,
+                        pause_paragraph: pauseParagraph,
+                        pause_line: pauseLine,
+                        reading_mode: readingMode
                     }) 
                 });
                 const data = await resp.json();
