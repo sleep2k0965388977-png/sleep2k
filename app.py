@@ -1224,7 +1224,8 @@ def normalize_text_input(text):
     # Expressive emotion tag natural prosody mapping
     text = text.replace("[cười]", " haha, ").replace("[cười nhẹ]", " hihi, ")
     text = text.replace("[thở dài]", " (thở dài), ").replace("[hắng giọng]", " ừm, ")
-    text = text.replace("[nghỉ 1s]", ". ").replace("[nghỉ]", ", ")
+    # Only replace plain [nghỉ] when not followed by number/seconds (e.g. [nghỉ 1s], [nghỉ 2s] are preserved for pause engine)
+    text = re.sub(r'\[nghỉ\](?!\s*\d)', ', ', text, flags=re.IGNORECASE)
 
     # Expand Vietnamese symbols & abbreviations to natural phonemes
     text = re.sub(r'(\d+)\s*%', r'\1 phần trăm', text)
@@ -1474,10 +1475,10 @@ def generate_silent_mp3_bytes(duration_ms=250):
         tmp_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
         tmp_path = Path(tmp_file.name)
         tmp_file.close()
-        dur_s = max(0.1, duration_ms / 1000.0)
+        dur_s = max(0.05, duration_ms / 1000.0)
         subprocess.run([
             FFMPEG_BIN, "-y",
-            "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono",
+            "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono",
             "-t", str(dur_s),
             "-c:a", "libmp3lame",
             "-b:a", "192k",
@@ -1489,6 +1490,113 @@ def generate_silent_mp3_bytes(duration_ms=250):
         return data
     except Exception:
         return b"\xff\xfb\x90d\x00\x00\x00\x00" * 30
+
+_SILENCE_CACHE = {}
+_SILENCE_CACHE_LOCK = threading.Lock()
+
+def get_cached_silent_mp3_bytes(duration_ms=400):
+    """Get or generate silent MP3 chunk with in-memory caching for microsecond pause delivery."""
+    duration_ms = max(50, int(round(duration_ms / 50.0) * 50))
+    with _SILENCE_CACHE_LOCK:
+        if duration_ms in _SILENCE_CACHE:
+            return _SILENCE_CACHE[duration_ms]
+    data = generate_silent_mp3_bytes(duration_ms)
+    with _SILENCE_CACHE_LOCK:
+        _SILENCE_CACHE[duration_ms] = data
+    return data
+
+def parse_pause_ms(tag_val):
+    """Parse pause tag arguments like '1.5s', '500ms', '2s', '2 giây' into milliseconds."""
+    tag_val = str(tag_val or "").strip().lower()
+    m = re.search(r'([0-9.]+)\s*(s|giây|ms)?', tag_val)
+    if not m:
+        return 1000
+    val = float(m.group(1))
+    unit = m.group(2) or 's'
+    if unit in ('s', 'giây'):
+        return int(val * 1000)
+    return int(val)
+
+def segment_text_with_pauses(text, pause_sentence_ms=400, pause_paragraph_ms=800, pause_line_ms=400, max_speech_chars=220):
+    """Segment text into ordered speech and pause segments for podcast, poetry, and storytelling natural prosody."""
+    if not text or not text.strip():
+        return []
+
+    # 1. Normalize line endings
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+
+    # 2. Extract explicit pause tags: [nghỉ 1.5s], [pause 2s], [ngắt 500ms], <break time="1s"/>
+    tag_pattern = r'\[(?:nghỉ|pause|ngắt)\s*([^\]]+)\]|<break\s+time=["\']([^"\']+)["\']\s*/?>'
+    def _tag_sub(m):
+        val = m.group(1) or m.group(2)
+        dur = parse_pause_ms(val)
+        return f"\n<<<PAUSE:{dur}>>>\n"
+
+    text = re.sub(tag_pattern, _tag_sub, text, flags=re.IGNORECASE)
+
+    # 3. Mark paragraph breaks (\n\n+) vs single line breaks (\n)
+    text = re.sub(r'\n\s*\n+', f'\n<<<PAUSE:{pause_paragraph_ms}>>>\n', text)
+    text = re.sub(r'\n', f'\n<<<PAUSE:{pause_line_ms}>>>\n', text)
+
+    # 4. Split by <<<PAUSE:X>>> tokens
+    tokens = re.split(r'(<<<PAUSE:\d+>>>)', text)
+
+    raw_items = []
+    for token in tokens:
+        token = token.strip()
+        if not token:
+            continue
+        p_match = re.match(r'<<<PAUSE:(\d+)>>>', token)
+        if p_match:
+            raw_items.append({"type": "silence", "duration_ms": int(p_match.group(1))})
+        else:
+            cleaned_token = normalize_text_input(token)
+            if not cleaned_token:
+                continue
+            sentences = re.split(r'([.!?…]+(?:\s+|$))', cleaned_token)
+            curr_sent = ""
+            for s in sentences:
+                if not s:
+                    continue
+                if re.match(r'^[.!?…]+', s.strip()):
+                    curr_sent += s
+                    if curr_sent.strip():
+                        raw_items.append({"type": "speech", "text": curr_sent.strip()})
+                        if pause_sentence_ms > 0:
+                            raw_items.append({"type": "silence", "duration_ms": pause_sentence_ms})
+                    curr_sent = ""
+                else:
+                    curr_sent += s
+            if curr_sent.strip():
+                raw_items.append({"type": "speech", "text": curr_sent.strip()})
+
+    # 5. Clean up, merge consecutive silences, and split oversized speech chunks
+    final_segments = []
+    accum_silence = 0
+    for item in raw_items:
+        if item["type"] == "silence":
+            accum_silence = max(accum_silence, item["duration_ms"])
+        else:
+            if accum_silence > 0:
+                final_segments.append({"type": "silence", "duration_ms": accum_silence})
+                accum_silence = 0
+
+            t_str = item["text"].strip()
+            if not t_str:
+                continue
+
+            if len(t_str) <= max_speech_chars:
+                final_segments.append({"type": "speech", "text": t_str})
+            else:
+                sub_chunks = split_text_into_chunks(t_str, max_chars=max_speech_chars)
+                for sc in sub_chunks:
+                    if sc.strip():
+                        final_segments.append({"type": "speech", "text": sc.strip()})
+
+    if accum_silence > 0:
+        final_segments.append({"type": "silence", "duration_ms": accum_silence})
+
+    return final_segments
 
 def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     """
@@ -1609,7 +1717,7 @@ def fetch_chunk_audio(idx, text_chunk, voice, resource_id, rate, lan="vi"):
     silence = generate_silent_mp3_bytes(300)
     return idx, silence, 300
 
-def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_size=240):
+def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_size=240, pause_sentence=400, pause_paragraph=800, pause_line=400, reading_mode="standard"):
     try:
         cleanup_all_temp_files()
 
@@ -1619,57 +1727,83 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_si
             chunk_max_chars = 220
         else:
             chunk_max_chars = 400
-        chunks = split_text_into_chunks(text, max_chars=chunk_max_chars)
-        total_chunks = len(chunks)
 
-        if total_chunks == 0:
+        # Natural pause-aware segmentation for podcast, poetry, and storytelling
+        segments = segment_text_with_pauses(
+            text,
+            pause_sentence_ms=pause_sentence,
+            pause_paragraph_ms=pause_paragraph,
+            pause_line_ms=pause_line,
+            max_speech_chars=chunk_max_chars
+        )
+        total_segments = len(segments)
+
+        if total_segments == 0:
             JOBS[job_id] = {"status": "error", "message": "Văn bản rỗng hoặc không hợp lệ."}
             save_atomic_checkpoint(job_id, JOBS[job_id])
             return
+
+        speech_indices = [i for i, s in enumerate(segments) if s["type"] == "speech"]
+        total_speech_chunks = len(speech_indices)
+
+        if total_speech_chunks == 0:
+            JOBS[job_id] = {"status": "error", "message": "Không tìm thấy nội dung văn bản để đọc."}
+            save_atomic_checkpoint(job_id, JOBS[job_id])
+            return
+
+        mode_label = "Podcast" if reading_mode == "podcast" else ("Đọc Thơ" if reading_mode == "poetry" else ("Kể Chuyện" if reading_mode == "story" else "Giọng Đọc"))
 
         JOBS[job_id] = {
             "status": "processing",
             "progress": 5,
             "started_at": time.time(),
             "last_active": time.time(),
-            "message": f"Đang khởi tạo {total_chunks} đoạn văn bản song song...",
-            "total_chunks": total_chunks,
+            "message": f"Đang khởi tạo {total_speech_chunks} đoạn văn bản ({mode_label})...",
+            "total_chunks": total_speech_chunks,
             "completed_chunks": 0,
             "result": None,
         }
         save_atomic_checkpoint(job_id, JOBS[job_id])
 
-        chunk_results = [None] * total_chunks
-        durations = [0] * total_chunks
-        completed_count = 0
+        chunk_results = [None] * total_segments
+        durations = [0] * total_segments
 
-        # Run chunk requests in parallel (3 workers for optimal throughput and zero delays)
+        # 1. Pre-fill silence segments instantly from high-speed in-memory cache
+        for i, s in enumerate(segments):
+            if s["type"] == "silence":
+                dur_ms = s["duration_ms"]
+                chunk_results[i] = get_cached_silent_mp3_bytes(dur_ms)
+                durations[i] = dur_ms
+
+        # 2. Synthesize speech segments in parallel (3 workers for optimal throughput)
+        completed_count = 0
         pool_workers = 3
         with ThreadPoolExecutor(max_workers=pool_workers) as executor:
-            futures = [
-                executor.submit(fetch_chunk_audio, i, chunk_text, voice, resource_id, rate, lan)
-                for i, chunk_text in enumerate(chunks)
-            ]
+            futures = {
+                executor.submit(fetch_chunk_audio, idx, segments[idx]["text"], voice, resource_id, rate, lan): idx
+                for idx in speech_indices
+            }
 
             for future in as_completed(futures):
-                idx, audio_data, duration_ms = future.result()
+                idx = futures[future]
+                _, audio_data, duration_ms = future.result()
                 if audio_data and len(audio_data) > 0:
                     chunk_results[idx] = audio_data
                     durations[idx] = duration_ms
                 else:
                     # Self-healing fallback: insert natural micro-pause to prevent job failure
-                    chunk_results[idx] = generate_silent_mp3_bytes(250)
+                    chunk_results[idx] = get_cached_silent_mp3_bytes(250)
                     durations[idx] = 250
 
                 completed_count += 1
-                progress_pct = int((completed_count / total_chunks) * 85) + 10
+                progress_pct = int((completed_count / max(1, total_speech_chunks)) * 85) + 10
                 JOBS[job_id]["progress"] = progress_pct
                 JOBS[job_id]["completed_chunks"] = completed_count
                 JOBS[job_id]["last_active"] = time.time()
                 if is_clone:
-                    JOBS[job_id]["message"] = f"Đang tạo giọng đọc Clone AI: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
+                    JOBS[job_id]["message"] = f"Đang tạo {mode_label} Clone AI: {completed_count}/{total_speech_chunks} đoạn ({progress_pct}%)..."
                 else:
-                    JOBS[job_id]["message"] = f"Đang tạo giọng đọc song song: {completed_count}/{total_chunks} đoạn ({progress_pct}%)..."
+                    JOBS[job_id]["message"] = f"Đang tạo {mode_label} song song: {completed_count}/{total_speech_chunks} đoạn ({progress_pct}%)..."
                 save_atomic_checkpoint(job_id, JOBS[job_id])
 
         JOBS[job_id]["progress"] = 96
@@ -1703,7 +1837,7 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_si
             "download_url": f"/output/{filename}",
             "duration_ms": total_duration_ms,
             "text_length": len(text),
-            "total_chunks": total_chunks,
+            "total_chunks": total_speech_chunks,
             "voice": voice
         }
         save_atomic_checkpoint(job_id, JOBS[job_id])
@@ -1826,10 +1960,15 @@ def get_voices():
 def generate_job():
     try:
         data = request.json or {}
-        text = normalize_text_input(data.get("text", ""))
+        text = (data.get("text") or "").strip()
         voice = data.get("voice", "BV421_vivn_streaming")
         resource_id = data.get("resource_id", None)
         rate = data.get("rate", "1.0")
+
+        pause_sentence = int(data.get("pause_sentence", 400))
+        pause_paragraph = int(data.get("pause_paragraph", 800))
+        pause_line = int(data.get("pause_line", 400))
+        reading_mode = str(data.get("reading_mode", "standard"))
 
         if not text:
             return jsonify({"status": "error", "message": "Vui lòng nhập văn bản cần đọc."}), 400
@@ -1861,7 +2000,7 @@ def generate_job():
 
         t = threading.Thread(
             target=run_with_queue,
-            args=(job_id, run_tts_job, text, voice, resource_id, rate, lan, clone_chunk_limit),
+            args=(job_id, run_tts_job, text, voice, resource_id, rate, lan, clone_chunk_limit, pause_sentence, pause_paragraph, pause_line, reading_mode),
             daemon=True
         )
         t.start()
