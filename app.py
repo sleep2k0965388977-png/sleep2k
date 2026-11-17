@@ -869,12 +869,30 @@ def get_nano_tts():
                         print(f"VieNeu {mode} init warning: {ex}")
     return _NANO_TTS_INSTANCE
 
+def apply_hann_smooth_envelope(wav_array, sample_rate=48000, fade_in_ms=25, fade_out_ms=45):
+    """Apply cosine-squared (Hann) acoustic envelope to eliminate harsh cuts, clicks, and abrupt stops."""
+    try:
+        import numpy as np
+        wav = np.array(wav_array, dtype=np.float32, copy=True)
+        in_samples = int(fade_in_ms * sample_rate / 1000)
+        out_samples = int(fade_out_ms * sample_rate / 1000)
+        if len(wav) > in_samples + out_samples:
+            t_in = np.linspace(0, np.pi / 2, in_samples)
+            wav[:in_samples] *= (np.sin(t_in) ** 2)
+            t_out = np.linspace(0, np.pi / 2, out_samples)
+            wav[-out_samples:] *= (np.cos(t_out) ** 2)
+        return wav
+    except Exception:
+        return wav_array
+
 def wav_to_mp3_bytes(wav_array, sample_rate=24000):
-    """Convert float32/int16 waveform array to standard high-quality MP3 bytes using FFmpeg."""
+    """Convert float32/int16 waveform array to standard high-quality MP3 bytes with silky-smooth acoustic envelope."""
     temp_wav = OUTPUT_DIR / f"nano_tmp_{uuid.uuid4().hex[:8]}.wav"
     temp_mp3 = OUTPUT_DIR / f"nano_tmp_{uuid.uuid4().hex[:8]}.mp3"
     try:
-        sf.write(str(temp_wav), wav_array, sample_rate, format='WAV')
+        # Smooth speech boundaries with 25ms attack and 45ms release envelope to prevent abrupt cutoffs
+        smooth_wav = apply_hann_smooth_envelope(wav_array, sample_rate=sample_rate, fade_in_ms=25, fade_out_ms=45)
+        sf.write(str(temp_wav), smooth_wav, sample_rate, format='WAV')
         subprocess.run([
             FFMPEG_BIN, "-y", "-i", str(temp_wav),
             "-codec:a", "libmp3lame", "-b:a", "192k",
@@ -1470,20 +1488,36 @@ def stitch_audio_chunks(chunk_bytes_list, output_file_path):
         return False
 
 def generate_silent_mp3_bytes(duration_ms=250):
-    """Generate a brief silent MP3 chunk to guarantee zero-crash execution under all network conditions."""
+    """
+    Generate a gentle natural room-tone MP3 pause with smooth Hann fades.
+    Eliminates harsh zero-amplitude dropouts, pops, and vacuum silence between sentences.
+    """
     try:
         tmp_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
         tmp_path = Path(tmp_file.name)
         tmp_file.close()
         dur_s = max(0.05, duration_ms / 1000.0)
-        subprocess.run([
+        fade_s = min(0.035, dur_s / 3.0)
+        fade_out_st = max(0.0, dur_s - fade_s)
+        # Gentle natural pink presence (-72dB) with Hann smooth fades: sounds like natural breathing room air
+        cmd = [
             FFMPEG_BIN, "-y",
-            "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono",
-            "-t", str(dur_s),
+            "-f", "lavfi",
+            "-i", f"anoisesrc=d={dur_s:.3f}:c=pink:r=48000:a=0.0002,lowpass=f=800,afade=t=in:d={fade_s:.3f},afade=t=out:st={fade_out_st:.3f}:d={fade_s:.3f}",
             "-c:a", "libmp3lame",
             "-b:a", "192k",
             str(tmp_path)
-        ], capture_output=True, timeout=10)
+        ]
+        proc = subprocess.run(cmd, capture_output=True, timeout=10)
+        if proc.returncode != 0:
+            subprocess.run([
+                FFMPEG_BIN, "-y",
+                "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono",
+                "-t", str(dur_s),
+                "-c:a", "libmp3lame",
+                "-b:a", "192k",
+                str(tmp_path)
+            ], capture_output=True, timeout=10)
         with open(tmp_path, "rb") as f:
             data = f.read()
         tmp_path.unlink(missing_ok=True)
@@ -1722,9 +1756,12 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_si
         cleanup_all_temp_files()
 
         is_clone = is_clone_voice(voice)
-        # CapCut BigTTS voices (multi_female/multi_male) & Clone voices require <= 220 chars to prevent SAMI empty response (err_code 231048)
-        if str(voice).startswith("multi_") or is_clone:
+        # CapCut BigTTS voices (multi_female/multi_male) require <= 220 chars to prevent SAMI empty response (err_code 231048)
+        # Clone voices (VieNeu/Worker) & Edge-TTS voices handle 380 chars smoothly, preserving natural comma prosody and breathing!
+        if str(voice).startswith("multi_"):
             chunk_max_chars = 220
+        elif is_clone:
+            chunk_max_chars = 380
         else:
             chunk_max_chars = 400
 
