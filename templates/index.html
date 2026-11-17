@@ -1709,28 +1709,28 @@
                         <div style="font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px;">
                             <span>🎙️</span> Podcast / Tản Văn
                         </div>
-                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 1.0s • Đoạn 1.8s</div>
+                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 0.5s • Đoạn 1.4s (Êm ái)</div>
                     </button>
 
                     <button type="button" onclick="selectReadingPreset('poetry', this)" class="reading-preset-btn" id="presetBtnPoetry">
                         <div style="font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px;">
                             <span>📜</span> Đọc Thơ / Vần Điệu
                         </div>
-                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu thơ 0.9s • Khổ 2.2s</div>
+                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu thơ 0.7s • Khổ 1.6s</div>
                     </button>
 
                     <button type="button" onclick="selectReadingPreset('story', this)" class="reading-preset-btn" id="presetBtnStory">
                         <div style="font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px;">
                             <span>📖</span> Kể Chuyện / AudioBook
                         </div>
-                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 0.8s • Đoạn 1.5s</div>
+                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 0.5s • Đoạn 1.2s</div>
                     </button>
 
                     <button type="button" onclick="selectReadingPreset('standard', this)" class="reading-preset-btn" id="presetBtnStandard">
                         <div style="font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:6px;">
                             <span>⚡</span> Tiêu Chuẩn / Tin Tức
                         </div>
-                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 0.4s • Đoạn 0.8s</div>
+                        <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">Nghỉ câu 0.3s • Đoạn 0.6s (Nhanh)</div>
                     </button>
                 </div>
 
@@ -1740,42 +1740,46 @@
                         <i class="fa-solid fa-hourglass-half" style="color:#38bdf8;"></i> Chèn nhịp dừng cảm xúc tại con trỏ:
                     </div>
                     <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                        <button type="button" onclick="insertPauseTag('0.3')" class="btn-quick-pause" title="Chèn ngừng nghỉ 0.3 giây">+ Nghỉ 0.3s (Nhẹ)</button>
                         <button type="button" onclick="insertPauseTag('0.5')" class="btn-quick-pause" title="Chèn ngừng nghỉ 0.5 giây">+ Nghỉ 0.5s</button>
                         <button type="button" onclick="insertPauseTag('1.0')" class="btn-quick-pause" title="Chèn ngừng nghỉ 1.0 giây">+ Nghỉ 1.0s</button>
                         <button type="button" onclick="insertPauseTag('1.5')" class="btn-quick-pause" title="Chèn ngừng nghỉ 1.5 giây">+ Nghỉ 1.5s</button>
                         <button type="button" onclick="insertPauseTag('2.0')" class="btn-quick-pause" title="Chèn ngừng nghỉ 2.0 giây">+ Nghỉ 2.0s</button>
-                        <button type="button" onclick="insertPauseTag('3.0')" class="btn-quick-pause" title="Chèn ngừng nghỉ 3.0 giây">+ Nghỉ 3.0s</button>
                     </div>
                 </div>
 
                 <!-- Bảng Thanh Trượt Tùy Chỉnh Chi Tiết (Mặc định ẩn) -->
-                <div id="customPauseSliderPanel" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(0,0,0,0.2); border-radius:8px; padding:10px 12px;">
+                <div id="customPauseSliderPanel" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(0,0,0,0.25); border-radius:8px; padding:10px 12px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:6px 10px; background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.2); border-radius:6px; font-size:11.5px; color:#7dd3fc;">
+                        <i class="fa-solid fa-feather-pointed" style="color:#38bdf8;"></i>
+                        <span><strong>Công nghệ Vuốt Âm Hann (40ms):</strong> Đã bật tự động làm mềm đuôi câu và nhịp thở, không bao giờ bị cắt cụt hay dừng giật cục!</span>
+                    </div>
                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
                         <!-- Slider 1: Hết câu (. ! ?) -->
                         <div>
                             <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#cbd5e1; margin-bottom:4px;">
                                 <span>🕒 Nghỉ hết câu (Dấu chấm . ! ? …)</span>
-                                <strong id="valPauseSentence" style="color:#c084fc;">1.0s</strong>
+                                <strong id="valPauseSentence" style="color:#c084fc;">0.5s</strong>
                             </div>
-                            <input type="range" id="sliderPauseSentence" min="100" max="3000" step="100" value="1000" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#c084fc; cursor:pointer;">
+                            <input type="range" id="sliderPauseSentence" min="100" max="3000" step="50" value="500" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#c084fc; cursor:pointer;">
                         </div>
 
                         <!-- Slider 2: Hết khổ thơ / Đoạn văn (\n\n) -->
                         <div>
                             <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#cbd5e1; margin-bottom:4px;">
                                 <span>📜 Nghỉ hết khổ thơ / Đoạn mới (\n\n)</span>
-                                <strong id="valPauseParagraph" style="color:#38bdf8;">1.8s</strong>
+                                <strong id="valPauseParagraph" style="color:#38bdf8;">1.4s</strong>
                             </div>
-                            <input type="range" id="sliderPauseParagraph" min="300" max="4000" step="100" value="1800" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#38bdf8; cursor:pointer;">
+                            <input type="range" id="sliderPauseParagraph" min="300" max="4000" step="100" value="1400" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#38bdf8; cursor:pointer;">
                         </div>
 
                         <!-- Slider 3: Xuống dòng thơ (\n) -->
                         <div>
                             <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#cbd5e1; margin-bottom:4px;">
                                 <span>✍️ Nghỉ giữa các dòng thơ (\n)</span>
-                                <strong id="valPauseLine" style="color:#34d399;">1.0s</strong>
+                                <strong id="valPauseLine" style="color:#34d399;">0.6s</strong>
                             </div>
-                            <input type="range" id="sliderPauseLine" min="100" max="3000" step="100" value="1000" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#34d399; cursor:pointer;">
+                            <input type="range" id="sliderPauseLine" min="100" max="3000" step="50" value="600" oninput="onCustomPauseSliderChange()" style="width:100%; accent-color:#34d399; cursor:pointer;">
                         </div>
                     </div>
                 </div>
@@ -3047,10 +3051,10 @@
         // ── PODCAST & POETRY READING PRESETS & PAUSE ENGINE ──
         let currentReadingMode = "podcast";
         const READING_PRESETS = {
-            podcast: { sentence: 1000, paragraph: 1800, line: 1000 },
-            poetry: { sentence: 900, paragraph: 2200, line: 900 },
-            story: { sentence: 800, paragraph: 1500, line: 800 },
-            standard: { sentence: 400, paragraph: 800, line: 400 }
+            podcast: { sentence: 500, paragraph: 1400, line: 600 },
+            poetry: { sentence: 600, paragraph: 1600, line: 700 },
+            story: { sentence: 450, paragraph: 1200, line: 500 },
+            standard: { sentence: 250, paragraph: 600, line: 300 }
         };
 
         function selectReadingPreset(mode, btnEl) {
