@@ -29,3 +29,8 @@
 7. **Autonomous Error Auto-Repair:**
    - Whenever any error, freeze, or unexpected behavior is reported or suspected, the agent MUST immediately invoke the self-healing skill and run `python .agents/skills/sleep2k-troubleshooting/scripts/auto_heal.py --sync` to autonomously diagnose, repair, and deploy the fix.
 
+8. **Acoustic Smoothing, Cadence & Outro Decrescendo:**
+   - Every audio synthesis must apply a 25ms attack and 65ms release Hann envelope (`apply_hann_smooth_envelope`) to prevent harsh phoneme stops and nasal clicks.
+   - Sentences ending in introspective/questioning level tones (`lắm không`, `được không`, `sao`, `chưa`, `nhỉ`...) must automatically be smoothed into gentle cadential trail-off (`...`).
+   - Every assembled audio track must append an 800ms room comfort outro tail (`get_cached_silent_mp3_bytes(800)`) so the player ends smoothly without clipping the final syllable.
+
