@@ -869,8 +869,11 @@ def get_nano_tts():
                         print(f"VieNeu {mode} init warning: {ex}")
     return _NANO_TTS_INSTANCE
 
-def apply_hann_smooth_envelope(wav_array, sample_rate=48000, fade_in_ms=25, fade_out_ms=45):
-    """Apply cosine-squared (Hann) acoustic envelope to eliminate harsh cuts, clicks, and abrupt stops."""
+def apply_hann_smooth_envelope(wav_array, sample_rate=48000, fade_in_ms=25, fade_out_ms=65):
+    """
+    Apply cosine-squared (Hann) & gentle acoustic decay envelope.
+    Softens harsh consonants, nasal endings (ng, m, n), and creates a natural falling breath release.
+    """
     try:
         import numpy as np
         wav = np.array(wav_array, dtype=np.float32, copy=True)
@@ -1270,6 +1273,14 @@ def normalize_text_input(text):
     text = re.sub(r'\.{4,}', '...', text)
     text = re.sub(r'\?{2,}', '?', text)
     text = re.sub(r'!{2,}', '!', text)
+
+    # 🌟 TOÀN DIỆN: Tự động uốn ngữ điệu câu hỏi, câu tâm sự & làm mềm hạ giọng đuôi câu 🌟
+    # 1. Các câu kết thúc bằng từ hỏi han / cảm xúc có thanh ngang hoặc thanh sắc (lắm không, được không, ổn không, sao, chưa, hả, nhỉ...)
+    # Tự động chuyển dấu chấm cụt cứng thành dấu ba chấm '...' để AI tự động kéo dài âm, hạ cao độ và thở nhẹ ra êm ái!
+    introspective_pattern = r'(\b(?:lắm\s+không|được\s+không|phải\s+không|đúng\s+không|ổn\s+không|có\s+không|sao|chưa|hả|nhỉ|thế\s+nhỉ|chăng|đâu\s+nhỉ))\s*\.(?=\s|$)'
+    text = re.sub(introspective_pattern, r'\1...', text, flags=re.IGNORECASE)
+    # 2. Xử lý các từ nghi vấn đứng cuối với dấu hỏi: bổ sung khoảng đệm hơi thở tự nhiên
+    text = re.sub(r'(\b(?:không|chưa|sao|nhỉ))\s*\?+(?=\s|$)', r'\1?...', text, flags=re.IGNORECASE)
     text = "".join(ch for ch in text if ch in ('\n', '\t') or ord(ch) >= 32)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
@@ -1854,9 +1865,9 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_si
             save_atomic_checkpoint(job_id, JOBS[job_id])
             return
 
-        # Append a gentle outro decay tail (600ms) so the final sentence breathes out naturally and never cuts off abruptly
-        valid_bytes.append(get_cached_silent_mp3_bytes(600))
-        durations.append(600)
+        # Append a gentle outro decay tail (800ms) so the final sentence breathes out naturally and never cuts off abruptly
+        valid_bytes.append(get_cached_silent_mp3_bytes(800))
+        durations.append(800)
 
         total_duration_ms = sum(durations)
         filename = f"tts_{job_id}_{int(time.time())}.mp3"
