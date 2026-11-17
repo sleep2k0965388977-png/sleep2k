@@ -1854,6 +1854,10 @@ def run_tts_job(job_id, text, voice, resource_id, rate, lan="vi", clone_chunk_si
             save_atomic_checkpoint(job_id, JOBS[job_id])
             return
 
+        # Append a gentle outro decay tail (600ms) so the final sentence breathes out naturally and never cuts off abruptly
+        valid_bytes.append(get_cached_silent_mp3_bytes(600))
+        durations.append(600)
+
         total_duration_ms = sum(durations)
         filename = f"tts_{job_id}_{int(time.time())}.mp3"
         local_path = OUTPUT_DIR / filename
