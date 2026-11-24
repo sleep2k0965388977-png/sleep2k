@@ -5703,13 +5703,11 @@
         }
 
         function clearDownloadedHistory() {
-            if (confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử đánh dấu đã tải? (Các video cũ sẽ hiển thị lại trạng thái Chờ tải)")) {
-                localStorage.removeItem("sleep2k_downloaded_videos");
-                updateHistoryCountBadge();
-                renderVideoGrid();
-                updateStatsBadges();
-                showToast("Đã xóa lịch sử đánh dấu tải!", "success");
-            }
+            localStorage.removeItem("sleep2k_downloaded_videos");
+            updateHistoryCountBadge();
+            renderVideoGrid();
+            updateStatsBadges();
+            showToast("Đã xóa lịch sử! Tất cả video đã sẵn sàng tải lại.", "success");
         }
 
         // Bắt đầu Quét Kênh
@@ -6116,8 +6114,18 @@ function renderVideoGrid() {
             });
 
             if (bulkQueue.length === 0) {
-                showToast("Tất cả video đã được tải về máy trước đó! (Bấm 'Xóa Lịch Sử Đã Tải' nếu muốn tải lại)", "info");
-                return;
+                // Toàn bộ video trong danh sách quét đã bị đánh dấu là đã tải trước đó
+                const reDownload = confirm(
+                    `Toàn bộ ${dlScannedVideos.length} video trong danh sách đang được đánh dấu đã tải.\n\n` +
+                    `Bạn có muốn TẢI LẠI TOÀN BỘ ${dlScannedVideos.length} video này vào máy không?`
+                );
+                if (reDownload) {
+                    clearDownloadedHistory();
+                    bulkQueue = [...dlScannedVideos];
+                } else {
+                    showToast("Tất cả video đã được tải về máy trước đó! (Bỏ tick ô 'Tự động bỏ qua video đã tải' để tải lại)", "info");
+                    return;
+                }
             }
 
             // Gợi ý chọn thư mục lưu trực tiếp nếu trình duyệt hỗ trợ để không bị Chrome chặn tải nhiều file
