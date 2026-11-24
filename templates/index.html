@@ -3033,9 +3033,18 @@
             if (typeof updateCloneLimitState === 'function') {
                 updateCloneLimitState();
             }
+            try {
+                if (text && text.trim().length > 0) {
+                    localStorage.setItem('sleep2k_saved_draft_text', text);
+                }
+            } catch(e) {}
         }
 
-        function clearText() { document.getElementById("textInput").value = ""; updateTextStats(); }
+        function clearText() {
+            document.getElementById("textInput").value = "";
+            try { localStorage.removeItem('sleep2k_saved_draft_text'); } catch(e) {}
+            updateTextStats();
+        }
 
         function insertEmotionCue(cue) {
             const ta = document.getElementById("textInput");
@@ -3701,7 +3710,15 @@
             }, 400);
         });
 
-        fetchVoices(); updateTextStats();
+        fetchVoices(); 
+        try {
+            const savedDraft = localStorage.getItem('sleep2k_saved_draft_text');
+            const ta = document.getElementById("textInput");
+            if (savedDraft && ta && !ta.value.trim()) {
+                ta.value = savedDraft;
+            }
+        } catch(e) {}
+        updateTextStats();
     
         // ── Main Mode Switcher (TTS vs STT) ──
         
