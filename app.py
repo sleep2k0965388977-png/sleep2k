@@ -477,6 +477,8 @@ def vieneu_synthesize_audio(text, voice_type, rate="1.0"):
     return capcut_synthesize_fallback(clean_text, is_male=is_male, rate=rate)
 
 app = Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.jinja_env.auto_reload = True
 
 @app.after_request
 def add_header(response):
