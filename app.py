@@ -677,17 +677,9 @@ CLONE_API_KEY = os.environ.get("CLONE_API_KEY", "sleep2k_clone_2024")
 TEMP_CUSTOM_VOICES = {}  # {voice_type: voice_entry}
 
 def auto_clean_stale_custom_voices():
-    """Automatically delete temporary voice recordings older than 1 hour to prevent disk bloat."""
-    now = time.time()
-    for vid, v in list(TEMP_CUSTOM_VOICES.items()):
-        if now - v.get("created_at", now) > 3600:
-            delete_custom_voice_entry(vid)
-    try:
-        for p in CUSTOM_VOICES_DIR.glob("clone_*.*"):
-            if now - p.stat().st_mtime > 3600:
-                p.unlink(missing_ok=True)
-    except Exception:
-        pass
+    """Preserve all custom clone voices permanently on local machine."""
+    # Do not auto-delete user clone voices on local machine
+    pass
 
 def get_clone_worker_url():
     """Retrieve the AI Clone Worker URL from environment or persistent config file."""
@@ -750,19 +742,23 @@ def set_youtube_cookies(content):
 
 
 def load_custom_voices(session_id=None):
-    """Load temporary custom voices for the active browser session only."""
+    """Load custom cloned voices. On local, all saved voices are permanently loaded."""
     auto_clean_stale_custom_voices()
-    if not session_id:
-        return []
     try:
         for p in CUSTOM_VOICES_DIR.glob("clone_*.json"):
             vid = p.stem
-            if vid not in TEMP_CUSTOM_VOICES:
+            try:
                 with open(p, "r", encoding="utf-8") as f:
                     TEMP_CUSTOM_VOICES[vid] = json.load(f)
+            except Exception:
+                pass
     except Exception:
         pass
-    return [v for v in TEMP_CUSTOM_VOICES.values() if v.get("session_id") == session_id]
+    if session_id:
+        matched = [v for v in TEMP_CUSTOM_VOICES.values() if v.get("session_id") == session_id or v.get("session_id") == "permanent_local"]
+        if matched:
+            return matched
+    return list(TEMP_CUSTOM_VOICES.values())
 
 def get_all_custom_voices(session_id=None):
     """Retrieve all active temporary custom voices across all sessions or for a specific session."""
@@ -1144,11 +1140,10 @@ def load_voices(session_id=None):
     voices = []
     # 0. High Quality Real Human Studio Preset Voices (Always available, top priority)
     voices.extend(STUDIO_PRESET_VOICES)
-    # 1. Temporary Custom Cloned Voices for this browser session only!
-    if session_id:
-        custom_v = load_custom_voices(session_id=session_id)
-        if custom_v:
-            voices.extend(custom_v)
+    # 1. Custom Cloned Voices (Always loaded on Local so user never loses their cloned voices)
+    custom_v = load_custom_voices(session_id=session_id)
+    if custom_v:
+        voices.extend(custom_v)
     # 2. Preset voices
     if VOICE_JSON_PATH.exists():
         with open(VOICE_JSON_PATH, "r", encoding="utf-8") as f:
@@ -1368,8 +1363,8 @@ def split_text_into_chunks(text, max_chars=450):
     return final_chunks if final_chunks else [text]
 
 
-def cleanup_all_temp_files(max_age_seconds=600):
-    """Auto-delete generated audio older than 10 minutes and purge any leftover uploads to guarantee Zero-Storage footprint."""
+def cleanup_all_temp_files(max_age_seconds=86400 * 7):
+    """Clean up temp files older than 7 days on local to preserve recent user audio history."""
     now = time.time()
     for p in OUTPUT_DIR.glob("tts_*.mp3"):
         try:
@@ -2851,14 +2846,8 @@ def upload_custom_voice():
 
 @app.route("/api/cleanup_session_voices", methods=["GET", "POST"])
 def cleanup_session_voices():
-    """Clean up all temporary voice recordings when user closes browser tab / Google Chrome."""
-    session_id = request.args.get("session_id") or (request.json or {}).get("session_id") or request.form.get("session_id")
-    if not session_id:
-        return jsonify({"status": "ignored"}), 200
-    to_delete = [vid for vid, v in list(TEMP_CUSTOM_VOICES.items()) if v.get("session_id") == session_id]
-    for vid in to_delete:
-        delete_custom_voice_entry(vid)
-    return jsonify({"status": "success", "deleted_count": len(to_delete)}), 200
+    """Preserve custom voices on local machine across browser restarts."""
+    return jsonify({"status": "preserved", "message": "Voices preserved on local machine"}), 200
 
 @app.route("/api/delete_custom_voice/<voice_id>", methods=["POST", "DELETE"])
 def delete_custom_voice(voice_id):
