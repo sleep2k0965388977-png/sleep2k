@@ -2198,9 +2198,12 @@
                         <i class="fa-solid fa-sliders" style="color:var(--accent-purple);"></i>
                         <span>Bảng Điều Khiển & Tiến Độ Tải Tuần Tự</span>
                     </div>
-                    <div style="display:flex; gap:8px;">
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <button class="dl-btn dl-btn-success" id="btnStartBulk" onclick="startBulkDownload()">
                             <i class="fa-solid fa-play"></i> Bắt Đầu Tải Tuần Tự
+                        </button>
+                        <button class="dl-btn" id="btnSelectFolder" onclick="selectDownloadFolder()" style="background:rgba(59,130,246,0.18); border:1px solid rgba(59,130,246,0.4); color:#93c5fd;" title="Chọn thư mục trên máy để video tự lưu thẳng vào ổ đĩa, 100% không bị Chrome chặn tải nhiều file!">
+                            <i class="fa-solid fa-folder-open"></i> <span id="btnSelectFolderText">Chọn Thư Mục Lưu Trực Tiếp</span>
                         </button>
                         <button class="dl-btn dl-btn-warning" id="btnPauseBulk" onclick="pauseBulkDownload()" style="display:none;">
                             <i class="fa-solid fa-pause"></i> Tạm Dừng
@@ -2235,12 +2238,14 @@
                 </div>
 
                 <!-- Thông báo hướng dẫn lưu file và cấp quyền tải nhiều tệp -->
-                <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:10px; padding:10px 14px; margin-top:14px; font-size:12.5px; color:#cbd5e1; line-height:1.6; display:flex; align-items:flex-start; gap:10px;">
+                <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:10px; padding:12px 14px; margin-top:14px; font-size:12.5px; color:#cbd5e1; line-height:1.6; display:flex; align-items:flex-start; gap:10px;">
                     <i class="fa-solid fa-circle-info" style="color:#60a5fa; font-size:16px; margin-top:2px;"></i>
                     <div>
-                        <strong style="color:#93c5fd;">Cơ chế tải về máy tính:</strong> Trình duyệt sẽ tải từng video (hiển thị % trên thanh tiến độ). Khi video đạt 100%, trình duyệt sẽ <strong>tự động lưu vào thư mục Downloads</strong> của máy tính.
+                        <strong style="color:#93c5fd;">Cơ chế tải về máy tính:</strong> Trình duyệt sẽ tải từng video (hiển thị % trên thanh tiến độ). Khi video đạt 100%, video sẽ tự động lưu vào máy tính.
                         <br>
-                        <span style="color:#fcd34d;">⚠️ <strong>Lưu ý:</strong> Nếu trình duyệt Chrome / Edge hỏi <strong>"Cho phép tải nhiều tệp" (Allow multiple downloads)</strong>, bạn hãy bấm <strong>"Cho phép" (Allow)</strong> để máy tự động lưu video liên tục mà không bị chặn!</span>
+                        <span style="color:#34d399;">💡 <strong>Khuyên dùng:</strong> Bấm nút <strong>"Chọn Thư Mục Lưu Trực Tiếp"</strong> ở trên để video tự động ghi thẳng vào ổ đĩa máy tính (100% không bao giờ bị Chrome chặn tải nhiều file).</span>
+                        <br>
+                        <span style="color:#fcd34d;">⚠️ <strong>Nếu chỉ thấy tải đúng 1 video đầu tiên:</strong> Do Chrome mặc định chặn tải nhiều file tự động. Bạn hãy bấm vào <strong>biểu tượng cài đặt / ổ khóa</strong> ở đầu thanh URL trình duyệt Chrome &rarr; tìm mục <strong>"Tệp tải xuống tự động" (Automatic downloads)</strong> &rarr; chọn <strong>"Cho phép" (Allow)</strong>. Sau đó bấm nút <strong>"Xóa Lịch Sử Đã Tải"</strong> rồi bấm tải lại!</span>
                     </div>
                 </div>
             </div>
@@ -5644,6 +5649,33 @@
         let isBulkPaused = false;
         let bulkQueue = [];
         let currentQueueIndex = 0;
+        let bulkDirectoryHandle = null;
+
+        // Cho phép người dùng chọn thư mục lưu trực tiếp trên máy tính (File System Access API)
+        async function selectDownloadFolder() {
+            if (!('showDirectoryPicker' in window)) {
+                showToast("Trình duyệt này không hỗ trợ chọn thư mục trực tiếp. File sẽ được lưu tự động vào thư mục Downloads của máy tính.", "info");
+                return;
+            }
+            try {
+                bulkDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                const folderName = bulkDirectoryHandle.name || "Thư mục đã chọn";
+                const btnText = document.getElementById("btnSelectFolderText");
+                if (btnText) btnText.innerHTML = `Đang lưu vào: <strong>${folderName}</strong>`;
+                const btn = document.getElementById("btnSelectFolder");
+                if (btn) {
+                    btn.style.background = "rgba(16,185,129,0.25)";
+                    btn.style.borderColor = "rgba(16,185,129,0.6)";
+                    btn.style.color = "#6ee7b7";
+                }
+                showToast(`Đã chọn thư mục "${folderName}". Tất cả video sẽ được ghi thẳng vào máy tính mà không sợ Chrome chặn!`, "success");
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error("Lỗi chọn thư mục:", err);
+                    showToast("Không thể chọn thư mục: " + err.message, "error");
+                }
+            }
+        }
 
         // Quản lý lịch sử đã tải qua LocalStorage
         function getDownloadedVideoSet() {
@@ -6031,8 +6063,20 @@ function renderVideoGrid() {
             }
 
             const blob = new Blob(chunks, { type: "video/mp4" });
-            const blobUrl = URL.createObjectURL(blob);
 
+            if (bulkDirectoryHandle) {
+                try {
+                    const fileHandle = await bulkDirectoryHandle.getFileHandle(filename, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                    return true;
+                } catch (fsErr) {
+                    console.warn("Lỗi ghi file qua File System API, chuyển sang tải thông thường:", fsErr);
+                }
+            }
+
+            const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = blobUrl;
             a.download = filename;
@@ -6072,8 +6116,34 @@ function renderVideoGrid() {
             });
 
             if (bulkQueue.length === 0) {
-                showToast("Tất cả video đã được tải về máy trước đó!", "info");
+                showToast("Tất cả video đã được tải về máy trước đó! (Bấm 'Xóa Lịch Sử Đã Tải' nếu muốn tải lại)", "info");
                 return;
+            }
+
+            // Gợi ý chọn thư mục lưu trực tiếp nếu trình duyệt hỗ trợ để không bị Chrome chặn tải nhiều file
+            if (!bulkDirectoryHandle && ('showDirectoryPicker' in window) && bulkQueue.length > 1) {
+                const wantFolder = confirm(
+                    `Bạn chuẩn bị tải ${bulkQueue.length} video.\n\n` +
+                    `💡 Để Chrome KHÔNG CHẶN tải từ video thứ 2 trở đi, bạn có muốn chọn một thư mục trên máy (VD: Downloads hoặc ổ D/E) để lưu thẳng vào đó không?\n\n` +
+                    `- Bấm [OK] để chọn thư mục lưu (Khuyên dùng - 100% không bị chặn).\n` +
+                    `- Bấm [Cancel] để tải mặc định qua trình duyệt (Lưu ý bấm "Cho phép" trên thanh địa chỉ Chrome).`
+                );
+                if (wantFolder) {
+                    try {
+                        bulkDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                        const folderName = bulkDirectoryHandle.name || "Thư mục đã chọn";
+                        const btnText = document.getElementById("btnSelectFolderText");
+                        if (btnText) btnText.innerHTML = `Đang lưu vào: <strong>${folderName}</strong>`;
+                        const btn = document.getElementById("btnSelectFolder");
+                        if (btn) {
+                            btn.style.background = "rgba(16,185,129,0.25)";
+                            btn.style.borderColor = "rgba(16,185,129,0.6)";
+                            btn.style.color = "#6ee7b7";
+                        }
+                    } catch (e) {
+                        // Người dùng hủy chọn thư mục, tiếp tục tải thường
+                    }
+                }
             }
 
             isBulkDownloading = true;
